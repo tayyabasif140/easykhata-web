@@ -24,24 +24,37 @@ const Index = () => {
     },
   ];
 
+  const totalPaidInvoices = 85000;
+  const totalUnpaidInvoices = 12500;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="mt-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-6 rounded-lg bg-primary/5 border border-primary/10">
                 <h3 className="text-lg font-semibold text-gray-900">Balance</h3>
                 <p className="text-3xl font-bold text-primary mt-2">
-                  Rs.73,500
+                  Rs.{(totalPaidInvoices - totalUnpaidInvoices).toLocaleString()}
                 </p>
               </div>
-              <div className="p-6 rounded-lg bg-secondary/5 border border-secondary/10">
+              <div className="p-6 rounded-lg bg-green-50 border border-green-100">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Total Transactions
+                  Paid Invoices
                 </h3>
-                <p className="text-3xl font-bold text-secondary mt-2">21</p>
+                <p className="text-3xl font-bold text-green-600 mt-2">
+                  Rs.{totalPaidInvoices.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-6 rounded-lg bg-red-50 border border-red-100">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Unpaid Invoices
+                </h3>
+                <p className="text-3xl font-bold text-red-600 mt-2">
+                  Rs.{totalUnpaidInvoices.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
