@@ -1,6 +1,7 @@
 
 import { Header } from "@/components/Header";
 import { TransactionCard } from "@/components/TransactionCard";
+import { FileText, ChartBar, Package } from "lucide-react";
 
 const Index = () => {
   const recentTransactions = [
@@ -33,13 +34,7 @@ const Index = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="mt-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-lg bg-primary/5 border border-primary/10">
-                <h3 className="text-lg font-semibold text-gray-900">Balance</h3>
-                <p className="text-3xl font-bold text-primary mt-2">
-                  Rs.{(totalPaidInvoices - totalUnpaidInvoices).toLocaleString()}
-                </p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-6 rounded-lg bg-green-50 border border-green-100">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Paid Invoices
@@ -56,6 +51,33 @@ const Index = () => {
                   Rs.{totalUnpaidInvoices.toLocaleString()}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Features</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
+                <FileText className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
+              <p className="text-gray-600">Create and manage your invoices easily</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
+                <ChartBar className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Report</h3>
+              <p className="text-gray-600">View detailed financial reports and analytics</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
+                <Package className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Inventory</h3>
+              <p className="text-gray-600">Track and manage your product stock</p>
             </div>
           </div>
         </div>
