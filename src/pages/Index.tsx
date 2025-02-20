@@ -164,7 +164,7 @@ const Index = () => {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="sales" fill="#9b87f5" />
+                  <Bar dataKey="sales" fill="#22c55e" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
