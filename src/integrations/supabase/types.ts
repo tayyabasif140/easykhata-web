@@ -9,7 +9,166 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          total_paid: number | null
+          total_unpaid: number | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          total_paid?: number | null
+          total_unpaid?: number | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          total_paid?: number | null
+          total_unpaid?: number | null
+        }
+        Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          id: string
+          invoice_id: string | null
+          price: number
+          product_name: string
+          quantity: number
+          total: number
+        }
+        Insert: {
+          id?: string
+          invoice_id?: string | null
+          price: number
+          product_name: string
+          quantity: number
+          total: number
+        }
+        Update: {
+          id?: string
+          invoice_id?: string | null
+          price?: number
+          product_name?: string
+          quantity?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          description: string | null
+          id: string
+          pdf_url: string | null
+          status: string
+          tax_amount: number
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          pdf_url?: string | null
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          pdf_url?: string | null
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          id: string
+          name: string
+          price: number
+          quantity: number
+        }
+        Insert: {
+          id?: string
+          name: string
+          price: number
+          quantity: number
+        }
+        Update: {
+          id?: string
+          name?: string
+          price?: number
+          quantity?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
