@@ -1,31 +1,9 @@
 
 import { Header } from "@/components/Header";
-import { TransactionCard } from "@/components/TransactionCard";
-import { FileText, ChartBar, Package, UserPlus } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const recentTransactions = [
-    {
-      type: "income" as const,
-      amount: 50000,
-      description: "Monthly Salary",
-      date: "Today, 2:30 PM",
-    },
-    {
-      type: "expense" as const,
-      amount: 1500,
-      description: "Grocery Shopping",
-      date: "Yesterday, 6:45 PM",
-    },
-    {
-      type: "income" as const,
-      amount: 25000,
-      description: "Freelance Payment",
-      date: "2 days ago, 3:20 PM",
-    },
-  ];
-
   const totalPaidInvoices = 85000;
   const totalUnpaidInvoices = 12500;
 
@@ -107,13 +85,25 @@ const Index = () => {
         </div>
 
         <div className="mt-12">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Recent Transactions
-          </h2>
-          <div className="space-y-4">
-            {recentTransactions.map((transaction, index) => (
-              <TransactionCard key={index} {...transaction} />
-            ))}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Recent Invoices</h2>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Invoice
+            </Button>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-6">
+              <div className="text-center py-8">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
+                <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
+                <Button className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Create Invoice
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </main>
