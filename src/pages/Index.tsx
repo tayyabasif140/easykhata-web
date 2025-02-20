@@ -1,11 +1,21 @@
 
 import { Header } from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Download, Plus } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Download, Plus, TrendingUp, Clock, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Index = () => {
   const totalPaidInvoices = 85000;
   const totalUnpaidInvoices = 12500;
+
+  const salesData = [
+    { month: 'Jan', sales: 4000 },
+    { month: 'Feb', sales: 3000 },
+    { month: 'Mar', sales: 5000 },
+    { month: 'Apr', sales: 4500 },
+    { month: 'May', sales: 6000 },
+    { month: 'Jun', sales: 5500 },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -103,6 +113,60 @@ const Index = () => {
                   Create Invoice
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Business Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Total Profit</p>
+                  <p className="text-2xl font-semibold text-gray-900">Rs.125,000</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Stock Sold</p>
+                  <p className="text-2xl font-semibold text-gray-900">250 units</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Pending Amount</p>
+                  <p className="text-2xl font-semibold text-gray-900">Rs.12,500</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Monthly Sales Overview</h3>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={salesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="sales" fill="#9b87f5" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

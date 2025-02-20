@@ -1,6 +1,5 @@
 
-import { Bell, Settings, User, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell, Settings, User } from "lucide-react";
 
 export const Header = () => {
   return (
@@ -20,10 +19,6 @@ export const Header = () => {
           <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">
             <User className="w-5 h-5 text-primary" />
           </div>
-          <Button className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Transaction
-          </Button>
         </div>
       </div>
     </header>
