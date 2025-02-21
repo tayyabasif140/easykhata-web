@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Plus, Download, Trash } from "lucide-react";
+import { Plus, Download, Trash, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -90,6 +89,50 @@ export function CreateInvoiceDialog() {
     doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
 
     doc.save("invoice.pdf");
+  };
+
+  const previewPDF = () => {
+    const doc = new jsPDF();
+    const lineHeight = 10;
+    let y = 20;
+
+    // Add header
+    doc.setFontSize(20);
+    doc.text("INVOICE", 105, y, { align: "center" });
+    y += lineHeight * 2;
+
+    // Add customer details
+    doc.setFontSize(12);
+    doc.text(`Customer: ${customerName}`, 20, y);
+    y += lineHeight;
+    doc.text(`Company: ${companyName}`, 20, y);
+    y += lineHeight;
+    doc.text(`Phone: ${phone}`, 20, y);
+    y += lineHeight;
+    doc.text(`Email: ${email}`, 20, y);
+    y += lineHeight * 2;
+
+    // Add products table
+    doc.text("Products:", 20, y);
+    y += lineHeight;
+    products.forEach((product) => {
+      doc.text(`${product.name} - Qty: ${product.quantity} - Price: Rs.${product.price} - Total: Rs.${product.quantity * product.price}`, 20, y);
+      y += lineHeight;
+    });
+
+    y += lineHeight;
+    doc.text(`Subtotal: Rs.${calculateSubtotal()}`, 20, y);
+    y += lineHeight;
+    doc.text(`Tax (${tax}%): Rs.${calculateTaxAmount()}`, 20, y);
+    y += lineHeight;
+    doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
+
+    // Open PDF in new window for preview
+    const pdfDataUri = doc.output('datauristring');
+    const previewWindow = window.open('');
+    previewWindow?.document.write(
+      `<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -298,6 +341,10 @@ export function CreateInvoiceDialog() {
           </div>
 
           <div className="flex justify-end gap-4">
+            <Button type="button" variant="outline" className="gap-2" onClick={previewPDF}>
+              <Eye className="w-4 h-4" />
+              Preview Invoice
+            </Button>
             <Button type="submit" className="gap-2">
               Create Invoice
             </Button>

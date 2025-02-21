@@ -5,8 +5,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const navigate = useNavigate();
+
   // Fetch customers data
   const { data: customers } = useQuery({
     queryKey: ['customers'],
@@ -126,7 +129,11 @@ const Index = () => {
               {customers?.length ? (
                 <div className="divide-y">
                   {customers.map((customer) => (
-                    <div key={customer.id} className="py-4 flex justify-between items-center">
+                    <div
+                      key={customer.id}
+                      className="py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 px-4 -mx-4 transition-colors"
+                      onClick={() => navigate(`/customer/${customer.id}`)}
+                    >
                       <div>
                         <h3 className="font-medium">{customer.name}</h3>
                         <p className="text-sm text-gray-600">{customer.email}</p>
