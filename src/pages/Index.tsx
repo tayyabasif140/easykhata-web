@@ -1,3 +1,4 @@
+
 import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -260,3 +261,4 @@ const Index = () => {
 };
 
 export default Index;
+
