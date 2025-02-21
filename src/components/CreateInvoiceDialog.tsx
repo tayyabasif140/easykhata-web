@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -32,18 +33,6 @@ export function CreateInvoiceDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: customers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      return data;
-    }
-  });
-
   const addProduct = () => {
     setProducts([...products, { name: "", quantity: 1, price: 0 }]);
   };
@@ -70,17 +59,36 @@ export function CreateInvoiceDialog() {
     return calculateSubtotal() + calculateTaxAmount();
   };
 
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = customers?.find(c => c.id === customerId);
+    if (customer) {
+      setCustomerName(customer.name);
+      setCompanyName(customer.company || '');
+      setPhone(customer.phone || '');
+      setEmail(customer.email || '');
+    }
+  };
+
   const generatePDF = () => {
     const doc = new jsPDF();
     const lineHeight = 10;
     let y = 20;
 
-    // Add header
     doc.setFontSize(20);
     doc.text("INVOICE", 105, y, { align: "center" });
     y += lineHeight * 2;
 
-    // Add customer details
     doc.setFontSize(12);
     doc.text(`Customer: ${customerName}`, 20, y);
     y += lineHeight;
@@ -91,7 +99,6 @@ export function CreateInvoiceDialog() {
     doc.text(`Email: ${email}`, 20, y);
     y += lineHeight * 2;
 
-    // Add products table
     doc.text("Products:", 20, y);
     y += lineHeight;
     products.forEach((product) => {
@@ -114,12 +121,10 @@ export function CreateInvoiceDialog() {
     const lineHeight = 10;
     let y = 20;
 
-    // Add header
     doc.setFontSize(20);
     doc.text("INVOICE", 105, y, { align: "center" });
     y += lineHeight * 2;
 
-    // Add customer details
     doc.setFontSize(12);
     doc.text(`Customer: ${customerName}`, 20, y);
     y += lineHeight;
@@ -130,7 +135,6 @@ export function CreateInvoiceDialog() {
     doc.text(`Email: ${email}`, 20, y);
     y += lineHeight * 2;
 
-    // Add products table
     doc.text("Products:", 20, y);
     y += lineHeight;
     products.forEach((product) => {
@@ -145,7 +149,6 @@ export function CreateInvoiceDialog() {
     y += lineHeight;
     doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
 
-    // Open PDF in new window for preview
     const pdfDataUri = doc.output('datauristring');
     const previewWindow = window.open('');
     previewWindow?.document.write(
@@ -153,20 +156,10 @@ export function CreateInvoiceDialog() {
     );
   };
 
-  const handleCustomerSelect = (customerId: string) => {
-    const customer = customers?.find(c => c.id === customerId);
-    if (customer) {
-      setCustomerName(customer.name);
-      setCompanyName(customer.company || '');
-      setPhone(customer.phone || '');
-      setEmail(customer.email || '');
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Create customer
+      // Create customer if not exists
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert([
@@ -227,8 +220,8 @@ export function CreateInvoiceDialog() {
       // Reset form
       setCustomerName("");
       setCompanyName("");
-      setPhone("");
       setEmail("");
+      setPhone("");
       setProducts([{ name: "", quantity: 1, price: 0 }]);
       setTax(0);
       setDueDate(undefined);
@@ -371,21 +364,6 @@ export function CreateInvoiceDialog() {
             />
           </div>
 
-          <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>Rs.{calculateSubtotal()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax ({tax}%):</span>
-              <span>Rs.{calculateTaxAmount()}</span>
-            </div>
-            <div className="flex justify-between font-bold">
-              <span>Total:</span>
-              <span>Rs.{calculateTotal()}</span>
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label>Due Date</Label>
             <Popover>
@@ -410,6 +388,21 @@ export function CreateInvoiceDialog() {
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
+            <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span>Rs.{calculateSubtotal()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tax ({tax}%):</span>
+              <span>Rs.{calculateTaxAmount()}</span>
+            </div>
+            <div className="flex justify-between font-bold">
+              <span>Total:</span>
+              <span>Rs.{calculateTotal()}</span>
+            </div>
           </div>
 
           <div className="flex justify-end gap-4">
