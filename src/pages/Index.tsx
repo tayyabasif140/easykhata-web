@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
+import { CreateCustomerDialog } from "@/components/CreateCustomerDialog";
 import { useNavigate } from "react-router-dom";
 
 const Index = () => {
@@ -119,10 +120,7 @@ const Index = () => {
         <div className="mt-12">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Customers</h2>
-            <Button className="gap-2">
-              <UserPlus className="w-4 h-4" />
-              Add Customer
-            </Button>
+            <CreateCustomerDialog />
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">

@@ -8,6 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Product {
   name: string;
@@ -23,8 +28,21 @@ export function CreateInvoiceDialog() {
   const [email, setEmail] = useState("");
   const [products, setProducts] = useState<Product[]>([{ name: "", quantity: 1, price: 0 }]);
   const [tax, setTax] = useState(0);
+  const [dueDate, setDueDate] = useState<Date>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const addProduct = () => {
     setProducts([...products, { name: "", quantity: 1, price: 0 }]);
@@ -135,6 +153,16 @@ export function CreateInvoiceDialog() {
     );
   };
 
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = customers?.find(c => c.id === customerId);
+    if (customer) {
+      setCustomerName(customer.name);
+      setCompanyName(customer.company || '');
+      setPhone(customer.phone || '');
+      setEmail(customer.email || '');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -158,7 +186,9 @@ export function CreateInvoiceDialog() {
             total_amount: calculateTotal(),
             tax_amount: calculateTaxAmount(),
             status: 'unpaid',
-            description: `Invoice for ${customerName}`
+            description: `Invoice for ${customerName}`,
+            due_date: dueDate?.toISOString().split('T')[0],
+            notification_sent: false
           }
         ])
         .select()
@@ -201,6 +231,7 @@ export function CreateInvoiceDialog() {
       setEmail("");
       setProducts([{ name: "", quantity: 1, price: 0 }]);
       setTax(0);
+      setDueDate(undefined);
 
     } catch (error: any) {
       toast({
@@ -224,6 +255,21 @@ export function CreateInvoiceDialog() {
           <DialogTitle>Create New Invoice</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <Label>Select Existing Customer</Label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              onChange={(e) => handleCustomerSelect(e.target.value)}
+            >
+              <option value="">Select a customer...</option>
+              {customers?.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name} {customer.company ? `(${customer.company})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="customerName">Customer Name</Label>
@@ -338,6 +384,32 @@ export function CreateInvoiceDialog() {
               <span>Total:</span>
               <span>Rs.{calculateTotal()}</span>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Due Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dueDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dueDate ? format(dueDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="flex justify-end gap-4">

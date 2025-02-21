@@ -42,6 +42,33 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          price: number
+          product_name: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          price?: number
+          product_name: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          price?: number
+          product_name?: string
+          quantity?: number
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           id: string
@@ -82,7 +109,9 @@ export type Database = {
           created_at: string
           customer_id: string | null
           description: string | null
+          due_date: string | null
           id: string
+          notification_sent: boolean | null
           pdf_url: string | null
           status: string
           tax_amount: number
@@ -92,7 +121,9 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           description?: string | null
+          due_date?: string | null
           id?: string
+          notification_sent?: boolean | null
           pdf_url?: string | null
           status?: string
           tax_amount?: number
@@ -102,7 +133,9 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           description?: string | null
+          due_date?: string | null
           id?: string
+          notification_sent?: boolean | null
           pdf_url?: string | null
           status?: string
           tax_amount?: number
