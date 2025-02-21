@@ -1,10 +1,10 @@
-
 import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 
 const Index = () => {
   // Fetch customers data
@@ -156,10 +156,7 @@ const Index = () => {
         <div className="mt-12">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Recent Invoices</h2>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Invoice
-            </Button>
+            <CreateInvoiceDialog />
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">
