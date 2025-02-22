@@ -53,10 +53,14 @@ const Index = () => {
 
   const handleDeleteCustomer = async (customerId: string) => {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { error } = await supabase
         .from('customers')
         .delete()
-        .eq('id', customerId);
+        .eq('id', customerId)
+        .eq('user_id', userData.user.id);
 
       if (error) throw error;
 
@@ -66,6 +70,7 @@ const Index = () => {
       });
 
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -229,21 +234,30 @@ const Index = () => {
 
         <div className="mt-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+            <div 
+              onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} 
+              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
+            >
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <FileText className="w-6 h-6 text-primary" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
               <p className="text-gray-600">Create and manage your invoices easily</p>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+            <div 
+              onClick={() => navigate('/reports')} 
+              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
+            >
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <ChartBar className="w-6 h-6 text-primary" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Report</h3>
               <p className="text-gray-600">View detailed financial reports and analytics</p>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+            <div 
+              onClick={() => navigate('/inventory')} 
+              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
+            >
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <Package className="w-6 h-6 text-primary" />
               </div>

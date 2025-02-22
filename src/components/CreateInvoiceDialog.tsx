@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -62,9 +61,13 @@ export function CreateInvoiceDialog() {
   const { data: customers } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('user_id', userData.user.id);
       if (error) throw error;
       return data;
     }
