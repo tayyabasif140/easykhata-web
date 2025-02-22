@@ -1,16 +1,18 @@
-
 import { Header } from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock, CheckCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 import { CreateCustomerDialog } from "@/components/CreateCustomerDialog";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch customers data
   const { data: customers } = useQuery({
@@ -24,17 +26,94 @@ const Index = () => {
     }
   });
 
-  // Fetch invoices data
+  // Fetch invoices data with customer information
   const { data: invoices } = useQuery({
     queryKey: ['invoices'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invoices')
-        .select('*');
+        .select(`
+          *,
+          customers (
+            name
+          )
+        `);
       if (error) throw error;
       return data;
     }
   });
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customerId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Customer deleted successfully",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Invoice deleted successfully",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status: 'paid' })
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Invoice marked as paid",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   // Calculate totals from actual data
   const totalPaidInvoices = invoices?.reduce((sum, invoice) => 
@@ -130,16 +209,24 @@ const Index = () => {
                   {customers.map((customer) => (
                     <div
                       key={customer.id}
-                      className="py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 px-4 -mx-4 transition-colors"
-                      onClick={() => navigate(`/customer/${customer.id}`)}
+                      className="py-4 flex justify-between items-center hover:bg-gray-50 px-4 -mx-4 transition-colors"
                     >
-                      <div>
+                      <div className="cursor-pointer" onClick={() => navigate(`/customer/${customer.id}`)}>
                         <h3 className="font-medium">{customer.name}</h3>
                         <p className="text-sm text-gray-600">{customer.email}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">Total Outstanding</p>
-                        <p className="text-sm text-red-600">Rs.{customer.total_unpaid?.toLocaleString() || '0'}</p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">Total Outstanding</p>
+                          <p className="text-sm text-red-600">Rs.{customer.total_unpaid?.toLocaleString() || '0'}</p>
+                        </div>
+                        <Button 
+                          variant="destructive" 
+                          size="icon"
+                          onClick={() => handleDeleteCustomer(customer.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -172,15 +259,39 @@ const Index = () => {
                     <div key={invoice.id} className="py-4 flex justify-between items-center">
                       <div>
                         <h3 className="font-medium">Invoice #{invoice.id.slice(0, 8)}</h3>
-                        <p className="text-sm text-gray-600">{new Date(invoice.created_at).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-600">
+                          {new Date(invoice.created_at).toLocaleDateString()} • 
+                          <span className="ml-2">{invoice.customers?.name}</span>
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">Rs.{invoice.total_amount.toLocaleString()}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {invoice.status}
-                        </span>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">Rs.{invoice.total_amount.toLocaleString()}</p>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          {invoice.status === 'unpaid' && (
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleMarkAsPaid(invoice.id)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button 
+                            variant="destructive" 
+                            size="icon"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -261,4 +372,3 @@ const Index = () => {
 };
 
 export default Index;
-
