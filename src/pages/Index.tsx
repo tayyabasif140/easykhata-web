@@ -8,19 +8,25 @@ import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 import { CreateCustomerDialog } from "@/components/CreateCustomerDialog";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [timeRange, setTimeRange] = useState<'1D' | '30D' | '1Y' | '5Y'>('30D');
 
   // Fetch customers data
   const { data: customers } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('user_id', userData.user.id);
       if (error) throw error;
       return data;
     }
@@ -30,6 +36,9 @@ const Index = () => {
   const { data: invoices } = useQuery({
     queryKey: ['invoices'],
     queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('invoices')
         .select(`
@@ -37,7 +46,8 @@ const Index = () => {
           customers (
             name
           )
-        `);
+        `)
+        .eq('user_id', userData.user.id);
       if (error) throw error;
       return data;
     }
@@ -124,24 +134,64 @@ const Index = () => {
     invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0
   ) || 0;
 
-  // Calculate monthly sales data from actual invoices
-  const calculateMonthlySales = () => {
-    if (!invoices) return [];
+  // Calculate sales data based on selected time range
+  const calculateSalesData = () => {
+    if (!invoices?.length) return [];
     
-    const monthlyData = {};
+    const now = new Date();
+    const data: { [key: string]: number } = {};
+    
+    let startDate = new Date();
+    let format: 'hour' | 'day' | 'month' | 'year';
+    
+    switch(timeRange) {
+      case '1D':
+        startDate.setDate(now.getDate() - 1);
+        format = 'hour';
+        break;
+      case '30D':
+        startDate.setDate(now.getDate() - 30);
+        format = 'day';
+        break;
+      case '1Y':
+        startDate.setFullYear(now.getFullYear() - 1);
+        format = 'month';
+        break;
+      case '5Y':
+        startDate.setFullYear(now.getFullYear() - 5);
+        format = 'year';
+        break;
+    }
+
     invoices.forEach(invoice => {
       const date = new Date(invoice.created_at);
-      const monthKey = date.toLocaleString('default', { month: 'short' });
-      monthlyData[monthKey] = (monthlyData[monthKey] || 0) + Number(invoice.total_amount);
+      if (date >= startDate) {
+        let key;
+        switch(format) {
+          case 'hour':
+            key = date.getHours() + ':00';
+            break;
+          case 'day':
+            key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            break;
+          case 'month':
+            key = date.toLocaleDateString('default', { month: 'short' });
+            break;
+          case 'year':
+            key = date.getFullYear().toString();
+            break;
+        }
+        data[key] = (data[key] || 0) + Number(invoice.total_amount);
+      }
     });
 
-    return Object.entries(monthlyData).map(([month, sales]) => ({
-      month,
-      sales
+    return Object.entries(data).map(([label, amount]) => ({
+      label,
+      amount
     }));
   };
 
-  const salesData = calculateMonthlySales();
+  const salesData = calculateSalesData();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -312,59 +362,46 @@ const Index = () => {
         </div>
 
         <div className="mt-12">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Business Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total Profit</p>
-                  <p className="text-2xl font-semibold text-gray-900">Rs.{totalPaidInvoices.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total Invoices</p>
-                  <p className="text-2xl font-semibold text-gray-900">{invoices?.length || 0}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Pending Amount</p>
-                  <p className="text-2xl font-semibold text-gray-900">Rs.{totalUnpaidInvoices.toLocaleString()}</p>
-                </div>
-              </div>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Sales Overview</h3>
+            <div className="flex gap-2">
+              <Button
+                variant={timeRange === '1D' ? 'default' : 'outline'}
+                onClick={() => setTimeRange('1D')}
+              >
+                1 Day
+              </Button>
+              <Button
+                variant={timeRange === '30D' ? 'default' : 'outline'}
+                onClick={() => setTimeRange('30D')}
+              >
+                30 Days
+              </Button>
+              <Button
+                variant={timeRange === '1Y' ? 'default' : 'outline'}
+                onClick={() => setTimeRange('1Y')}
+              >
+                1 Year
+              </Button>
+              <Button
+                variant={timeRange === '5Y' ? 'default' : 'outline'}
+                onClick={() => setTimeRange('5Y')}
+              >
+                5 Years
+              </Button>
             </div>
           </div>
-          
-          {salesData.length > 0 && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Monthly Sales Overview</h3>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={salesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="sales" fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={salesData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="amount" fill="#22c55e" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </main>
     </div>
