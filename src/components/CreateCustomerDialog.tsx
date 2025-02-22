@@ -24,6 +24,25 @@ export function CreateCustomerDialog() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Check if customer already exists
+      const { data: existingCustomers } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .eq('name', name)
+        .eq('company', company)
+        .eq('email', email)
+        .eq('phone', phone);
+
+      if (existingCustomers && existingCustomers.length > 0) {
+        toast({
+          title: "Error",
+          description: "A customer with these details already exists",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('customers')
         .insert([{ 

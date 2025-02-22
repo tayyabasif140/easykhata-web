@@ -16,7 +16,6 @@ const Index = () => {
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<'1D' | '30D' | '1Y' | '5Y'>('30D');
 
-  // Fetch customers data
   const { data: customers } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
@@ -32,7 +31,6 @@ const Index = () => {
     }
   });
 
-  // Fetch invoices data with customer information
   const { data: invoices } = useQuery({
     queryKey: ['invoices'],
     queryFn: async () => {
@@ -125,7 +123,6 @@ const Index = () => {
     }
   };
 
-  // Calculate totals from actual data
   const totalPaidInvoices = invoices?.reduce((sum, invoice) => 
     invoice.status === 'paid' ? sum + Number(invoice.total_amount) : sum, 0
   ) || 0;
@@ -134,7 +131,6 @@ const Index = () => {
     invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0
   ) || 0;
 
-  // Calculate sales data based on selected time range
   const calculateSalesData = () => {
     if (!invoices?.length) return [];
     
@@ -163,32 +159,43 @@ const Index = () => {
         break;
     }
 
-    invoices.forEach(invoice => {
-      const date = new Date(invoice.created_at);
-      if (date >= startDate) {
-        let key;
-        switch(format) {
-          case 'hour':
-            key = date.getHours() + ':00';
-            break;
-          case 'day':
-            key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
-            break;
-          case 'month':
-            key = date.toLocaleDateString('default', { month: 'short' });
-            break;
-          case 'year':
-            key = date.getFullYear().toString();
-            break;
+    invoices
+      .filter(invoice => invoice.status === 'paid')
+      .forEach(invoice => {
+        const date = new Date(invoice.created_at);
+        if (date >= startDate) {
+          let key;
+          switch(format) {
+            case 'hour':
+              key = date.getHours() + ':00';
+              break;
+            case 'day':
+              key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+              break;
+            case 'month':
+              key = date.toLocaleDateString('default', { month: 'short' });
+              break;
+            case 'year':
+              key = date.getFullYear().toString();
+              break;
+          }
+          data[key] = (data[key] || 0) + Number(invoice.total_amount);
         }
-        data[key] = (data[key] || 0) + Number(invoice.total_amount);
-      }
     });
 
-    return Object.entries(data).map(([label, amount]) => ({
-      label,
-      amount
-    }));
+    return Object.entries(data)
+      .sort(([a], [b]) => {
+        if (format === 'hour') {
+          return parseInt(a) - parseInt(b);
+        } else if (format === 'year') {
+          return parseInt(a) - parseInt(b);
+        }
+        return 0;
+      })
+      .map(([label, amount]) => ({
+        label,
+        amount
+      }));
   };
 
   const salesData = calculateSalesData();
@@ -221,9 +228,8 @@ const Index = () => {
         </div>
 
         <div className="mt-12">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Features</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <FileText className="w-6 h-6 text-primary" />
               </div>

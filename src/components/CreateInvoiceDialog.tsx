@@ -162,29 +162,45 @@ export function CreateInvoiceDialog() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      // Create customer if not exists
-      const { data: customer, error: customerError } = await supabase
+      // Check if customer already exists
+      const { data: existingCustomers } = await supabase
         .from('customers')
-        .insert([
-          { 
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .eq('name', customerName)
+        .eq('company', companyName)
+        .eq('email', email)
+        .eq('phone', phone);
+
+      let customerId;
+
+      if (existingCustomers && existingCustomers.length > 0) {
+        // Use existing customer
+        customerId = existingCustomers[0].id;
+      } else {
+        // Create new customer
+        const { data: customer, error: customerError } = await supabase
+          .from('customers')
+          .insert([{ 
             name: customerName, 
             company: companyName, 
             phone, 
             email,
             user_id: userData.user.id 
-          }
-        ])
-        .select()
-        .single();
+          }])
+          .select()
+          .single();
 
-      if (customerError) throw customerError;
+        if (customerError) throw customerError;
+        customerId = customer.id;
+      }
 
       // Create invoice
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert([
           {
-            customer_id: customer.id,
+            customer_id: customerId,
             total_amount: calculateTotal(),
             tax_amount: calculateTaxAmount(),
             status: 'unpaid',
