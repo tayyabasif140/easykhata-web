@@ -21,9 +21,18 @@ export function CreateCustomerDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { error } = await supabase
         .from('customers')
-        .insert([{ name, company, email, phone }]);
+        .insert([{ 
+          name, 
+          company, 
+          email, 
+          phone,
+          user_id: userData.user.id 
+        }]);
 
       if (error) throw error;
 

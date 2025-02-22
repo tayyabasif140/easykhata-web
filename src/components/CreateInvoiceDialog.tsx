@@ -159,11 +159,20 @@ export function CreateInvoiceDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       // Create customer if not exists
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .insert([
-          { name: customerName, company: companyName, phone, email }
+          { 
+            name: customerName, 
+            company: companyName, 
+            phone, 
+            email,
+            user_id: userData.user.id 
+          }
         ])
         .select()
         .single();
@@ -181,7 +190,8 @@ export function CreateInvoiceDialog() {
             status: 'unpaid',
             description: `Invoice for ${customerName}`,
             due_date: dueDate?.toISOString().split('T')[0],
-            notification_sent: false
+            notification_sent: false,
+            user_id: userData.user.id
           }
         ])
         .select()

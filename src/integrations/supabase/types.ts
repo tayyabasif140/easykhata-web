@@ -19,6 +19,7 @@ export type Database = {
           phone: string | null
           total_paid: number | null
           total_unpaid: number | null
+          user_id: string | null
         }
         Insert: {
           company?: string | null
@@ -29,6 +30,7 @@ export type Database = {
           phone?: string | null
           total_paid?: number | null
           total_unpaid?: number | null
+          user_id?: string | null
         }
         Update: {
           company?: string | null
@@ -39,6 +41,7 @@ export type Database = {
           phone?: string | null
           total_paid?: number | null
           total_unpaid?: number | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -116,6 +119,7 @@ export type Database = {
           status: string
           tax_amount: number
           total_amount: number
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -128,6 +132,7 @@ export type Database = {
           status?: string
           tax_amount?: number
           total_amount?: number
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -140,6 +145,7 @@ export type Database = {
           status?: string
           tax_amount?: number
           total_amount?: number
+          user_id?: string | null
         }
         Relationships: [
           {
