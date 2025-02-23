@@ -32,6 +32,17 @@ export function CreateInvoiceDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { data: inventoryProducts } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const addProduct = () => {
     setProducts([...products, { name: "", quantity: 1, price: 0 }]);
   };
@@ -42,7 +53,32 @@ export function CreateInvoiceDialog() {
 
   const updateProduct = (index: number, field: keyof Product, value: string | number) => {
     const newProducts = [...products];
-    newProducts[index] = { ...newProducts[index], [field]: value };
+    
+    if (field === 'name' && typeof value === 'string') {
+      // Find matching inventory product
+      const inventoryProduct = inventoryProducts?.find(
+        p => p.product_name.toLowerCase() === value.toLowerCase()
+      );
+      
+      if (inventoryProduct) {
+        newProducts[index] = {
+          ...newProducts[index],
+          name: inventoryProduct.product_name,
+          price: inventoryProduct.price,
+        };
+      } else {
+        newProducts[index] = {
+          ...newProducts[index],
+          [field]: value,
+        };
+      }
+    } else {
+      newProducts[index] = {
+        ...newProducts[index],
+        [field]: value,
+      };
+    }
+    
     setProducts(newProducts);
   };
 
@@ -343,10 +379,16 @@ export function CreateInvoiceDialog() {
                 <div className="space-y-2">
                   <Label>Product Name</Label>
                   <Input
+                    list={`products-${index}`}
                     value={product.name}
                     onChange={(e) => updateProduct(index, "name", e.target.value)}
                     required
                   />
+                  <datalist id={`products-${index}`}>
+                    {inventoryProducts?.map((p) => (
+                      <option key={p.id} value={p.product_name} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
                   <Label>Quantity</Label>
