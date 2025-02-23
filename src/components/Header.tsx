@@ -13,6 +13,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
+import { Link } from "react-router-dom";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -37,6 +38,22 @@ export const Header = () => {
       const { data: { session } } = await supabase.auth.getSession();
       return session;
     }
+  });
+
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!session?.user?.id
   });
 
   const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
@@ -95,9 +112,11 @@ export const Header = () => {
               </SheetHeader>
               <div className="mt-4">
                 <div className="space-y-4">
-                  <Button className="w-full justify-start" variant="outline">
-                    Profile Settings
-                  </Button>
+                  <Link to="/account">
+                    <Button className="w-full justify-start" variant="outline">
+                      Profile Settings
+                    </Button>
+                  </Link>
                   <Button className="w-full justify-start" variant="outline">
                     Notification Preferences
                   </Button>
@@ -111,19 +130,31 @@ export const Header = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">
-                <User className="w-5 h-5 text-primary" />
-              </button>
+              {businessDetails?.business_logo_url ? (
+                <button className="w-9 h-9 rounded-full overflow-hidden">
+                  <img
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                    alt="Business Logo"
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ) : (
+                <button className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
+                </button>
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <div className="flex flex-col">
-                  <span className="font-medium">{session?.user?.email}</span>
-                  <span className="text-xs text-gray-500">Logged in</span>
-                </div>
-              </DropdownMenuItem>
+              <Link to="/account">
+                <DropdownMenuItem>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{session?.user?.email}</span>
+                    <span className="text-xs text-gray-500">View Profile</span>
+                  </div>
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600 cursor-pointer" 
                 onClick={async () => {

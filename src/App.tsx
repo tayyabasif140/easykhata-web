@@ -13,6 +13,7 @@ import CustomerDetails from "./pages/CustomerDetails";
 import Reports from "./pages/Reports";
 import Inventory from "./pages/Inventory";
 import SetupWizard from "./components/SetupWizard";
+import Account from "./pages/Account";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,14 @@ const App = () => (
             element={
               <PrivateRoute>
                 <Index />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <PrivateRoute>
+                <Account />
               </PrivateRoute>
             }
           />
