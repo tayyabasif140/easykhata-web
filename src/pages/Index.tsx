@@ -51,6 +51,15 @@ const Index = () => {
     }
   });
 
+  const { data: businessTip } = useQuery({
+    queryKey: ['businessTip'],
+    queryFn: async () => {
+      const { data } = await supabase.functions.invoke('generate-business-tips');
+      return data.tip;
+    },
+    refetchInterval: 1000 * 60 * 60, // Refresh every hour
+  });
+
   const handleDeleteCustomer = async (customerId: string) => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -164,42 +173,41 @@ const Index = () => {
         break;
     }
 
+    if (format === 'hour') {
+      for (let i = 0; i < 24; i++) {
+        data[`${i}:00`] = 0;
+      }
+    }
+
     invoices
-      .filter(invoice => invoice.status === 'paid')
+      .filter(invoice => {
+        const date = new Date(invoice.created_at);
+        return invoice.status === 'paid' && date >= startDate;
+      })
       .forEach(invoice => {
         const date = new Date(invoice.created_at);
-        if (date >= startDate) {
-          let key;
-          switch(format) {
-            case 'hour':
-              key = date.getHours() + ':00';
-              break;
-            case 'day':
-              key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
-              break;
-            case 'month':
-              key = date.toLocaleDateString('default', { month: 'short' });
-              break;
-            case 'year':
-              key = date.getFullYear().toString();
-              break;
-          }
-          data[key] = (data[key] || 0) + Number(invoice.total_amount);
+        let key;
+        switch(format) {
+          case 'hour':
+            key = `${date.getHours()}:00`;
+            break;
+          case 'day':
+            key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
+            break;
+          case 'month':
+            key = date.toLocaleDateString('default', { month: 'short' });
+            break;
+          case 'year':
+            key = date.getFullYear().toString();
+            break;
         }
-    });
+        data[key] = (data[key] || 0) + Number(invoice.total_amount);
+      });
 
     return Object.entries(data)
-      .sort(([a], [b]) => {
-        if (format === 'hour') {
-          return parseInt(a) - parseInt(b);
-        } else if (format === 'year') {
-          return parseInt(a) - parseInt(b);
-        }
-        return 0;
-      })
       .map(([label, amount]) => ({
         label,
-        amount
+        amount: parseFloat(amount.toFixed(2))
       }));
   };
 
@@ -231,6 +239,13 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {businessTip && (
+          <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">Business Tip of the Day</h3>
+            <p className="text-blue-800">{businessTip}</p>
+          </div>
+        )}
 
         <div className="mt-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
