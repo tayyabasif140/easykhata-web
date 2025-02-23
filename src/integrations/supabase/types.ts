@@ -9,6 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      business_details: {
+        Row: {
+          business_address: string | null
+          business_category: string | null
+          business_logo_url: string | null
+          business_name: string
+          created_at: string
+          id: string
+          ntn_number: string | null
+          social_media_links: Json | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          business_address?: string | null
+          business_category?: string | null
+          business_logo_url?: string | null
+          business_name: string
+          created_at?: string
+          id?: string
+          ntn_number?: string | null
+          social_media_links?: Json | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          business_address?: string | null
+          business_category?: string | null
+          business_logo_url?: string | null
+          business_name?: string
+          created_at?: string
+          id?: string
+          ntn_number?: string | null
+          social_media_links?: Json | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           company: string | null
@@ -205,6 +244,36 @@ export type Database = {
           name?: string
           price?: number
           quantity?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          digital_signature_url: string | null
+          email: string
+          full_name: string
+          id: string
+          phone_number: string | null
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          digital_signature_url?: string | null
+          email: string
+          full_name: string
+          id: string
+          phone_number?: string | null
+          username: string
+        }
+        Update: {
+          created_at?: string
+          digital_signature_url?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          phone_number?: string | null
+          username?: string
         }
         Relationships: []
       }
