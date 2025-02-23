@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import CustomerDetails from "./pages/CustomerDetails";
 import Reports from "./pages/Reports";
 import Inventory from "./pages/Inventory";
+import SetupWizard from "./components/SetupWizard";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/setup"
+            element={
+              <PrivateRoute>
+                <SetupWizard />
+              </PrivateRoute>
+            }
+          />
           <Route
             path="/"
             element={

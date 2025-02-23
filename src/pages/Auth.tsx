@@ -25,23 +25,45 @@ export default function Auth() {
           email,
           password,
         });
+
+        if (result.error) throw result.error;
+
+        // Check if user profile exists
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', result.data.user?.id)
+          .single();
+
+        if (!profile) {
+          // Redirect to setup wizard if profile doesn't exist
+          navigate('/setup');
+          return;
+        }
       } else {
         result = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-      }
 
-      if (result.error) throw result.error;
+        if (result.error) throw result.error;
 
-      if (type === 'signup') {
-        toast({
-          title: "Success!",
-          description: "Please check your email to verify your account.",
-        });
-      } else {
+        // Check if user profile exists after login
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', result.data.user?.id)
+          .single();
+
+        if (!profile) {
+          // Redirect to setup wizard if profile doesn't exist
+          navigate('/setup');
+          return;
+        }
+
         navigate('/');
       }
+
     } catch (error: any) {
       toast({
         title: "Error",
