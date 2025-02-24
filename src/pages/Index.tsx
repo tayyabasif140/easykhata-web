@@ -2,13 +2,29 @@ import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock, CheckCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 import { CreateCustomerDialog } from "@/components/CreateCustomerDialog";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+
+interface TaxPayment {
+  id: string;
+  amount: number;
+  description: string;
+  payment_date: string;
+  user_id: string;
+}
+
+interface MonthlyData {
+  month: string;
+  revenue: number;
+  expenses: number;
+  growth: number;
+}
 
 const Index = () => {
   const navigate = useNavigate();
@@ -226,7 +242,7 @@ const Index = () => {
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as TaxPayment[];
     }
   });
 
@@ -253,16 +269,17 @@ const Index = () => {
     }
   });
 
-  // Calculate business growth data
-  const calculateGrowthData = () => {
+  const calculateGrowthData = (): MonthlyData[] => {
     if (!invoices?.length) return [];
     
-    const monthlyData = invoices.reduce((acc: any, invoice) => {
+    const monthlyData: { [key: string]: MonthlyData } = {};
+    
+    invoices.forEach(invoice => {
       const date = new Date(invoice.created_at);
       const monthYear = date.toLocaleDateString('default', { month: 'short', year: 'numeric' });
       
-      if (!acc[monthYear]) {
-        acc[monthYear] = {
+      if (!monthlyData[monthYear]) {
+        monthlyData[monthYear] = {
           month: monthYear,
           revenue: 0,
           expenses: 0,
@@ -271,15 +288,13 @@ const Index = () => {
       }
       
       if (invoice.status === 'paid') {
-        acc[monthYear].revenue += Number(invoice.total_amount);
+        monthlyData[monthYear].revenue += Number(invoice.total_amount);
       }
-      
-      return acc;
-    }, {});
+    });
 
     // Calculate growth percentage
     const months = Object.values(monthlyData);
-    months.forEach((month: any, index) => {
+    months.forEach((month, index) => {
       if (index > 0) {
         const prevRevenue = months[index - 1].revenue;
         month.growth = prevRevenue ? ((month.revenue - prevRevenue) / prevRevenue) * 100 : 0;
