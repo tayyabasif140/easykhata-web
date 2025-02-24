@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock, CheckCircle, Trash2 } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -10,6 +10,14 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TaxPayment {
   id: string;
@@ -31,6 +39,11 @@ const Index = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<'1D' | '30D' | '1Y' | '5Y'>('30D');
+  const [showTaxDialog, setShowTaxDialog] = useState(false);
+  const [taxAmount, setTaxAmount] = useState('');
+  const [taxDescription, setTaxDescription] = useState('');
+  const [taxDate, setTaxDate] = useState<Date>();
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
   const { data: customers } = useQuery({
     queryKey: ['customers'],
@@ -246,6 +259,23 @@ const Index = () => {
     }
   });
 
+  const handleDownloadInvoice = async (invoice: any) => {
+    const { data } = await supabase.storage
+      .from('invoices')
+      .download(`invoice_${invoice.id}.pdf`);
+    
+    if (data) {
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice_${invoice.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const addTaxPayment = useMutation({
     mutationFn: async (payment: { amount: number; description: string; payment_date: Date }) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -262,6 +292,10 @@ const Index = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['taxPayments'] });
+      setShowTaxDialog(false);
+      setTaxAmount('');
+      setTaxDescription('');
+      setTaxDate(undefined);
       toast({
         title: "Success",
         description: "Tax payment recorded successfully",
@@ -339,7 +373,7 @@ const Index = () => {
         )}
 
         <div className="mt-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div 
               onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} 
               className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
@@ -350,6 +384,7 @@ const Index = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
               <p className="text-gray-600">Create and manage your invoices easily</p>
             </div>
+
             <div 
               onClick={() => navigate('/reports')} 
               className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
@@ -360,6 +395,7 @@ const Index = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Report</h3>
               <p className="text-gray-600">View detailed financial reports and analytics</p>
             </div>
+
             <div 
               onClick={() => navigate('/inventory')} 
               className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
@@ -369,6 +405,17 @@ const Index = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Inventory</h3>
               <p className="text-gray-600">Track and manage your product stock</p>
+            </div>
+
+            <div 
+              onClick={() => setShowTaxDialog(true)} 
+              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
+            >
+              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
+                <IndianRupee className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Tax</h3>
+              <p className="text-gray-600">Record and track your tax payments</p>
             </div>
           </div>
         </div>
@@ -450,22 +497,19 @@ const Index = () => {
                           </span>
                         </div>
                         <div className="flex gap-2">
-                          {invoice.status === 'unpaid' && (
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              onClick={() => handleMarkAsPaid(invoice.id)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button 
-                            variant="destructive" 
+                          <Button
+                            variant="outline"
                             size="icon"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
+                            onClick={() => setSelectedInvoice(invoice)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleDownloadInvoice(invoice)}
+                          >
+                            <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -568,7 +612,7 @@ const Index = () => {
                   ))}
                   <Button
                     onClick={() => {
-                      // Add tax payment dialog logic here
+                      setShowTaxDialog(true);
                     }}
                     className="w-full"
                   >
@@ -579,6 +623,149 @@ const Index = () => {
             </Card>
           </div>
         </div>
+
+        {/* Tax Dialog */}
+        <Dialog open={showTaxDialog} onOpenChange={setShowTaxDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Record Tax Payment</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!taxDate || !taxAmount) return;
+              
+              addTaxPayment.mutate({
+                amount: parseFloat(taxAmount),
+                description: taxDescription,
+                payment_date: taxDate
+              });
+            }}>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Amount</Label>
+                  <Input
+                    type="number"
+                    value={taxAmount}
+                    onChange={(e) => setTaxAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input
+                    value={taxDescription}
+                    onChange={(e) => setTaxDescription(e.target.value)}
+                    placeholder="Enter description"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Payment Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !taxDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {taxDate ? format(taxDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={taxDate}
+                        onSelect={setTaxDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <Button type="submit" className="w-full">
+                  Record Payment
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Details Dialog */}
+        <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Invoice Details</DialogTitle>
+            </DialogHeader>
+            {selectedInvoice && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="font-medium text-gray-500">Invoice Number</h3>
+                    <p>#{selectedInvoice.id.slice(0, 8)}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Date</h3>
+                    <p>{new Date(selectedInvoice.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Customer</h3>
+                    <p>{selectedInvoice.customers?.name}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-500">Status</h3>
+                    <span className={`inline-block px-2 py-1 rounded-full text-sm ${
+                      selectedInvoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedInvoice.status}
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium text-gray-500 mb-2">Items</h3>
+                  <div className="space-y-2">
+                    {selectedInvoice.invoice_items?.map((item: any) => (
+                      <div key={item.id} className="flex justify-between py-2 border-b">
+                        <div>
+                          <p className="font-medium">{item.product_name}</p>
+                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                        </div>
+                        <p className="font-medium">Rs.{item.total.toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <p className="text-gray-500">Subtotal</p>
+                    <p>Rs.{selectedInvoice.total_amount.toLocaleString()}</p>
+                  </div>
+                  <div className="flex justify-between">
+                    <p className="text-gray-500">Tax</p>
+                    <p>Rs.{selectedInvoice.tax_amount.toLocaleString()}</p>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <p>Total</p>
+                    <p>Rs.{(Number(selectedInvoice.total_amount) + Number(selectedInvoice.tax_amount)).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadInvoice(selectedInvoice)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
