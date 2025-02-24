@@ -1,4 +1,3 @@
-
 import { Bell, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -51,6 +50,14 @@ export const Header = () => {
         .single();
       
       if (error) throw error;
+      
+      if (data?.business_logo_url) {
+        const { data: publicUrl } = supabase.storage
+          .from('business_files')
+          .getPublicUrl(data.business_logo_url);
+        return { ...data, logoUrl: publicUrl.publicUrl };
+      }
+      
       return data;
     },
     enabled: !!session?.user?.id
@@ -130,10 +137,10 @@ export const Header = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {businessDetails?.business_logo_url ? (
+              {businessDetails?.logoUrl ? (
                 <button className="w-9 h-9 rounded-full overflow-hidden">
                   <img
-                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                    src={businessDetails.logoUrl}
                     alt="Business Logo"
                     className="w-full h-full object-cover"
                   />

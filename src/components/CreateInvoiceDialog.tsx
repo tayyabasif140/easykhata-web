@@ -20,6 +20,12 @@ interface Product {
   price: number;
 }
 
+const INVOICE_TEMPLATES = [
+  { id: 'classic', name: 'Classic Template', preview: '/classic-template.png' },
+  { id: 'modern', name: 'Modern Template', preview: '/modern-template.png' },
+  { id: 'professional', name: 'Professional Template', preview: '/professional-template.png' },
+];
+
 export function CreateInvoiceDialog() {
   const [open, setOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -31,6 +37,8 @@ export function CreateInvoiceDialog() {
   const [dueDate, setDueDate] = useState<Date>();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedTemplate, setSelectedTemplate] = useState('classic');
+  const [showPreview, setShowPreview] = useState(false);
 
   const { data: inventoryProducts } = useQuery({
     queryKey: ['inventory'],
@@ -119,10 +127,48 @@ export function CreateInvoiceDialog() {
     }
   };
 
-  const generatePDF = () => {
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const generatePDF = (template = selectedTemplate) => {
     const doc = new jsPDF();
     const lineHeight = 10;
     let y = 20;
+
+    // Add business logo if available
+    if (businessDetails?.business_logo_url) {
+      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
+      doc.addImage(logoUrl, 'PNG', 20, y, 40, 40);
+      y += 45;
+    }
 
     doc.setFontSize(20);
     doc.text("INVOICE", 105, y, { align: "center" });
@@ -151,43 +197,21 @@ export function CreateInvoiceDialog() {
     doc.text(`Tax (${tax}%): Rs.${calculateTaxAmount()}`, 20, y);
     y += lineHeight;
     doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
+    y += lineHeight * 2;
 
-    doc.save("invoice.pdf");
+    // Add signature if available
+    if (profile?.digital_signature_url) {
+      const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
+      doc.addImage(signatureUrl, 'PNG', 20, y, 50, 20);
+      y += 25;
+      doc.text("Authorized Signature", 20, y);
+    }
+
+    return doc;
   };
 
   const previewPDF = () => {
-    const doc = new jsPDF();
-    const lineHeight = 10;
-    let y = 20;
-
-    doc.setFontSize(20);
-    doc.text("INVOICE", 105, y, { align: "center" });
-    y += lineHeight * 2;
-
-    doc.setFontSize(12);
-    doc.text(`Customer: ${customerName}`, 20, y);
-    y += lineHeight;
-    doc.text(`Company: ${companyName}`, 20, y);
-    y += lineHeight;
-    doc.text(`Phone: ${phone}`, 20, y);
-    y += lineHeight;
-    doc.text(`Email: ${email}`, 20, y);
-    y += lineHeight * 2;
-
-    doc.text("Products:", 20, y);
-    y += lineHeight;
-    products.forEach((product) => {
-      doc.text(`${product.name} - Qty: ${product.quantity} - Price: Rs.${product.price} - Total: Rs.${product.quantity * product.price}`, 20, y);
-      y += lineHeight;
-    });
-
-    y += lineHeight;
-    doc.text(`Subtotal: Rs.${calculateSubtotal()}`, 20, y);
-    y += lineHeight;
-    doc.text(`Tax (${tax}%): Rs.${calculateTaxAmount()}`, 20, y);
-    y += lineHeight;
-    doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
-
+    const doc = generatePDF();
     const pdfDataUri = doc.output('datauristring');
     const previewWindow = window.open('');
     previewWindow?.document.write(
@@ -269,7 +293,6 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
-      generatePDF();
       
       toast({
         title: "Success",
@@ -313,6 +336,7 @@ export function CreateInvoiceDialog() {
           <DialogTitle>Create New Invoice</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
+          
           <div className="space-y-4">
             <Label>Select Existing Customer</Label>
             <select
@@ -461,6 +485,28 @@ export function CreateInvoiceDialog() {
             </Popover>
           </div>
 
+          <div className="space-y-4">
+            <Label>Select Invoice Template</Label>
+            <div className="grid grid-cols-3 gap-4">
+              {INVOICE_TEMPLATES.map((template) => (
+                <div
+                  key={template.id}
+                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    selectedTemplate === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
+                  }`}
+                  onClick={() => setSelectedTemplate(template.id)}
+                >
+                  <div className="aspect-video bg-gray-100 rounded mb-2">
+                    {/* Add template preview image here */}
+                  </div>
+                  <p className="text-sm text-center">{template.name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          
+
           <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
             <div className="flex justify-between">
               <span>Subtotal:</span>
@@ -477,14 +523,24 @@ export function CreateInvoiceDialog() {
           </div>
 
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" className="gap-2" onClick={previewPDF}>
+            <Button type="button" variant="outline" className="gap-2" onClick={() => {
+              const doc = generatePDF();
+              const pdfDataUri = doc.output('datauristring');
+              const previewWindow = window.open('');
+              previewWindow?.document.write(
+                `<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`
+              );
+            }}>
               <Eye className="w-4 h-4" />
               Preview Invoice
             </Button>
             <Button type="submit" className="gap-2">
               Create Invoice
             </Button>
-            <Button type="button" variant="outline" className="gap-2" onClick={generatePDF}>
+            <Button type="button" variant="outline" className="gap-2" onClick={() => {
+              const doc = generatePDF();
+              doc.save("invoice.pdf");
+            }}>
               <Download className="w-4 h-4" />
               Download PDF
             </Button>
