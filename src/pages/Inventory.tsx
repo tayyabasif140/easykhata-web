@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Header } from "@/components/Header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,9 +31,13 @@ const Inventory = () => {
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('inventory')
         .select('*')
+        .eq('user_id', userData.user.id)
         .order('quantity', { ascending: true });
       if (error) throw error;
       return data;
@@ -43,9 +46,15 @@ const Inventory = () => {
 
   const addProduct = useMutation({
     mutationFn: async (product: typeof newProduct) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
       const { error } = await supabase
         .from('inventory')
-        .insert([product]);
+        .insert([{
+          ...product,
+          user_id: userData.user.id
+        }]);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -95,9 +104,9 @@ const Inventory = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 overflow-y-auto">
         <Header />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
@@ -107,9 +116,9 @@ const Inventory = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-y-auto">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">Inventory Management</h1>
