@@ -1,7 +1,7 @@
 import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, TrendingUp, Clock, CheckCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
@@ -212,6 +212,82 @@ const Index = () => {
   };
 
   const salesData = calculateSalesData();
+
+  const { data: taxPayments } = useQuery({
+    queryKey: ['taxPayments'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('tax_payments')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .order('payment_date', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const addTaxPayment = useMutation({
+    mutationFn: async (payment: { amount: number; description: string; payment_date: Date }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('tax_payments')
+        .insert([{
+          ...payment,
+          user_id: userData.user.id
+        }]);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['taxPayments'] });
+      toast({
+        title: "Success",
+        description: "Tax payment recorded successfully",
+      });
+    }
+  });
+
+  // Calculate business growth data
+  const calculateGrowthData = () => {
+    if (!invoices?.length) return [];
+    
+    const monthlyData = invoices.reduce((acc: any, invoice) => {
+      const date = new Date(invoice.created_at);
+      const monthYear = date.toLocaleDateString('default', { month: 'short', year: 'numeric' });
+      
+      if (!acc[monthYear]) {
+        acc[monthYear] = {
+          month: monthYear,
+          revenue: 0,
+          expenses: 0,
+          growth: 0
+        };
+      }
+      
+      if (invoice.status === 'paid') {
+        acc[monthYear].revenue += Number(invoice.total_amount);
+      }
+      
+      return acc;
+    }, {});
+
+    // Calculate growth percentage
+    const months = Object.values(monthlyData);
+    months.forEach((month: any, index) => {
+      if (index > 0) {
+        const prevRevenue = months[index - 1].revenue;
+        month.growth = prevRevenue ? ((month.revenue - prevRevenue) / prevRevenue) * 100 : 0;
+      }
+    });
+
+    return months;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -436,6 +512,56 @@ const Index = () => {
                 <Bar dataKey="amount" fill="#22c55e" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="mt-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Business Growth</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={calculateGrowthData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="growth" stroke="#22c55e" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Tax Payments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {taxPayments?.map((payment) => (
+                    <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">Rs.{payment.amount.toLocaleString()}</p>
+                        <p className="text-sm text-gray-500">{new Date(payment.payment_date).toLocaleDateString()}</p>
+                      </div>
+                      <p className="text-sm text-gray-600">{payment.description}</p>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => {
+                      // Add tax payment dialog logic here
+                    }}
+                    className="w-full"
+                  >
+                    Record Tax Payment
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

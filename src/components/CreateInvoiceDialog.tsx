@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useMutation } from "@tanstack/react-query";
 
 interface Product {
   name: string;
@@ -63,7 +64,6 @@ export function CreateInvoiceDialog() {
     const newProducts = [...products];
     
     if (field === 'name' && typeof value === 'string') {
-      // Find matching inventory product
       const inventoryProduct = inventoryProducts?.find(
         p => p.product_name.toLowerCase() === value.toLowerCase()
       );
@@ -158,6 +158,28 @@ export function CreateInvoiceDialog() {
     }
   });
 
+  const updateInventory = useMutation({
+    mutationFn: async (updates: { productName: string, quantity: number }) => {
+      const { data: inventoryItem } = await supabase
+        .from('inventory')
+        .select('quantity')
+        .eq('product_name', updates.productName)
+        .single();
+
+      if (!inventoryItem) throw new Error('Product not found in inventory');
+
+      const newQuantity = inventoryItem.quantity - updates.quantity;
+      if (newQuantity < 0) throw new Error('Not enough stock');
+
+      const { error } = await supabase
+        .from('inventory')
+        .update({ quantity: newQuantity })
+        .eq('product_name', updates.productName);
+
+      if (error) throw error;
+    }
+  });
+
   const generatePDF = (template = selectedTemplate) => {
     const doc = new jsPDF();
     const lineHeight = 10;
@@ -222,6 +244,14 @@ export function CreateInvoiceDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Update inventory quantities
+      for (const product of products) {
+        await updateInventory.mutateAsync({
+          productName: product.name,
+          quantity: product.quantity
+        });
+      }
+
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
@@ -293,7 +323,24 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
+      const doc = generatePDF(selectedTemplate);
+      const pdfBlob = doc.output('blob');
       
+      // Upload PDF to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(`invoice_${invoice.id}.pdf`, pdfBlob);
+      
+      if (uploadError) throw uploadError;
+
+      // Update invoice with PDF URL
+      const { error: updateError } = await supabase
+        .from('invoices')
+        .update({ pdf_url: `invoice_${invoice.id}.pdf` })
+        .eq('id', invoice.id);
+
+      if (updateError) throw updateError;
+
       toast({
         title: "Success",
         description: "Invoice created successfully!",
@@ -331,10 +378,35 @@ export function CreateInvoiceDialog() {
           Create Invoice
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
         </DialogHeader>
+
+        <div className="mb-6">
+          <Label>Select Invoice Template</Label>
+          <div className="grid grid-cols-3 gap-4 mt-2">
+            {INVOICE_TEMPLATES.map((template) => (
+              <div
+                key={template.id}
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  selectedTemplate === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
+                }`}
+                onClick={() => setSelectedTemplate(template.id)}
+              >
+                <div className="aspect-video bg-gray-100 rounded mb-2">
+                  <img
+                    src={template.preview}
+                    alt={template.name}
+                    className="w-full h-full object-cover rounded"
+                  />
+                </div>
+                <p className="text-sm font-medium text-center">{template.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           
           <div className="space-y-4">
@@ -497,15 +569,17 @@ export function CreateInvoiceDialog() {
                   onClick={() => setSelectedTemplate(template.id)}
                 >
                   <div className="aspect-video bg-gray-100 rounded mb-2">
-                    {/* Add template preview image here */}
+                    <img
+                      src={template.preview}
+                      alt={template.name}
+                      className="w-full h-full object-cover rounded"
+                    />
                   </div>
                   <p className="text-sm text-center">{template.name}</p>
                 </div>
               ))}
             </div>
           </div>
-
-          
 
           <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
             <div className="flex justify-between">
@@ -522,28 +596,18 @@ export function CreateInvoiceDialog() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
-            <Button type="button" variant="outline" className="gap-2" onClick={() => {
-              const doc = generatePDF();
-              const pdfDataUri = doc.output('datauristring');
-              const previewWindow = window.open('');
-              previewWindow?.document.write(
-                `<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`
-              );
-            }}>
-              <Eye className="w-4 h-4" />
-              Preview Invoice
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const doc = generatePDF(selectedTemplate);
+                doc.save(`invoice_preview.pdf`);
+              }}
+            >
+              Preview & Download
             </Button>
-            <Button type="submit" className="gap-2">
-              Create Invoice
-            </Button>
-            <Button type="button" variant="outline" className="gap-2" onClick={() => {
-              const doc = generatePDF();
-              doc.save("invoice.pdf");
-            }}>
-              <Download className="w-4 h-4" />
-              Download PDF
-            </Button>
+            <Button type="submit">Create Invoice</Button>
           </div>
         </form>
       </DialogContent>

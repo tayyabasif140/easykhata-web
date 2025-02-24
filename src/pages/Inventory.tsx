@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Package, AlertTriangle, Plus } from "lucide-react";
+import { Package, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -93,6 +93,23 @@ const Inventory = () => {
       toast({
         title: "Success",
         description: "Stock updated successfully",
+      });
+    }
+  });
+
+  const deleteProduct = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast({
+        title: "Success",
+        description: "Product deleted successfully",
       });
     }
   });
@@ -256,6 +273,15 @@ const Inventory = () => {
                       }}
                     >
                       +
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteProduct.mutate(item.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

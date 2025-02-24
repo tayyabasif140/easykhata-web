@@ -17,6 +17,7 @@ export type Database = {
           business_name: string
           created_at: string
           id: string
+          invoice_template: string | null
           ntn_number: string | null
           social_media_links: Json | null
           user_id: string
@@ -29,6 +30,7 @@ export type Database = {
           business_name: string
           created_at?: string
           id?: string
+          invoice_template?: string | null
           ntn_number?: string | null
           social_media_links?: Json | null
           user_id: string
@@ -41,6 +43,7 @@ export type Database = {
           business_name?: string
           created_at?: string
           id?: string
+          invoice_template?: string | null
           ntn_number?: string | null
           social_media_links?: Json | null
           user_id?: string
@@ -277,6 +280,33 @@ export type Database = {
           id?: string
           phone_number?: string | null
           username?: string
+        }
+        Relationships: []
+      }
+      tax_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          payment_date: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_date: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          payment_date?: string
+          user_id?: string | null
         }
         Relationships: []
       }
