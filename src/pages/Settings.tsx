@@ -9,11 +9,24 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
+import { Trash } from "lucide-react";
 
 const INVOICE_TEMPLATES = [
-  { id: 'classic', name: 'Classic Template', preview: '/classic-template.png' },
-  { id: 'modern', name: 'Modern Template', preview: '/modern-template.png' },
-  { id: 'professional', name: 'Professional Template', preview: '/professional-template.png' },
+  { 
+    id: 'modern', 
+    name: 'Modern Template', 
+    description: 'A sleek and contemporary design with a clean layout.'
+  },
+  { 
+    id: 'professional', 
+    name: 'Professional Template', 
+    description: 'A formal and polished design perfect for business use.'
+  },
+  { 
+    id: 'classic', 
+    name: 'Classic Template', 
+    description: 'A timeless and traditional invoice layout.'
+  }
 ];
 
 export default function Settings() {
@@ -65,8 +78,8 @@ export default function Settings() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <Tabs defaultValue="templates">
-          <TabsList className="mb-8">
+        <Tabs defaultValue="templates" className="space-y-8">
+          <TabsList>
             <TabsTrigger value="templates">Invoice Templates</TabsTrigger>
             <TabsTrigger value="taxes">Tax Configuration</TabsTrigger>
             <TabsTrigger value="general">General Settings</TabsTrigger>
@@ -77,27 +90,26 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle>Invoice Templates</CardTitle>
                 <CardDescription>
-                  Select your default invoice template
+                  Choose a template for your invoices
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {INVOICE_TEMPLATES.map((template) => (
                     <div
                       key={template.id}
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        businessDetails?.invoice_template === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
+                      className={`border rounded-lg p-6 cursor-pointer transition-all ${
+                        businessDetails?.invoice_template === template.id 
+                          ? 'border-primary bg-primary/5 shadow-md' 
+                          : 'hover:border-gray-400 hover:shadow'
                       }`}
                       onClick={() => updateBusinessDetails.mutate({ invoice_template: template.id })}
                     >
-                      <div className="aspect-video bg-gray-100 rounded mb-2">
-                        <img
-                          src={template.preview}
-                          alt={template.name}
-                          className="w-full h-full object-cover rounded"
-                        />
-                      </div>
-                      <p className="text-sm text-center font-medium">{template.name}</p>
+                      <h3 className="font-semibold mb-2">{template.name}</h3>
+                      <p className="text-sm text-gray-600">{template.description}</p>
+                      {businessDetails?.invoice_template === template.id && (
+                        <div className="mt-4 text-sm text-primary">Currently selected</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -116,7 +128,7 @@ export default function Settings() {
               <CardContent>
                 <div className="space-y-4">
                   {taxes.map((tax, index) => (
-                    <div key={index} className="flex gap-4 items-center">
+                    <div key={index} className="flex gap-4 items-center border p-4 rounded-lg">
                       <div className="flex-1">
                         <Label>Tax Name</Label>
                         <Input
@@ -156,11 +168,12 @@ export default function Settings() {
                       </div>
                       <Button
                         variant="destructive"
+                        size="icon"
                         onClick={() => {
                           setTaxes(taxes.filter((_, i) => i !== index));
                         }}
                       >
-                        Remove
+                        <Trash className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}

@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
+import { templates } from "@/utils/invoiceTemplates";
 
 interface Product {
   name: string;
@@ -186,58 +187,39 @@ export function CreateInvoiceDialog() {
   });
 
   const generatePDF = () => {
-    const doc = new jsPDF();
-    const lineHeight = 10;
-    let y = 20;
-
-    // Add business logo if available
-    if (businessDetails?.business_logo_url) {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
-      doc.addImage(logoUrl, 'PNG', 20, y, 40, 40);
-      y += 45;
-    }
-
-    // Use the template from business details
     const template = businessDetails?.invoice_template || 'classic';
+    const templateFn = templates[template as keyof typeof templates];
 
-    doc.setFontSize(20);
-    doc.text("INVOICE", 105, y, { align: "center" });
-    y += lineHeight * 2;
-
-    doc.setFontSize(12);
-    doc.text(`Customer: ${customerName}`, 20, y);
-    y += lineHeight;
-    doc.text(`Company: ${companyName}`, 20, y);
-    y += lineHeight;
-    doc.text(`Phone: ${phone}`, 20, y);
-    y += lineHeight;
-    doc.text(`Email: ${email}`, 20, y);
-    y += lineHeight * 2;
-
-    doc.text("Products:", 20, y);
-    y += lineHeight;
-    products.forEach((product) => {
-      doc.text(`${product.name} - Qty: ${product.quantity} - Price: Rs.${product.price} - Total: Rs.${product.quantity * product.price}`, 20, y);
-      y += lineHeight;
-    });
-
-    y += lineHeight;
-    doc.text(`Subtotal: Rs.${calculateSubtotal()}`, 20, y);
-    y += lineHeight;
-    doc.text(`Tax: Rs.${calculateTotalTax()}`, 20, y);
-    y += lineHeight;
-    doc.text(`Total: Rs.${calculateSubtotal() + calculateTotalTax()}`, 20, y);
-    y += lineHeight * 2;
-
-    // Add signature if available
-    if (profile?.digital_signature_url) {
-      const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-      doc.addImage(signatureUrl, 'PNG', 20, y, 50, 20);
-      y += 25;
-      doc.text("Authorized Signature", 20, y);
+    if (!templateFn) {
+      console.error('Template not found:', template);
+      return templates.classic({
+        customerName,
+        companyName,
+        phone,
+        email,
+        products,
+        subtotal: calculateSubtotal(),
+        tax: calculateTotalTax(),
+        total: calculateSubtotal() + calculateTotalTax(),
+        dueDate,
+        businessDetails,
+        profile
+      });
     }
 
-    return doc;
+    return templateFn({
+      customerName,
+      companyName,
+      phone,
+      email,
+      products,
+      subtotal: calculateSubtotal(),
+      tax: calculateTotalTax(),
+      total: calculateSubtotal() + calculateTotalTax(),
+      dueDate,
+      businessDetails,
+      profile
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
