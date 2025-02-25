@@ -32,12 +32,11 @@ export default function Settings() {
         .eq('user_id', userData.user.id)
         .single();
       if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data?.tax_configuration) {
-        setTaxes(data.tax_configuration);
+      const result = data;
+      if (result?.tax_configuration) {
+        setTaxes(result.tax_configuration);
       }
+      return result;
     }
   });
 
@@ -196,7 +195,7 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* ... keep existing general settings */}
+                {/* General settings content */}
               </CardContent>
             </Card>
           </TabsContent>
