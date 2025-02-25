@@ -22,12 +22,6 @@ interface Product {
   price: number;
 }
 
-const INVOICE_TEMPLATES = [
-  { id: 'classic', name: 'Classic Template', preview: '/classic-template.png' },
-  { id: 'modern', name: 'Modern Template', preview: '/modern-template.png' },
-  { id: 'professional', name: 'Professional Template', preview: '/professional-template.png' },
-];
-
 export function CreateInvoiceDialog() {
   const [open, setOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -40,8 +34,6 @@ export function CreateInvoiceDialog() {
   const [selectedTaxes, setSelectedTaxes] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedTemplate, setSelectedTemplate] = useState('classic');
-  const [showPreview, setShowPreview] = useState(false);
 
   const { data: inventoryProducts } = useQuery({
     queryKey: ['inventory'],
@@ -193,7 +185,7 @@ export function CreateInvoiceDialog() {
     }
   });
 
-  const generatePDF = (template = selectedTemplate) => {
+  const generatePDF = () => {
     const doc = new jsPDF();
     const lineHeight = 10;
     let y = 20;
@@ -204,6 +196,9 @@ export function CreateInvoiceDialog() {
       doc.addImage(logoUrl, 'PNG', 20, y, 40, 40);
       y += 45;
     }
+
+    // Use the template from business details
+    const template = businessDetails?.invoice_template || 'classic';
 
     doc.setFontSize(20);
     doc.text("INVOICE", 105, y, { align: "center" });
@@ -229,9 +224,9 @@ export function CreateInvoiceDialog() {
     y += lineHeight;
     doc.text(`Subtotal: Rs.${calculateSubtotal()}`, 20, y);
     y += lineHeight;
-    doc.text(`Tax (${tax}%): Rs.${calculateTaxAmount()}`, 20, y);
+    doc.text(`Tax: Rs.${calculateTotalTax()}`, 20, y);
     y += lineHeight;
-    doc.text(`Total: Rs.${calculateTotal()}`, 20, y);
+    doc.text(`Total: Rs.${calculateSubtotal() + calculateTotalTax()}`, 20, y);
     y += lineHeight * 2;
 
     // Add signature if available
@@ -243,15 +238,6 @@ export function CreateInvoiceDialog() {
     }
 
     return doc;
-  };
-
-  const previewPDF = () => {
-    const doc = generatePDF();
-    const pdfDataUri = doc.output('datauristring');
-    const previewWindow = window.open('');
-    previewWindow?.document.write(
-      `<iframe width='100%' height='100%' src='${pdfDataUri}'></iframe>`
-    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -336,7 +322,7 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
-      const doc = generatePDF(selectedTemplate);
+      const doc = generatePDF();
       const pdfBlob = doc.output('blob');
       
       // Upload PDF to Supabase Storage
@@ -395,30 +381,6 @@ export function CreateInvoiceDialog() {
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
         </DialogHeader>
-
-        <div className="mb-6">
-          <Label>Select Invoice Template</Label>
-          <div className="grid grid-cols-3 gap-4 mt-2">
-            {INVOICE_TEMPLATES.map((template) => (
-              <div
-                key={template.id}
-                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  selectedTemplate === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
-                }`}
-                onClick={() => setSelectedTemplate(template.id)}
-              >
-                <div className="aspect-video bg-gray-100 rounded mb-2">
-                  <img
-                    src={template.preview}
-                    alt={template.name}
-                    className="w-full h-full object-cover rounded"
-                  />
-                </div>
-                <p className="text-sm font-medium text-center">{template.name}</p>
-              </div>
-            ))}
-          </div>
-        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
@@ -571,30 +533,6 @@ export function CreateInvoiceDialog() {
           </div>
 
           <div className="space-y-4">
-            <Label>Select Invoice Template</Label>
-            <div className="grid grid-cols-3 gap-4">
-              {INVOICE_TEMPLATES.map((template) => (
-                <div
-                  key={template.id}
-                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                    selectedTemplate === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
-                  }`}
-                  onClick={() => setSelectedTemplate(template.id)}
-                >
-                  <div className="aspect-video bg-gray-100 rounded mb-2">
-                    <img
-                      src={template.preview}
-                      alt={template.name}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  </div>
-                  <p className="text-sm text-center">{template.name}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
             <Label>Tax Options</Label>
             <div className="space-y-2">
               {businessDetails?.tax_configuration?.map((tax: any) => (
@@ -629,12 +567,7 @@ export function CreateInvoiceDialog() {
           </div>
 
           <div className="flex justify-end space-x-2">
-            <Button
-              type="submit"
-              data-create-invoice
-            >
-              Create Invoice
-            </Button>
+            <Button type="submit">Create Invoice</Button>
           </div>
         </form>
       </DialogContent>

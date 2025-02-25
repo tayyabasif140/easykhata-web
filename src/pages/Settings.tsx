@@ -1,6 +1,6 @@
-
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,18 +16,10 @@ const INVOICE_TEMPLATES = [
   { id: 'professional', name: 'Professional Template', preview: '/professional-template.png' },
 ];
 
-interface TaxConfig {
-  name: string;
-  rate: number;
-  enabled: boolean;
-}
-
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [taxes, setTaxes] = useState<TaxConfig[]>([
-    { name: '', rate: 0, enabled: true }
-  ]);
+  const [taxes, setTaxes] = useState<Array<{ name: string; rate: number; enabled: boolean; }>>([]);
 
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
@@ -41,6 +33,11 @@ export default function Settings() {
         .single();
       if (error) throw error;
       return data;
+    },
+    onSuccess: (data) => {
+      if (data?.tax_configuration) {
+        setTaxes(data.tax_configuration);
+      }
     }
   });
 
@@ -65,133 +62,145 @@ export default function Settings() {
     }
   });
 
-  const addTaxField = () => {
-    setTaxes([...taxes, { name: '', rate: 0, enabled: true }]);
-  };
-
-  const removeTaxField = (index: number) => {
-    setTaxes(taxes.filter((_, i) => i !== index));
-  };
-
-  const updateTax = (index: number, field: keyof TaxConfig, value: string | number | boolean) => {
-    const newTaxes = [...taxes];
-    newTaxes[index] = { ...newTaxes[index], [field]: value };
-    setTaxes(newTaxes);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateBusinessDetails.mutateAsync({
-        tax_configuration: taxes
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <div className="grid gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Default Invoice Template</CardTitle>
-              <CardDescription>
-                Select your preferred invoice template that will be used by default when creating new invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                {INVOICE_TEMPLATES.map((template) => (
-                  <div
-                    key={template.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                      businessDetails?.invoice_template === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
-                    }`}
-                    onClick={() => updateBusinessDetails.mutate({ invoice_template: template.id })}
-                  >
-                    <div className="aspect-video bg-gray-100 rounded mb-2">
-                      <img
-                        src={template.preview}
-                        alt={template.name}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    </div>
-                    <p className="text-sm text-center font-medium">{template.name}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="templates">
+          <TabsList className="mb-8">
+            <TabsTrigger value="templates">Invoice Templates</TabsTrigger>
+            <TabsTrigger value="taxes">Tax Configuration</TabsTrigger>
+            <TabsTrigger value="general">General Settings</TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Tax Configuration</CardTitle>
-              <CardDescription>
-                Configure different types of taxes that can be applied to your invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {taxes.map((tax, index) => (
-                  <div key={index} className="flex gap-4 items-start">
-                    <div className="flex-1 space-y-2">
-                      <Label>Tax Name</Label>
-                      <Input
-                        value={tax.name}
-                        onChange={(e) => updateTax(index, 'name', e.target.value)}
-                        placeholder="e.g., GST, VAT"
-                        required
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <Label>Rate (%)</Label>
-                      <Input
-                        type="number"
-                        value={tax.rate}
-                        onChange={(e) => updateTax(index, 'rate', parseFloat(e.target.value))}
-                        min="0"
-                        max="100"
-                        required
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <Label>Enabled</Label>
-                      <div className="pt-2">
-                        <Switch
-                          checked={tax.enabled}
-                          onCheckedChange={(checked) => updateTax(index, 'enabled', checked)}
+          <TabsContent value="templates">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice Templates</CardTitle>
+                <CardDescription>
+                  Select your default invoice template
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  {INVOICE_TEMPLATES.map((template) => (
+                    <div
+                      key={template.id}
+                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                        businessDetails?.invoice_template === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
+                      }`}
+                      onClick={() => updateBusinessDetails.mutate({ invoice_template: template.id })}
+                    >
+                      <div className="aspect-video bg-gray-100 rounded mb-2">
+                        <img
+                          src={template.preview}
+                          alt={template.name}
+                          className="w-full h-full object-cover rounded"
                         />
                       </div>
+                      <p className="text-sm text-center font-medium">{template.name}</p>
                     </div>
-                    {taxes.length > 1 && (
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="taxes">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tax Configuration</CardTitle>
+                <CardDescription>
+                  Configure tax rates and types for your invoices
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {taxes.map((tax, index) => (
+                    <div key={index} className="flex gap-4 items-center">
+                      <div className="flex-1">
+                        <Label>Tax Name</Label>
+                        <Input
+                          value={tax.name}
+                          onChange={(e) => {
+                            const newTaxes = [...taxes];
+                            newTaxes[index].name = e.target.value;
+                            setTaxes(newTaxes);
+                          }}
+                          placeholder="e.g., GST, VAT"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label>Rate (%)</Label>
+                        <Input
+                          type="number"
+                          value={tax.rate}
+                          onChange={(e) => {
+                            const newTaxes = [...taxes];
+                            newTaxes[index].rate = parseFloat(e.target.value);
+                            setTaxes(newTaxes);
+                          }}
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label>Enabled</Label>
+                        <Switch
+                          checked={tax.enabled}
+                          onCheckedChange={(checked) => {
+                            const newTaxes = [...taxes];
+                            newTaxes[index].enabled = checked;
+                            setTaxes(newTaxes);
+                          }}
+                        />
+                      </div>
                       <Button
-                        type="button"
                         variant="destructive"
-                        onClick={() => removeTaxField(index)}
-                        className="mt-8"
+                        onClick={() => {
+                          setTaxes(taxes.filter((_, i) => i !== index));
+                        }}
                       >
                         Remove
                       </Button>
-                    )}
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTaxes([...taxes, { name: '', rate: 0, enabled: true }]);
+                    }}
+                  >
+                    Add Tax
+                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => {
+                        updateBusinessDetails.mutate({ tax_configuration: taxes });
+                      }}
+                    >
+                      Save Tax Configuration
+                    </Button>
                   </div>
-                ))}
-                <Button type="button" variant="outline" onClick={addTaxField}>
-                  Add Tax Type
-                </Button>
-                <div className="flex justify-end">
-                  <Button type="submit">Save Changes</Button>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="general">
+            <Card>
+              <CardHeader>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>
+                  Configure general settings for your business
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* ... keep existing general settings */}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

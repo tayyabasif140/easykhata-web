@@ -261,19 +261,27 @@ const Index = () => {
   });
 
   const handleDownloadInvoice = async (invoice: any) => {
-    const { data } = await supabase.storage
-      .from('invoices')
-      .download(`invoice_${invoice.id}.pdf`);
-    
-    if (data) {
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice_${invoice.id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    try {
+      const { data } = await supabase.storage
+        .from('invoices')
+        .download(`invoice_${invoice.id}.pdf`);
+      
+      if (data) {
+        const url = URL.createObjectURL(data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `invoice_${invoice.id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to download invoice",
+        variant: "destructive",
+      });
     }
   };
 
@@ -540,6 +548,13 @@ const Index = () => {
                             onClick={() => handleDownloadInvoice(invoice)}
                           >
                             <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
