@@ -14,6 +14,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
+import { Switch } from "@/components/ui/switch";
 
 interface Product {
   name: string;
@@ -36,6 +37,7 @@ export function CreateInvoiceDialog() {
   const [products, setProducts] = useState<Product[]>([{ name: "", quantity: 1, price: 0 }]);
   const [tax, setTax] = useState(0);
   const [dueDate, setDueDate] = useState<Date>();
+  const [selectedTaxes, setSelectedTaxes] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState('classic');
@@ -100,6 +102,17 @@ export function CreateInvoiceDialog() {
 
   const calculateTotal = () => {
     return calculateSubtotal() + calculateTaxAmount();
+  };
+
+  const calculateTotalTax = () => {
+    if (!businessDetails?.tax_configuration) return 0;
+    const taxConfig = businessDetails.tax_configuration as any[];
+    return taxConfig.reduce((sum, tax) => {
+      if (selectedTaxes[tax.name] && tax.enabled) {
+        return sum + (calculateSubtotal() * tax.rate) / 100;
+      }
+      return sum;
+    }, 0);
   };
 
   const { data: customers } = useQuery({
@@ -295,7 +308,7 @@ export function CreateInvoiceDialog() {
           {
             customer_id: customerId,
             total_amount: calculateTotal(),
-            tax_amount: calculateTaxAmount(),
+            tax_amount: calculateTotalTax(),
             status: 'unpaid',
             description: `Invoice for ${customerName}`,
             due_date: dueDate?.toISOString().split('T')[0],
@@ -373,7 +386,7 @@ export function CreateInvoiceDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button className="gap-2" data-create-invoice>
           <Plus className="w-4 h-4" />
           Create Invoice
         </Button>
@@ -581,33 +594,47 @@ export function CreateInvoiceDialog() {
             </div>
           </div>
 
+          <div className="space-y-4">
+            <Label>Tax Options</Label>
+            <div className="space-y-2">
+              {businessDetails?.tax_configuration?.map((tax: any) => (
+                tax.enabled && (
+                  <div key={tax.name} className="flex items-center justify-between">
+                    <Label>{tax.name} ({tax.rate}%)</Label>
+                    <Switch
+                      checked={selectedTaxes[tax.name] || false}
+                      onCheckedChange={(checked) => {
+                        setSelectedTaxes({ ...selectedTaxes, [tax.name]: checked });
+                      }}
+                    />
+                  </div>
+                )
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2 bg-gray-50 p-4 rounded-lg">
             <div className="flex justify-between">
               <span>Subtotal:</span>
               <span>Rs.{calculateSubtotal()}</span>
             </div>
             <div className="flex justify-between">
-              <span>Tax ({tax}%):</span>
-              <span>Rs.{calculateTaxAmount()}</span>
+              <span>Tax:</span>
+              <span>Rs.{calculateTotalTax()}</span>
             </div>
             <div className="flex justify-between font-bold">
               <span>Total:</span>
-              <span>Rs.{calculateTotal()}</span>
+              <span>Rs.{calculateSubtotal() + calculateTotalTax()}</span>
             </div>
           </div>
 
           <div className="flex justify-end space-x-2">
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                const doc = generatePDF(selectedTemplate);
-                doc.save(`invoice_preview.pdf`);
-              }}
+              type="submit"
+              data-create-invoice
             >
-              Preview & Download
+              Create Invoice
             </Button>
-            <Button type="submit">Create Invoice</Button>
           </div>
         </form>
       </DialogContent>

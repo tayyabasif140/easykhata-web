@@ -44,6 +44,7 @@ const Index = () => {
   const [taxDescription, setTaxDescription] = useState('');
   const [taxDate, setTaxDate] = useState<Date>();
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
 
   const { data: customers } = useQuery({
     queryKey: ['customers'],
@@ -472,20 +473,49 @@ const Index = () => {
         <div className="mt-12">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Recent Invoices</h2>
-            <CreateInvoiceDialog />
+            <div className="flex gap-2">
+              {selectedInvoices.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    selectedInvoices.forEach(id => {
+                      const invoice = invoices?.find(inv => inv.id === id);
+                      if (invoice) handleDownloadInvoice(invoice);
+                    });
+                  }}
+                >
+                  Download Selected
+                </Button>
+              )}
+              <CreateInvoiceDialog />
+            </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">
               {invoices?.length ? (
                 <div className="divide-y">
-                  {invoices.slice(0, 5).map((invoice) => (
+                  {invoices.map((invoice) => (
                     <div key={invoice.id} className="py-4 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-medium">Invoice #{invoice.id.slice(0, 8)}</h3>
-                        <p className="text-sm text-gray-600">
-                          {new Date(invoice.created_at).toLocaleDateString()} • 
-                          <span className="ml-2">{invoice.customers?.name}</span>
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedInvoices.includes(invoice.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedInvoices([...selectedInvoices, invoice.id]);
+                            } else {
+                              setSelectedInvoices(selectedInvoices.filter(id => id !== invoice.id));
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <div>
+                          <h3 className="font-medium">Invoice #{invoice.id.slice(0, 8)}</h3>
+                          <p className="text-sm text-gray-600">
+                            {new Date(invoice.created_at).toLocaleDateString()} • 
+                            <span className="ml-2">{invoice.customers?.name}</span>
+                          </p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">

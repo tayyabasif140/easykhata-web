@@ -1,65 +1,57 @@
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
 
 const INVOICE_TEMPLATES = [
-  {
-    id: 'classic',
-    name: 'Classic Template',
-    description: 'A clean and professional design',
-    preview: '/classic-template.png'
-  },
-  {
-    id: 'modern',
-    name: 'Modern Template',
-    description: 'Contemporary and sleek layout',
-    preview: '/modern-template.png'
-  },
-  {
-    id: 'professional',
-    name: 'Professional Template',
-    description: 'Formal and detailed design',
-    preview: '/professional-template.png'
-  },
+  { id: 'classic', name: 'Classic Template', preview: '/classic-template.png' },
+  { id: 'modern', name: 'Modern Template', preview: '/modern-template.png' },
+  { id: 'professional', name: 'Professional Template', preview: '/professional-template.png' },
 ];
 
-const Settings = () => {
+interface TaxConfig {
+  name: string;
+  rate: number;
+  enabled: boolean;
+}
+
+export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedTemplate, setSelectedTemplate] = useState('classic');
+  const [taxes, setTaxes] = useState<TaxConfig[]>([
+    { name: '', rate: 0, enabled: true }
+  ]);
 
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
-      
       const { data, error } = await supabase
         .from('business_details')
         .select('*')
         .eq('user_id', userData.user.id)
         .single();
-      
       if (error) throw error;
       return data;
     }
   });
 
-  const updateTemplate = useMutation({
-    mutationFn: async (templateId: string) => {
+  const updateBusinessDetails = useMutation({
+    mutationFn: async (updates: any) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
       const { error } = await supabase
         .from('business_details')
-        .update({ invoice_template: templateId })
+        .update(updates)
         .eq('user_id', userData.user.id);
 
       if (error) throw error;
@@ -68,78 +60,139 @@ const Settings = () => {
       queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
       toast({
         title: "Success",
-        description: "Invoice template updated successfully",
+        description: "Settings updated successfully",
       });
     }
   });
 
-  return (
-    <div className="min-h-screen bg-gray-50 overflow-y-auto">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-gray-600 mt-1">Manage your business preferences</p>
-        </div>
+  const addTaxField = () => {
+    setTaxes([...taxes, { name: '', rate: 0, enabled: true }]);
+  };
 
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Invoice Template</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup
-              value={selectedTemplate}
-              onValueChange={setSelectedTemplate}
-              className="grid grid-cols-1 md:grid-cols-3 gap-8"
-            >
-              {INVOICE_TEMPLATES.map((template) => (
-                <div key={template.id} className="relative">
-                  <RadioGroupItem
-                    value={template.id}
-                    id={template.id}
-                    className="sr-only"
-                  />
-                  <Label
-                    htmlFor={template.id}
-                    className="block cursor-pointer"
+  const removeTaxField = (index: number) => {
+    setTaxes(taxes.filter((_, i) => i !== index));
+  };
+
+  const updateTax = (index: number, field: keyof TaxConfig, value: string | number | boolean) => {
+    const newTaxes = [...taxes];
+    newTaxes[index] = { ...newTaxes[index], [field]: value };
+    setTaxes(newTaxes);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateBusinessDetails.mutateAsync({
+        tax_configuration: taxes
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <div className="grid gap-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Default Invoice Template</CardTitle>
+              <CardDescription>
+                Select your preferred invoice template that will be used by default when creating new invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4">
+                {INVOICE_TEMPLATES.map((template) => (
+                  <div
+                    key={template.id}
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      businessDetails?.invoice_template === template.id ? 'border-primary bg-primary/5' : 'hover:border-gray-400'
+                    }`}
+                    onClick={() => updateBusinessDetails.mutate({ invoice_template: template.id })}
                   >
-                    <div className={`border rounded-lg p-4 transition-colors ${
-                      selectedTemplate === template.id
-                        ? 'border-primary bg-primary/5'
-                        : 'hover:border-gray-400'
-                    }`}>
-                      <div className="aspect-[4/5] bg-gray-100 rounded mb-4">
-                        <img
-                          src={template.preview}
-                          alt={template.name}
-                          className="w-full h-full object-cover rounded"
+                    <div className="aspect-video bg-gray-100 rounded mb-2">
+                      <img
+                        src={template.preview}
+                        alt={template.name}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    </div>
+                    <p className="text-sm text-center font-medium">{template.name}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax Configuration</CardTitle>
+              <CardDescription>
+                Configure different types of taxes that can be applied to your invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {taxes.map((tax, index) => (
+                  <div key={index} className="flex gap-4 items-start">
+                    <div className="flex-1 space-y-2">
+                      <Label>Tax Name</Label>
+                      <Input
+                        value={tax.name}
+                        onChange={(e) => updateTax(index, 'name', e.target.value)}
+                        placeholder="e.g., GST, VAT"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label>Rate (%)</Label>
+                      <Input
+                        type="number"
+                        value={tax.rate}
+                        onChange={(e) => updateTax(index, 'rate', parseFloat(e.target.value))}
+                        min="0"
+                        max="100"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label>Enabled</Label>
+                      <div className="pt-2">
+                        <Switch
+                          checked={tax.enabled}
+                          onCheckedChange={(checked) => updateTax(index, 'enabled', checked)}
                         />
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{template.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {template.description}
-                        </p>
-                      </div>
                     </div>
-                  </Label>
+                    {taxes.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => removeTaxField(index)}
+                        className="mt-8"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" onClick={addTaxField}>
+                  Add Tax Type
+                </Button>
+                <div className="flex justify-end">
+                  <Button type="submit">Save Changes</Button>
                 </div>
-              ))}
-            </RadioGroup>
-
-            <div className="mt-6">
-              <Button
-                onClick={() => updateTemplate.mutate(selectedTemplate)}
-                disabled={updateTemplate.isPending}
-              >
-                Save Template Preference
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
-};
-
-export default Settings;
+}
