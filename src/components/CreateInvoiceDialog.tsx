@@ -186,7 +186,7 @@ export function CreateInvoiceDialog() {
     }
   });
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     const template = businessDetails?.invoice_template || 'classic';
     const templateFn = templates[template as keyof typeof templates];
 
@@ -207,7 +207,7 @@ export function CreateInvoiceDialog() {
       });
     }
 
-    return templateFn({
+    return await templateFn({
       customerName,
       companyName,
       phone,
@@ -304,7 +304,7 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
-      const doc = generatePDF();
+      const doc = await generatePDF();
       const pdfBlob = doc.output('blob');
       
       // Upload PDF to Supabase Storage

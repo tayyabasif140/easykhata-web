@@ -1,4 +1,3 @@
-
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 
@@ -20,42 +19,62 @@ export type InvoiceData = {
   profile?: any;
 };
 
-const addBusinessHeader = (doc: jsPDF, businessDetails: any, y: number) => {
-  if (businessDetails?.business_logo_url) {
-    const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
-    doc.addImage(logoUrl, 'PNG', 20, y, 40, 40);
-  }
-  
-  if (businessDetails?.business_name) {
-    doc.setFontSize(16);
-    doc.text(businessDetails.business_name, 70, y + 15);
-  }
-  
-  if (businessDetails?.business_address) {
-    doc.setFontSize(10);
-    doc.text(businessDetails.business_address, 70, y + 25);
+const loadImage = async (url: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";  // Important for CORS
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+};
+
+const addBusinessHeader = async (doc: jsPDF, businessDetails: any, y: number) => {
+  try {
+    if (businessDetails?.business_logo_url) {
+      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
+      const img = await loadImage(logoUrl);
+      doc.addImage(img, 'PNG', 20, y, 40, 40);
+    }
+    
+    if (businessDetails?.business_name) {
+      doc.setFontSize(16);
+      doc.text(businessDetails.business_name, 70, y + 15);
+    }
+    
+    if (businessDetails?.business_address) {
+      doc.setFontSize(10);
+      doc.text(businessDetails.business_address, 70, y + 25);
+    }
+  } catch (error) {
+    console.error('Error loading business logo:', error);
   }
   
   return y + 50;
 };
 
-const addSignature = (doc: jsPDF, profile: any, y: number) => {
-  if (profile?.digital_signature_url) {
-    const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-    doc.addImage(signatureUrl, 'PNG', 20, y, 50, 20);
-    doc.setFontSize(10);
-    doc.text("Authorized Signature", 20, y + 25);
+const addSignature = async (doc: jsPDF, profile: any, y: number) => {
+  try {
+    if (profile?.digital_signature_url) {
+      const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
+      const img = await loadImage(signatureUrl);
+      doc.addImage(img, 'PNG', 20, y, 50, 20);
+      doc.setFontSize(10);
+      doc.text("Authorized Signature", 20, y + 25);
+    }
+  } catch (error) {
+    console.error('Error loading signature:', error);
   }
   return y + 30;
 };
 
 export const templates = {
-  modern: (data: InvoiceData) => {
+  modern: async (data: InvoiceData) => {
     const doc = new jsPDF();
     let y = 20;
 
     // Header with business details
-    y = addBusinessHeader(doc, data.businessDetails, y);
+    y = await addBusinessHeader(doc, data.businessDetails, y);
 
     // Invoice title
     doc.setFillColor(51, 51, 51);
@@ -117,130 +136,136 @@ export const templates = {
     y += 45;
 
     // Signature
-    y = addSignature(doc, data.profile, y);
+    y = await addSignature(doc, data.profile, y);
 
     return doc;
   },
 
-  professional: (data: InvoiceData) => {
+  professional: async (data: InvoiceData) => {
     const doc = new jsPDF();
     let y = 20;
 
-    // Header
-    if (data.businessDetails?.business_logo_url) {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
-      doc.addImage(logoUrl, 'PNG', 20, 20, 40, 40);
-    }
+    try {
+      // Header
+      if (data.businessDetails?.business_logo_url) {
+        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
+        const img = await loadImage(logoUrl);
+        doc.addImage(img, 'PNG', 20, 20, 40, 40);
+      }
 
-    // Business details on right
-    doc.setFontSize(10);
-    doc.text(data.businessDetails?.business_name || "", 140, 25, { align: "right" });
-    doc.text(data.businessDetails?.business_address || "", 140, 35, { align: "right" });
-    y += 50;
+      // Business details on right
+      doc.setFontSize(10);
+      doc.text(data.businessDetails?.business_name || "", 140, 25, { align: "right" });
+      doc.text(data.businessDetails?.business_address || "", 140, 35, { align: "right" });
+      y += 50;
 
-    // Invoice title
-    doc.setFontSize(24);
-    doc.setTextColor(44, 62, 80);
-    doc.text("INVOICE", 20, y);
-    y += 20;
+      // Invoice title
+      doc.setFontSize(24);
+      doc.setTextColor(44, 62, 80);
+      doc.text("INVOICE", 20, y);
+      y += 20;
 
-    // Customer details in a box
-    doc.setDrawColor(44, 62, 80);
-    doc.setLineWidth(0.5);
-    doc.rect(20, y, 170, 40);
-    doc.setFontSize(12);
-    doc.text("Bill To:", 25, y + 10);
-    doc.setFontSize(10);
-    doc.text(data.customerName, 25, y + 20);
-    doc.text(data.companyName, 25, y + 30);
-    y += 50;
+      // Customer details in a box
+      doc.setDrawColor(44, 62, 80);
+      doc.setLineWidth(0.5);
+      doc.rect(20, y, 170, 40);
+      doc.setFontSize(12);
+      doc.text("Bill To:", 25, y + 10);
+      doc.setFontSize(10);
+      doc.text(data.customerName, 25, y + 20);
+      doc.text(data.companyName, 25, y + 30);
+      y += 50;
 
-    // Products table
-    const headers = ["Item", "Quantity", "Price", "Total"];
-    const columnWidths = [80, 30, 30, 30];
-    
-    // Table headers
-    doc.setFillColor(44, 62, 80);
-    doc.rect(20, y, 170, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    let xPos = 25;
-    headers.forEach((header, i) => {
-      doc.text(header, xPos, y + 7);
-      xPos += columnWidths[i];
-    });
-    y += 15;
+      // Products table
+      const headers = ["Item", "Quantity", "Price", "Total"];
+      const columnWidths = [80, 30, 30, 30];
+      
+      // Table headers
+      doc.setFillColor(44, 62, 80);
+      doc.rect(20, y, 170, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      let xPos = 25;
+      headers.forEach((header, i) => {
+        doc.text(header, xPos, y + 7);
+        xPos += columnWidths[i];
+      });
+      y += 15;
 
-    // Table content
-    doc.setTextColor(0, 0, 0);
-    data.products.forEach(product => {
-      xPos = 25;
-      doc.text(product.name, xPos, y);
-      xPos += columnWidths[0];
-      doc.text(product.quantity.toString(), xPos, y);
-      xPos += columnWidths[1];
-      doc.text(`Rs.${product.price}`, xPos, y);
-      xPos += columnWidths[2];
-      doc.text(`Rs.${product.quantity * product.price}`, xPos, y);
+      // Table content
+      doc.setTextColor(0, 0, 0);
+      data.products.forEach(product => {
+        xPos = 25;
+        doc.text(product.name, xPos, y);
+        xPos += columnWidths[0];
+        doc.text(product.quantity.toString(), xPos, y);
+        xPos += columnWidths[1];
+        doc.text(`Rs.${product.price}`, xPos, y);
+        xPos += columnWidths[2];
+        doc.text(`Rs.${product.quantity * product.price}`, xPos, y);
+        y += 10;
+      });
+
+      y += 20;
+
+      // Totals
+      doc.setFontSize(12);
+      doc.text("Subtotal:", 140, y);
+      doc.text(`Rs.${data.subtotal}`, 170, y, { align: "right" });
       y += 10;
-    });
-
-    y += 20;
-
-    // Totals
-    doc.setFontSize(12);
-    doc.text("Subtotal:", 140, y);
-    doc.text(`Rs.${data.subtotal}`, 170, y, { align: "right" });
-    y += 10;
-    doc.text("Tax:", 140, y);
-    doc.text(`Rs.${data.tax}`, 170, y, { align: "right" });
-    y += 10;
-    doc.setFontSize(14);
-    doc.setTextColor(44, 62, 80);
-    doc.text("Total:", 140, y);
-    doc.text(`Rs.${data.total}`, 170, y, { align: "right" });
-    y += 30;
-
-    // Terms and Conditions
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Terms and Conditions", 20, y);
-    y += 10;
-    const terms = [
-      "1. Payment is due within 30 days of invoice date",
-      "2. Late payments are subject to a 2% monthly fee",
-      "3. Please include invoice number in all correspondence",
-      "4. This invoice is subject to our standard terms and conditions"
-    ];
-    terms.forEach(term => {
-      doc.text(term, 20, y);
+      doc.text("Tax:", 140, y);
+      doc.text(`Rs.${data.tax}`, 170, y, { align: "right" });
       y += 10;
-    });
+      doc.setFontSize(14);
+      doc.setTextColor(44, 62, 80);
+      doc.text("Total:", 140, y);
+      doc.text(`Rs.${data.total}`, 170, y, { align: "right" });
+      y += 30;
 
-    // Privacy Notice
-    y += 10;
-    doc.text("Privacy Notice", 20, y);
-    y += 10;
-    doc.setFontSize(8);
-    doc.text("This document contains confidential information and is intended only for the individual named.", 20, y);
-    y += 20;
+      // Terms and Conditions
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Terms and Conditions", 20, y);
+      y += 10;
+      const terms = [
+        "1. Payment is due within 30 days of invoice date",
+        "2. Late payments are subject to a 2% monthly fee",
+        "3. Please include invoice number in all correspondence",
+        "4. This invoice is subject to our standard terms and conditions"
+      ];
+      terms.forEach(term => {
+        doc.text(term, 20, y);
+        y += 10;
+      });
 
-    // Signature
-    if (data.profile?.digital_signature_url) {
-      const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.profile.digital_signature_url}`;
-      doc.addImage(signatureUrl, 'PNG', 20, y, 50, 20);
-      doc.text("Authorized Signature", 20, y + 25);
+      // Privacy Notice
+      y += 10;
+      doc.text("Privacy Notice", 20, y);
+      y += 10;
+      doc.setFontSize(8);
+      doc.text("This document contains confidential information and is intended only for the individual named.", 20, y);
+      y += 20;
+
+      // Signature
+      if (data.profile?.digital_signature_url) {
+        const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.profile.digital_signature_url}`;
+        const img = await loadImage(signatureUrl);
+        doc.addImage(img, 'PNG', 20, y, 50, 20);
+        doc.text("Authorized Signature", 20, y + 25);
+      }
+    } catch (error) {
+      console.error('Error generating professional template:', error);
     }
 
     return doc;
   },
 
-  classic: (data: InvoiceData) => {
+  classic: async (data: InvoiceData) => {
     const doc = new jsPDF();
     let y = 20;
 
     // Logo and business details
-    y = addBusinessHeader(doc, data.businessDetails, y);
+    y = await addBusinessHeader(doc, data.businessDetails, y);
 
     // Invoice header
     doc.setFontSize(24);
@@ -291,12 +316,14 @@ export const templates = {
     doc.text(`Rs.${data.tax}`, 190, y, { align: "right" });
     y += 10;
     doc.setFontSize(14);
+    doc.setTextColor(44, 62, 80);
     doc.text("Total:", 130, y);
     doc.text(`Rs.${data.total}`, 190, y, { align: "right" });
     y += 30;
 
     // Terms and Privacy
     doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
     doc.text("Terms and Conditions:", 20, y);
     y += 10;
     doc.text("1. All invoices are payable within 30 days of issue", 20, y);
@@ -310,7 +337,7 @@ export const templates = {
     y += 30;
 
     // Signature
-    y = addSignature(doc, data.profile, y);
+    y = await addSignature(doc, data.profile, y);
 
     return doc;
   }
