@@ -20,6 +20,7 @@ export type Database = {
           invoice_template: string | null
           ntn_number: string | null
           social_media_links: Json | null
+          tax_configuration: Json | null
           user_id: string
           website: string | null
         }
@@ -33,6 +34,7 @@ export type Database = {
           invoice_template?: string | null
           ntn_number?: string | null
           social_media_links?: Json | null
+          tax_configuration?: Json | null
           user_id: string
           website?: string | null
         }
@@ -46,6 +48,7 @@ export type Database = {
           invoice_template?: string | null
           ntn_number?: string | null
           social_media_links?: Json | null
+          tax_configuration?: Json | null
           user_id?: string
           website?: string | null
         }
