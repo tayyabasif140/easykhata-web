@@ -55,34 +55,40 @@ export function CreateInvoiceDialog() {
     setProducts(products.filter((_, i) => i !== index));
   };
 
-  const updateProduct = (index: number, field: keyof Product, value: string | number) => {
-    const newProducts = [...products];
+  const debounceInventorySearch = (value: string, index: number, field: keyof Product) => {
+    const inventoryProduct = inventoryProducts?.find(
+      p => p.product_name.toLowerCase() === value.toLowerCase()
+    );
     
-    if (field === 'name' && typeof value === 'string') {
-      const inventoryProduct = inventoryProducts?.find(
-        p => p.product_name.toLowerCase() === value.toLowerCase()
-      );
-      
-      if (inventoryProduct) {
-        newProducts[index] = {
-          ...newProducts[index],
-          name: inventoryProduct.product_name,
-          price: inventoryProduct.price,
-        };
-      } else {
-        newProducts[index] = {
-          ...newProducts[index],
-          [field]: value,
-        };
-      }
+    if (inventoryProduct && field === 'name') {
+      const newProducts = [...products];
+      newProducts[index] = {
+        ...newProducts[index],
+        name: inventoryProduct.product_name,
+        price: inventoryProduct.price,
+      };
+      setProducts(newProducts);
     } else {
+      const newProducts = [...products];
       newProducts[index] = {
         ...newProducts[index],
         [field]: value,
       };
+      setProducts(newProducts);
     }
-    
-    setProducts(newProducts);
+  };
+
+  const updateProduct = (index: number, field: keyof Product, value: string | number) => {
+    if (field === 'name' && typeof value === 'string') {
+      debounceInventorySearch(value, index, field);
+    } else {
+      const newProducts = [...products];
+      newProducts[index] = {
+        ...newProducts[index],
+        [field]: value,
+      };
+      setProducts(newProducts);
+    }
   };
 
   const calculateSubtotal = () => {
@@ -224,8 +230,22 @@ export function CreateInvoiceDialog() {
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
+      console.log('Starting PDF download...');
       const doc = await generatePDF();
-      doc.save(`invoice_${invoice.id}.pdf`);
+      
+      if (!doc) {
+        throw new Error('PDF generation failed');
+      }
+      
+      console.log('PDF generated, saving...');
+      const fileName = `invoice_${invoice.id}.pdf`;
+      doc.save(fileName);
+      console.log('PDF saved as:', fileName);
+      
+      toast({
+        title: "Success",
+        description: "Invoice downloaded successfully!",
+      });
     } catch (error) {
       console.error('Error downloading invoice:', error);
       toast({
@@ -281,14 +301,17 @@ export function CreateInvoiceDialog() {
         customerId = customer.id;
       }
 
-      // Create invoice
+      // Create invoice with proper tax calculation
+      const totalTax = calculateTotalTax();
+      const totalAmount = calculateSubtotal();
+
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert([
           {
             customer_id: customerId,
-            total_amount: calculateTotal(),
-            tax_amount: calculateTotalTax(),
+            total_amount: totalAmount,
+            tax_amount: totalTax,
             status: 'unpaid',
             description: `Invoice for ${customerName}`,
             due_date: dueDate?.toISOString().split('T')[0],
@@ -316,51 +339,21 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
-      // Generate and save PDF
-      const doc = await generatePDF();
-      const pdfBlob = doc.output('blob');
-      
-      // Upload PDF to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('invoices')
-        .upload(`invoice_${invoice.id}.pdf`, pdfBlob, {
-          cacheControl: '3600',
-          contentType: 'application/pdf'
-        });
-      
-      if (uploadError) throw uploadError;
-
-      // Update invoice with PDF URL
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update({ pdf_url: `invoice_${invoice.id}.pdf` })
-        .eq('id', invoice.id);
-
-      if (updateError) throw updateError;
-
-      // Download the invoice
+      // Generate PDF and trigger download
+      console.log('Generating PDF for download...');
       await handleDownloadInvoice(invoice);
 
       toast({
         title: "Success",
-        description: "Invoice created and downloaded successfully!",
+        description: "Invoice created successfully!",
       });
 
-      // Refresh queries
+      // Refresh queries and reset form
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-
-      setOpen(false);
       
-      // Reset form
-      setCustomerName("");
-      setCompanyName("");
-      setEmail("");
-      setPhone("");
-      setProducts([{ name: "", quantity: 1, price: 0 }]);
-      setTax(0);
-      setDueDate(undefined);
-      setSelectedTaxes({});
+      setOpen(false);
+      resetForm();
     } catch (error: any) {
       console.error('Error creating invoice:', error);
       toast({
@@ -369,6 +362,17 @@ export function CreateInvoiceDialog() {
         variant: "destructive",
       });
     }
+  };
+
+  const resetForm = () => {
+    setCustomerName("");
+    setCompanyName("");
+    setEmail("");
+    setPhone("");
+    setProducts([{ name: "", quantity: 1, price: 0 }]);
+    setTax(0);
+    setDueDate(undefined);
+    setSelectedTaxes({});
   };
 
   return (
