@@ -1,3 +1,4 @@
+
 import { Bell, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -127,9 +128,11 @@ export const Header = () => {
                   <Button className="w-full justify-start" variant="outline">
                     Notification Preferences
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
-                    Security
-                  </Button>
+                  <Link to="/settings">
+                    <Button className="w-full justify-start" variant="outline">
+                      Templates
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </SheetContent>
