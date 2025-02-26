@@ -88,6 +88,72 @@ export const Header = () => {
     refetchBusinessDetails();
   };
 
+  const addNewTax = async () => {
+    if (!session?.user?.id || !businessDetails) return;
+    
+    const currentTaxes = businessDetails.tax_configuration || [];
+    const newTax = {
+      name: `Tax ${currentTaxes.length + 1}`,
+      rate: 0,
+      enabled: true
+    };
+    
+    const { error } = await supabase
+      .from('business_details')
+      .update({
+        tax_configuration: [...currentTaxes, newTax]
+      })
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      console.error('Error adding tax:', error);
+      return;
+    }
+
+    refetchBusinessDetails();
+  };
+
+  const updateTax = async (index: number, updates: any) => {
+    if (!session?.user?.id || !businessDetails) return;
+    
+    const newTaxes = [...(businessDetails.tax_configuration || [])];
+    newTaxes[index] = { ...newTaxes[index], ...updates };
+    
+    const { error } = await supabase
+      .from('business_details')
+      .update({
+        tax_configuration: newTaxes
+      })
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      console.error('Error updating tax:', error);
+      return;
+    }
+
+    refetchBusinessDetails();
+  };
+
+  const deleteTax = async (index: number) => {
+    if (!session?.user?.id || !businessDetails) return;
+    
+    const newTaxes = (businessDetails.tax_configuration || []).filter((_, i) => i !== index);
+    
+    const { error } = await supabase
+      .from('business_details')
+      .update({
+        tax_configuration: newTaxes
+      })
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      console.error('Error deleting tax:', error);
+      return;
+    }
+
+    refetchBusinessDetails();
+  };
+
   return (
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -183,59 +249,58 @@ export const Header = () => {
                     <Card>
                       <CardHeader>
                         <CardTitle>Tax Configuration</CardTitle>
-                        <CardDescription>Manage your tax rates</CardDescription>
+                        <CardDescription>Add and manage your tax rates</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                           {(businessDetails?.tax_configuration || []).map((tax: any, index: number) => (
-                            <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
-                              <div className="flex-1">
-                                <Label>Name</Label>
-                                <Input 
-                                  value={tax.name} 
-                                  onChange={(e) => {
-                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
-                                    newTaxes[index].name = e.target.value;
-                                    updateBusinessDetails({ tax_configuration: newTaxes });
-                                  }}
-                                />
+                            <div key={index} className="flex flex-col gap-4 p-4 border rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-medium">Tax {index + 1}</h3>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteTax(index)}
+                                >
+                                  Remove
+                                </Button>
                               </div>
-                              <div className="w-24">
-                                <Label>Rate (%)</Label>
-                                <Input 
-                                  type="number" 
-                                  value={tax.rate} 
-                                  onChange={(e) => {
-                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
-                                    newTaxes[index].rate = parseFloat(e.target.value);
-                                    updateBusinessDetails({ tax_configuration: newTaxes });
-                                  }}
-                                />
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label>Name</Label>
+                                  <Input 
+                                    value={tax.name}
+                                    placeholder="Enter tax name"
+                                    onChange={(e) => updateTax(index, { name: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <Label>Rate (%)</Label>
+                                  <Input 
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    value={tax.rate}
+                                    onChange={(e) => updateTax(index, { rate: parseFloat(e.target.value) })}
+                                  />
+                                </div>
                               </div>
-                              <div className="flex flex-col justify-center">
-                                <Label>Enabled</Label>
+                              <div className="flex items-center gap-2">
                                 <Switch 
                                   checked={tax.enabled}
-                                  onCheckedChange={(checked) => {
-                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
-                                    newTaxes[index].enabled = checked;
-                                    updateBusinessDetails({ tax_configuration: newTaxes });
-                                  }}
+                                  onCheckedChange={(checked) => updateTax(index, { enabled: checked })}
                                 />
+                                <Label>Enable this tax</Label>
                               </div>
                             </div>
                           ))}
                           <Button
                             variant="outline"
-                            onClick={() => {
-                              const newTaxes = [
-                                ...(businessDetails?.tax_configuration || []),
-                                { name: '', rate: 0, enabled: true }
-                              ];
-                              updateBusinessDetails({ tax_configuration: newTaxes });
-                            }}
+                            onClick={addNewTax}
+                            className="w-full"
                           >
-                            Add Tax
+                            Add New Tax
                           </Button>
                         </div>
                       </CardContent>

@@ -222,6 +222,20 @@ export function CreateInvoiceDialog() {
     });
   };
 
+  const handleDownloadInvoice = async (invoice: any) => {
+    try {
+      const doc = await generatePDF();
+      doc.save(`invoice_${invoice.id}.pdf`);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download invoice. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -249,10 +263,8 @@ export function CreateInvoiceDialog() {
       let customerId;
 
       if (existingCustomers && existingCustomers.length > 0) {
-        // Use existing customer
         customerId = existingCustomers[0].id;
       } else {
-        // Create new customer
         const { data: customer, error: customerError } = await supabase
           .from('customers')
           .insert([{ 
@@ -304,13 +316,17 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
+      // Generate and save PDF
       const doc = await generatePDF();
       const pdfBlob = doc.output('blob');
       
       // Upload PDF to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('invoices')
-        .upload(`invoice_${invoice.id}.pdf`, pdfBlob);
+        .upload(`invoice_${invoice.id}.pdf`, pdfBlob, {
+          cacheControl: '3600',
+          contentType: 'application/pdf'
+        });
       
       if (uploadError) throw uploadError;
 
@@ -322,9 +338,12 @@ export function CreateInvoiceDialog() {
 
       if (updateError) throw updateError;
 
+      // Download the invoice
+      await handleDownloadInvoice(invoice);
+
       toast({
         title: "Success",
-        description: "Invoice created successfully!",
+        description: "Invoice created and downloaded successfully!",
       });
 
       // Refresh queries
@@ -341,8 +360,9 @@ export function CreateInvoiceDialog() {
       setProducts([{ name: "", quantity: 1, price: 0 }]);
       setTax(0);
       setDueDate(undefined);
-
+      setSelectedTaxes({});
     } catch (error: any) {
+      console.error('Error creating invoice:', error);
       toast({
         title: "Error",
         description: error.message,
