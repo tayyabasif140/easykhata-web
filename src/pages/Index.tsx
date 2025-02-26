@@ -262,24 +262,77 @@ const Index = () => {
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
-      const { data } = await supabase.storage
-        .from('invoices')
-        .download(`invoice_${invoice.id}.pdf`);
-      
-      if (data) {
-        const url = URL.createObjectURL(data);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `invoice_${invoice.id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
+      // Get invoice items
+      const { data: invoiceItems, error: itemsError } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+
+      if (itemsError) throw itemsError;
+
+      // Get customer details
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', invoice.customer_id)
+        .single();
+
+      if (customerError) throw customerError;
+
+      // Get business details
+      const { data: businessDetails, error: businessError } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', invoice.user_id)
+        .single();
+
+      if (businessError) throw businessError;
+
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', invoice.user_id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Generate PDF
+      const template = businessDetails?.invoice_template || 'classic';
+      const templateFn = templates[template as keyof typeof templates];
+
+      if (!templateFn) throw new Error('Invalid template');
+
+      const doc = await templateFn({
+        customerName: customer.name,
+        companyName: customer.company || '',
+        phone: customer.phone || '',
+        email: customer.email,
+        products: invoiceItems.map((item: any) => ({
+          name: item.product_name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        subtotal: invoice.total_amount,
+        tax: invoice.tax_amount,
+        total: invoice.total_amount + invoice.tax_amount,
+        dueDate: invoice.due_date ? new Date(invoice.due_date) : undefined,
+        businessDetails,
+        profile
+      });
+
+      // Download PDF
+      doc.save(`invoice_${invoice.id}.pdf`);
+
+      toast({
+        title: "Success",
+        description: "Invoice downloaded successfully!",
+      });
     } catch (error: any) {
+      console.error('Error downloading invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to download invoice",
+        description: "Failed to download invoice. Please try again.",
         variant: "destructive",
       });
     }

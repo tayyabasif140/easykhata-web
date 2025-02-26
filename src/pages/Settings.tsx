@@ -34,50 +34,55 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const [taxes, setTaxes] = useState<Array<{ name: string; rate: number; enabled: boolean; }>>([]);
 
-  const { data: businessDetails } = useQuery({
+  const {
+    data: businessDetails,
+    error: businessError,
+    refetch: refetchBusinessDetails
+  } = useQuery({
     queryKey: ['businessDetails'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
+      
       const { data, error } = await supabase
         .from('business_details')
         .select('*')
         .eq('user_id', userData.user.id)
         .single();
+      
       if (error) throw error;
-      const result = data;
-      if (result?.tax_configuration) {
-        setTaxes(result.tax_configuration);
-      }
-      return result;
+      return data;
     }
   });
 
-  const updateBusinessDetails = useMutation({
-    mutationFn: async (updates: any) => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+  const updateBusinessDetails = async (updates: any) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
 
-      const { error } = await supabase
-        .from('business_details')
-        .update(updates)
-        .eq('user_id', userData.user.id);
+    const { error } = await supabase
+      .from('business_details')
+      .update(updates)
+      .eq('user_id', userData.user.id);
 
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
+    if (error) {
       toast({
-        title: "Success",
-        description: "Settings updated successfully",
+        title: "Error",
+        description: "Failed to update business details",
+        variant: "destructive",
       });
+      return;
     }
-  });
+
+    refetchBusinessDetails();
+    toast({
+      title: "Success",
+      description: "Business details updated successfully",
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+    <div className="container mx-auto py-10">
+      <div className="space-y-10">
         <Tabs defaultValue="templates" className="space-y-8">
           <TabsList>
             <TabsTrigger value="templates">Invoice Templates</TabsTrigger>
@@ -103,7 +108,7 @@ export default function Settings() {
                           ? 'border-primary bg-primary/5 shadow-md' 
                           : 'hover:border-gray-400 hover:shadow'
                       }`}
-                      onClick={() => updateBusinessDetails.mutate({ invoice_template: template.id })}
+                      onClick={() => updateBusinessDetails({ invoice_template: template.id })}
                     >
                       <h3 className="font-semibold mb-2">{template.name}</h3>
                       <p className="text-sm text-gray-600">{template.description}</p>
@@ -208,12 +213,62 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* General settings content */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium">Business Profile</h3>
+                    <p className="text-sm text-gray-500">
+                      Manage your business information and preferences
+                    </p>
+                  </div>
+                  <div className="grid gap-6">
+                    <div className="space-y-2">
+                      <Label>Business Name</Label>
+                      <Input
+                        value={businessDetails?.business_name || ''}
+                        onChange={(e) => updateBusinessDetails({ business_name: e.target.value })}
+                        placeholder="Enter your business name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Business Address</Label>
+                      <Input
+                        value={businessDetails?.business_address || ''}
+                        onChange={(e) => updateBusinessDetails({ business_address: e.target.value })}
+                        placeholder="Enter your business address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Default Invoice Template</Label>
+                      <select
+                        className="w-full p-2 border rounded-md"
+                        value={businessDetails?.invoice_template || 'classic'}
+                        onChange={(e) => updateBusinessDetails({ invoice_template: e.target.value })}
+                      >
+                        <option value="classic">Classic</option>
+                        <option value="modern">Modern</option>
+                        <option value="professional">Professional</option>
+                        <option value="golden">Golden</option>
+                        <option value="diamond">Diamond</option>
+                        <option value="funky">Funky</option>
+                        <option value="bold">Bold</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Terms and Conditions</Label>
+                      <textarea
+                        className="w-full p-2 border rounded-md min-h-[200px]"
+                        value={businessDetails?.terms_and_conditions || ''}
+                        onChange={(e) => updateBusinessDetails({ terms_and_conditions: e.target.value })}
+                        placeholder="Enter your business terms and conditions"
+                      />
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-      </main>
+      </div>
     </div>
   );
 }
