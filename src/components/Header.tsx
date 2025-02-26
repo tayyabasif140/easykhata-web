@@ -1,4 +1,3 @@
-
 import { Bell, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -14,10 +13,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Link } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { Switch } from "./ui/switch";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("templates");
+  const [taxes, setTaxes] = useState<{ name: string; rate: number; enabled: boolean; }[]>([]);
 
   const { data: notifications } = useQuery({
     queryKey: ['notifications'],
@@ -40,7 +46,7 @@ export const Header = () => {
     }
   });
 
-  const { data: businessDetails } = useQuery({
+  const { data: businessDetails, refetch: refetchBusinessDetails } = useQuery({
     queryKey: ['businessDetails'],
     queryFn: async () => {
       if (!session?.user?.id) return null;
@@ -65,6 +71,22 @@ export const Header = () => {
   });
 
   const unreadNotifications = notifications?.filter(n => !n.read)?.length || 0;
+
+  const updateBusinessDetails = async (updates: any) => {
+    if (!session?.user?.id) return;
+
+    const { error } = await supabase
+      .from('business_details')
+      .update(updates)
+      .eq('user_id', session.user.id);
+
+    if (error) {
+      console.error('Error updating business details:', error);
+      return;
+    }
+
+    refetchBusinessDetails();
+  };
 
   return (
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">
@@ -114,26 +136,125 @@ export const Header = () => {
                 <Settings className="w-5 h-5" />
               </button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="w-[500px]">
               <SheetHeader>
                 <SheetTitle>Settings</SheetTitle>
               </SheetHeader>
               <div className="mt-4">
-                <div className="space-y-4">
-                  <Link to="/account">
-                    <Button className="w-full justify-start" variant="outline">
-                      Profile Settings
-                    </Button>
-                  </Link>
-                  <Button className="w-full justify-start" variant="outline">
-                    Notification Preferences
-                  </Button>
-                  <Link to="/settings">
-                    <Button className="w-full justify-start" variant="outline">
-                      Templates
-                    </Button>
-                  </Link>
-                </div>
+                <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+                  <TabsList className="grid grid-cols-3 gap-4 mb-4">
+                    <TabsTrigger value="templates">Templates</TabsTrigger>
+                    <TabsTrigger value="taxes">Taxes</TabsTrigger>
+                    <TabsTrigger value="profile">Profile</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="templates">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Invoice Templates</CardTitle>
+                        <CardDescription>Choose your preferred invoice template</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {['classic', 'modern', 'professional'].map((template) => (
+                            <div
+                              key={template}
+                              className={`p-4 rounded-lg border cursor-pointer ${
+                                businessDetails?.invoice_template === template
+                                  ? 'border-primary bg-primary/5'
+                                  : 'hover:border-gray-400'
+                              }`}
+                              onClick={() => updateBusinessDetails({ invoice_template: template })}
+                            >
+                              <h3 className="font-medium capitalize">{template}</h3>
+                              <p className="text-sm text-gray-600">
+                                {template === 'classic' && 'Traditional and clean design'}
+                                {template === 'modern' && 'Contemporary and sleek layout'}
+                                {template === 'professional' && 'Formal and polished appearance'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="taxes">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Tax Configuration</CardTitle>
+                        <CardDescription>Manage your tax rates</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {(businessDetails?.tax_configuration || []).map((tax: any, index: number) => (
+                            <div key={index} className="flex items-center gap-4 p-4 border rounded-lg">
+                              <div className="flex-1">
+                                <Label>Name</Label>
+                                <Input 
+                                  value={tax.name} 
+                                  onChange={(e) => {
+                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
+                                    newTaxes[index].name = e.target.value;
+                                    updateBusinessDetails({ tax_configuration: newTaxes });
+                                  }}
+                                />
+                              </div>
+                              <div className="w-24">
+                                <Label>Rate (%)</Label>
+                                <Input 
+                                  type="number" 
+                                  value={tax.rate} 
+                                  onChange={(e) => {
+                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
+                                    newTaxes[index].rate = parseFloat(e.target.value);
+                                    updateBusinessDetails({ tax_configuration: newTaxes });
+                                  }}
+                                />
+                              </div>
+                              <div className="flex flex-col justify-center">
+                                <Label>Enabled</Label>
+                                <Switch 
+                                  checked={tax.enabled}
+                                  onCheckedChange={(checked) => {
+                                    const newTaxes = [...(businessDetails?.tax_configuration || [])];
+                                    newTaxes[index].enabled = checked;
+                                    updateBusinessDetails({ tax_configuration: newTaxes });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              const newTaxes = [
+                                ...(businessDetails?.tax_configuration || []),
+                                { name: '', rate: 0, enabled: true }
+                              ];
+                              updateBusinessDetails({ tax_configuration: newTaxes });
+                            }}
+                          >
+                            Add Tax
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="profile">
+                    <div className="space-y-4">
+                      <Link to="/account" className="w-full">
+                        <Button className="w-full justify-start" variant="outline">
+                          Profile Settings
+                        </Button>
+                      </Link>
+                      <Button className="w-full justify-start" variant="outline">
+                        Notification Preferences
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </SheetContent>
           </Sheet>
