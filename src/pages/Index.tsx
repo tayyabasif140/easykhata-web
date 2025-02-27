@@ -1,4 +1,3 @@
-
 import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,17 +66,20 @@ const Index = () => {
     queryKey: ['invoices'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
+      if (!userData.user) return [];
 
       const { data, error } = await supabase
         .from('invoices')
         .select(`
           *,
           customers (
-            name
+            name,
+            company
           )
         `)
-        .eq('user_id', userData.user.id);
+        .eq('user_id', userData.user.id)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
       return data;
     }
@@ -261,6 +263,98 @@ const Index = () => {
       return data as TaxPayment[];
     }
   });
+
+  const handlePreviewInvoice = async (invoice: any) => {
+    try {
+      // Get invoice items
+      const { data: invoiceItems, error: itemsError } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoice.id);
+
+      if (itemsError) throw itemsError;
+
+      // Get customer details
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', invoice.customer_id)
+        .single();
+
+      if (customerError) throw customerError;
+
+      // Get business details
+      const { data: businessDetails, error: businessError } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', invoice.user_id)
+        .single();
+
+      if (businessError) throw businessError;
+
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', invoice.user_id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Generate PDF
+      const template = businessDetails?.invoice_template || 'classic';
+      const templateFn = templates[template as keyof typeof templates];
+
+      if (!templateFn) throw new Error('Invalid template');
+
+      const doc = await templateFn({
+        customerName: customer.name,
+        companyName: customer.company || '',
+        phone: customer.phone || '',
+        email: customer.email,
+        products: invoiceItems.map((item: any) => ({
+          name: item.product_name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        subtotal: invoice.total_amount,
+        tax: invoice.tax_amount,
+        total: invoice.total_amount + invoice.tax_amount,
+        dueDate: invoice.due_date ? new Date(invoice.due_date) : undefined,
+        businessDetails,
+        profile
+      });
+
+      // Convert to data URL for preview
+      const pdfDataUrl = doc.output('dataurlstring');
+      
+      // Open preview in new window
+      const previewWindow = window.open();
+      if (previewWindow) {
+        previewWindow.document.write(`
+          <html>
+            <head>
+              <title>Invoice Preview - ${customer.name}</title>
+              <style>
+                body { margin: 0; padding: 0; }
+                iframe { width: 100%; height: 100vh; border: none; }
+              </style>
+            </head>
+            <body>
+              <iframe src="${pdfDataUrl}"></iframe>
+            </body>
+          </html>
+        `);
+      }
+    } catch (error: any) {
+      console.error('Error previewing invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to preview invoice. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
@@ -558,62 +652,67 @@ const Index = () => {
               {invoices?.length ? (
                 <div className="divide-y">
                   {invoices.map((invoice) => (
-                    <div key={invoice.id} className="py-4 flex justify-between items-center">
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedInvoices.includes(invoice.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedInvoices([...selectedInvoices, invoice.id]);
-                            } else {
-                              setSelectedInvoices(selectedInvoices.filter(id => id !== invoice.id));
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <div>
-                          <h3 className="font-medium">Invoice #{invoice.id.slice(0, 8)}</h3>
-                          <p className="text-sm text-gray-600">
-                            {new Date(invoice.created_at).toLocaleDateString()} • 
-                            <span className="ml-2">{invoice.customers?.name}</span>
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">Rs.{invoice.total_amount.toLocaleString()}</p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    <Card key={invoice.id} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex justify-between items-center">
+                          <span>{invoice.customers.name}</span>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            invoice.status === 'paid' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-amber-100 text-amber-800'
                           }`}>
                             {invoice.status}
                           </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setSelectedInvoice(invoice)}
+                        </CardTitle>
+                        <CardDescription>
+                          {invoice.customers.company || 'No company'}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-bold">Rs.{invoice.total_amount + invoice.tax_amount}</p>
+                        <p className="text-sm text-gray-500">
+                          Created: {format(new Date(invoice.created_at), 'MMM d, yyyy')}
+                        </p>
+                        {invoice.due_date && (
+                          <p className="text-sm text-gray-500">
+                            Due: {format(new Date(invoice.due_date), 'MMM d, yyyy')}
+                          </p>
+                        )}
+                      </CardContent>
+                      <CardFooter className="flex justify-between border-t pt-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setSelectedInvoice(invoice)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Details
+                        </Button>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handlePreviewInvoice(invoice)}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
+                          <Button 
+                            variant="outline" 
+                            size="sm"
                             onClick={() => handleDownloadInvoice(invoice)}
                           >
-                            <Download className="h-4 w-4" />
+                            <Download className="w-4 h-4" />
                           </Button>
-                          <Button
+                          <Button 
                             variant="destructive"
-                            size="icon"
+                            size="sm"
                             onClick={() => handleDeleteInvoice(invoice.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                      </div>
-                    </div>
+                      </CardFooter>
+                    </Card>
                   ))}
                 </div>
               ) : (
@@ -793,74 +892,71 @@ const Index = () => {
         </Dialog>
 
         {/* Invoice Details Dialog */}
-        <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
+        <Dialog open={!!selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
             </DialogHeader>
             {selectedInvoice && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="font-medium text-gray-500">Invoice Number</h3>
-                    <p>#{selectedInvoice.id.slice(0, 8)}</p>
+                    <h3 className="font-medium">Customer</h3>
+                    <p>{selectedInvoice.customers.name}</p>
+                    <p>{selectedInvoice.customers.company || 'No company'}</p>
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-500">Date</h3>
-                    <p>{new Date(selectedInvoice.created_at).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500">Customer</h3>
-                    <p>{selectedInvoice.customers?.name}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-500">Status</h3>
-                    <span className={`inline-block px-2 py-1 rounded-full text-sm ${
-                      selectedInvoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedInvoice.status}
-                    </span>
+                    <h3 className="font-medium">Invoice</h3>
+                    <p>Status: {selectedInvoice.status}</p>
+                    <p>Created: {format(new Date(selectedInvoice.created_at), 'MMM d, yyyy')}</p>
+                    {selectedInvoice.due_date && (
+                      <p>Due: {format(new Date(selectedInvoice.due_date), 'MMM d, yyyy')}</p>
+                    )}
                   </div>
                 </div>
                 
                 <div>
-                  <h3 className="font-medium text-gray-500 mb-2">Items</h3>
-                  <div className="space-y-2">
-                    {selectedInvoice.invoice_items?.map((item: any) => (
-                      <div key={item.id} className="flex justify-between py-2 border-b">
-                        <div>
-                          <p className="font-medium">{item.product_name}</p>
-                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                        </div>
-                        <p className="font-medium">Rs.{item.total.toLocaleString()}</p>
-                      </div>
-                    ))}
+                  <h3 className="font-medium mb-2">Items</h3>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.map((item: any) => (
+                          <tr key={item.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">{item.product_name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">Rs.{item.price}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">Rs.{item.total}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <p className="text-gray-500">Subtotal</p>
-                    <p>Rs.{selectedInvoice.total_amount.toLocaleString()}</p>
+                
+                <div className="flex justify-between border-t pt-4">
+                  <div>
+                    <p>Subtotal: Rs.{selectedInvoice.total_amount}</p>
+                    <p>Tax: Rs.{selectedInvoice.tax_amount}</p>
+                    <p className="font-bold">Total: Rs.{selectedInvoice.total_amount + selectedInvoice.tax_amount}</p>
                   </div>
-                  <div className="flex justify-between">
-                    <p className="text-gray-500">Tax</p>
-                    <p>Rs.{selectedInvoice.tax_amount.toLocaleString()}</p>
+                  <div className="flex space-x-2">
+                    <Button onClick={() => handlePreviewInvoice(selectedInvoice)}>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Preview
+                    </Button>
+                    <Button onClick={() => handleDownloadInvoice(selectedInvoice)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
                   </div>
-                  <div className="flex justify-between font-medium">
-                    <p>Total</p>
-                    <p>Rs.{(Number(selectedInvoice.total_amount) + Number(selectedInvoice.tax_amount)).toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDownloadInvoice(selectedInvoice)}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
-                  </Button>
                 </div>
               </div>
             )}
