@@ -1,3 +1,4 @@
+
 import { Header } from "@/components/Header";
 import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { templates } from "@/utils/invoiceTemplates";
 
 interface TaxPayment {
   id: string;

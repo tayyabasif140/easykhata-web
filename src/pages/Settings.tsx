@@ -55,29 +55,36 @@ export default function Settings() {
     }
   });
 
-  const updateBusinessDetails = async (updates: any) => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+  const updateBusinessDetailsMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
 
-    const { error } = await supabase
-      .from('business_details')
-      .update(updates)
-      .eq('user_id', userData.user.id);
+      const { error } = await supabase
+        .from('business_details')
+        .update(updates)
+        .eq('user_id', userData.user.id);
 
-    if (error) {
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchBusinessDetails();
+      toast({
+        title: "Success",
+        description: "Business details updated successfully",
+      });
+    },
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to update business details",
         variant: "destructive",
       });
-      return;
     }
+  });
 
-    refetchBusinessDetails();
-    toast({
-      title: "Success",
-      description: "Business details updated successfully",
-    });
+  const updateBusinessDetails = (updates: any) => {
+    updateBusinessDetailsMutation.mutate(updates);
   };
 
   return (
