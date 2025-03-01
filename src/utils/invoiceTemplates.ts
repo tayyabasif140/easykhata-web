@@ -143,143 +143,220 @@ export const templates = {
   },
 
   professional: async (data: InvoiceData) => {
-    const doc = new jsPDF();
-    let y = 20;
-
-    // Add a blue header bar
-    doc.setFillColor(41, 128, 185); // Professional blue color
-    doc.rect(0, 0, doc.internal.pageSize.width, 40, 'F');
-
-    // Add logo and business details
     try {
+      // Create a new PDF document
+      const doc = new jsPDF();
+      let y = 20;
+      
+      // Add a professional header with gradient-like appearance
+      doc.setFillColor(25, 47, 96); // Deep blue for header
+      doc.rect(0, 0, doc.internal.pageSize.width, 50, 'F');
+      doc.setFillColor(37, 71, 132); // Lighter blue for accent
+      doc.rect(0, 50, doc.internal.pageSize.width, 5, 'F');
+      
+      // Add company logo and details
       if (data.businessDetails?.business_logo_url) {
-        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
-        const img = await loadImage(logoUrl);
-        doc.addImage(img, 'PNG', 20, 10, 30, 30);
+        try {
+          const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
+          const img = await loadImage(logoUrl);
+          doc.addImage(img, 'PNG', 15, 8, 35, 35);
+        } catch (logoError) {
+          console.error('Error loading logo:', logoError);
+        }
       }
-
-      // Business details on right side in white text
+      
+      // Business details in white text on blue background
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(16);
-      doc.text(data.businessDetails?.business_name || "Your Business", 190, 15, { align: "right" });
+      doc.setFontSize(18);
+      doc.text(data.businessDetails?.business_name || "Your Business", 60, 20);
       doc.setFontSize(10);
-      doc.text(data.businessDetails?.business_address || "", 190, 25, { align: "right" });
-      doc.text(data.businessDetails?.business_email || "", 190, 35, { align: "right" });
+      doc.text(data.businessDetails?.business_address || "", 60, 30);
+      if (data.businessDetails?.business_category) {
+        doc.text(data.businessDetails.business_category, 60, 40);
+      }
       
-      y = 60; // Start content below the header
-
-      // Invoice title with blue accent
-      doc.setFontSize(22);
-      doc.setTextColor(41, 128, 185);
+      // Set starting position below the header
+      y = 70;
+      
+      // Add "INVOICE" title with current date
+      doc.setTextColor(25, 47, 96); // Match header color
+      doc.setFontSize(24);
       doc.text("INVOICE", 20, y);
-      
-      // Add date and invoice details
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      doc.text(`Date: ${format(new Date(), 'MMMM dd, yyyy')}`, 190, y, { align: "right" });
-      if (data.dueDate) {
-        doc.text(`Due: ${format(data.dueDate, 'MMMM dd, yyyy')}`, 190, y + 10, { align: "right" });
-      }
-      y += 30;
-
-      // Customer details in a box with blue border
-      doc.setDrawColor(41, 128, 185);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(20, y, 170, 50, 3, 3);
-      doc.setFontSize(12);
-      doc.setTextColor(41, 128, 185);
-      doc.text("Bill To:", 30, y + 15);
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(11);
-      doc.text(data.customerName, 30, y + 30);
-      doc.text(data.companyName || "", 30, y + 40);
+      doc.text(`Date: ${format(new Date(), 'MMMM dd, yyyy')}`, 20, y + 10);
       
-      // Contact info
-      doc.text(`Email: ${data.email}`, 120, y + 30);
-      doc.text(`Phone: ${data.phone || "N/A"}`, 120, y + 40);
-      y += 70;
-
+      // Add invoice number on right side
+      doc.setFontSize(10);
+      doc.text(`Invoice #: ${Math.floor(Math.random() * 10000)}`, 150, y); // Random number as placeholder
+      if (data.dueDate) {
+        doc.text(`Due: ${format(data.dueDate, 'MMMM dd, yyyy')}`, 150, y + 10);
+      }
+      
+      y += 25;
+      
+      // Add a clean separator line
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(20, y, 190, y);
+      y += 15;
+      
+      // Customer info in a clean, well-spaced format
+      doc.setFontSize(12);
+      doc.setTextColor(25, 47, 96);
+      doc.text("BILL TO:", 20, y);
+      y += 8;
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(11);
+      doc.text(data.customerName, 20, y);
+      y += 7;
+      if (data.companyName) {
+        doc.text(data.companyName, 20, y);
+        y += 7;
+      }
+      doc.text(data.email || "", 20, y);
+      y += 7;
+      doc.text(data.phone || "", 20, y);
+      y += 20;
+      
       // Table headers with blue background
-      doc.setFillColor(41, 128, 185);
+      doc.setFillColor(25, 47, 96);
       doc.rect(20, y, 170, 10, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(10);
-      doc.text("Item", 25, y + 7);
-      doc.text("Quantity", 100, y + 7);
-      doc.text("Price", 130, y + 7);
-      doc.text("Total", 160, y + 7);
+      doc.text("ITEM", 25, y + 7);
+      doc.text("QTY", 100, y + 7);
+      doc.text("PRICE", 130, y + 7);
+      doc.text("AMOUNT", 170, y + 7);
       y += 15;
-
-      // Table content with alternating background
-      doc.setTextColor(0, 0, 0);
+      
+      // Table content with alternating rows for readability
+      doc.setTextColor(70, 70, 70);
       data.products.forEach((product, index) => {
         if (index % 2 === 0) {
-          doc.setFillColor(240, 240, 240);
+          doc.setFillColor(245, 245, 250); // Very light blue for even rows
           doc.rect(20, y - 5, 170, 10, 'F');
         }
         doc.text(product.name, 25, y);
         doc.text(product.quantity.toString(), 100, y);
-        doc.text(`Rs.${product.price}`, 130, y);
-        doc.text(`Rs.${product.quantity * product.price}`, 160, y);
+        doc.text(`Rs.${product.price.toFixed(2)}`, 130, y);
+        doc.text(`Rs.${(product.quantity * product.price).toFixed(2)}`, 170, y);
         y += 10;
       });
-
-      y += 20;
-
-      // Summary box with blue border
-      doc.setDrawColor(41, 128, 185);
-      doc.roundedRect(110, y, 80, 50, 3, 3);
       
-      // Totals
-      doc.text("Subtotal:", 120, y + 15);
-      doc.text(`Rs.${data.subtotal}`, 180, y + 15, { align: "right" });
-      doc.text("Tax:", 120, y + 30);
-      doc.text(`Rs.${data.tax}`, 180, y + 30, { align: "right" });
+      y += 10;
       
-      // Total with blue highlight
-      doc.setFillColor(41, 128, 185);
-      doc.rect(110, y + 35, 80, 15, 'F');
+      // Add another separator before totals
+      doc.setDrawColor(220, 220, 220);
+      doc.line(20, y, 190, y);
+      y += 15;
+      
+      // Totals section with professional styling
+      doc.setTextColor(70, 70, 70);
+      doc.text("Subtotal:", 130, y);
+      doc.setTextColor(25, 47, 96);
+      doc.text(`Rs.${data.subtotal.toFixed(2)}`, 190, y, { align: "right" });
+      y += 10;
+      
+      doc.setTextColor(70, 70, 70);
+      doc.text("Tax:", 130, y);
+      doc.setTextColor(25, 47, 96);
+      doc.text(`Rs.${data.tax.toFixed(2)}`, 190, y, { align: "right" });
+      y += 15;
+      
+      // Total amount highlighted for emphasis
+      doc.setFillColor(25, 47, 96);
+      doc.rect(120, y - 5, 70, 15, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
-      doc.text("TOTAL:", 120, y + 45);
-      doc.text(`Rs.${data.total}`, 180, y + 45, { align: "right" });
-      y += 70;
-
-      // Terms and conditions
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.text("Terms and Conditions", 20, y);
-      y += 10;
-      doc.setFontSize(8);
-      doc.text("1. Payment is due within 30 days of invoice date", 20, y);
-      y += 8;
-      doc.text("2. Late payments are subject to a 2% monthly fee", 20, y);
-      y += 8;
-      doc.text("3. Please include invoice number in all correspondence", 20, y);
-      y += 20;
-
-      // Footer with signature
-      y = await addSignature(doc, data.profile, y);
+      doc.text("TOTAL:", 130, y + 5);
+      doc.text(`Rs.${data.total.toFixed(2)}`, 190, y + 5, { align: "right" });
+      y += 25;
       
-      // Add a blue footer bar
-      doc.setFillColor(41, 128, 185);
-      doc.rect(0, doc.internal.pageSize.height - 20, doc.internal.pageSize.width, 20, 'F');
+      // Payment information and terms
+      doc.setTextColor(25, 47, 96);
+      doc.setFontSize(11);
+      doc.text("Payment Details:", 20, y);
+      y += 8;
+      doc.setTextColor(70, 70, 70);
+      doc.setFontSize(10);
+      doc.text("Bank: Professional Bank Ltd", 20, y);
+      y += 7;
+      doc.text("Account: XXXX-XXXX-XXXX-1234", 20, y);
+      y += 7;
+      doc.text("SWIFT: PBXXXXXXX", 20, y);
+      y += 20;
+      
+      // Terms and conditions
+      doc.setTextColor(25, 47, 96);
+      doc.setFontSize(11);
+      doc.text("Terms & Conditions:", 20, y);
+      y += 8;
+      doc.setTextColor(70, 70, 70);
+      doc.setFontSize(9);
+      doc.text("1. Payment is due within 30 days", 20, y);
+      y += 6;
+      doc.text("2. Please include invoice number with your payment", 20, y);
+      y += 6;
+      doc.text("3. Contact us for any questions regarding this invoice", 20, y);
+      y += 20;
+      
+      // Add signature if available
+      try {
+        if (data.profile?.digital_signature_url) {
+          const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.profile.digital_signature_url}`;
+          const img = await loadImage(signatureUrl);
+          doc.addImage(img, 'PNG', 20, y, 40, 20);
+          doc.setFontSize(9);
+          doc.text("Authorized Signature", 20, y + 25);
+        }
+      } catch (signatureError) {
+        console.error('Error loading signature:', signatureError);
+      }
+      
+      // Add a professional footer
+      doc.setFillColor(25, 47, 96); 
+      doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(8);
-      doc.text("Thank you for your business", doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: "center" });
+      doc.text("Thank you for your business", doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 5, { align: "center" });
+      
+      return doc;
     } catch (error) {
-      console.error('Error generating professional template:', error);
-      // Create a fallback template in case of errors
+      console.error('Error generating professional invoice:', error);
+      
+      // Create a basic fallback template that won't fail
+      const doc = new jsPDF();
       doc.setTextColor(0, 0, 0);
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.text("INVOICE", 105, 20, { align: "center" });
+      
+      // Add basic customer info
       doc.setFontSize(12);
       doc.text(`Customer: ${data.customerName}`, 20, 40);
-      doc.text(`Total Amount: Rs.${data.total}`, 20, 60);
-      doc.text("Note: There was an error generating the complete invoice template.", 20, 80);
+      doc.text(`Email: ${data.email}`, 20, 50);
+      
+      // Add products in simple table
+      let y = 70;
+      doc.text("Products:", 20, y);
+      y += 10;
+      
+      data.products.forEach(product => {
+        doc.text(`${product.name} x${product.quantity} @ Rs.${product.price} = Rs.${product.quantity * product.price}`, 30, y);
+        y += 10;
+      });
+      
+      // Add totals
+      y += 10;
+      doc.text(`Subtotal: Rs.${data.subtotal}`, 20, y);
+      y += 10;
+      doc.text(`Tax: Rs.${data.tax}`, 20, y);
+      y += 10;
+      doc.setFontSize(14);
+      doc.text(`Total: Rs.${data.total}`, 20, y);
+      
+      return doc;
     }
-
-    return doc;
   },
 
   classic: async (data: InvoiceData) => {
