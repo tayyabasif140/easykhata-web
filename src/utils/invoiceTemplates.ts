@@ -1,4 +1,3 @@
-
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 
@@ -517,244 +516,156 @@ export const templates = {
   },
 
   diamond: async (data: InvoiceData) => {
-    const doc = new jsPDF();
-    let y = 20;
+    try {
+      const doc = new jsPDF();
+      let y = 20;
 
-    // Luxury header
-    doc.setFillColor(72, 72, 72); // Dark gray
-    doc.rect(0, 0, doc.internal.pageSize.width, 40, 'F');
-    
-    // Add business details with premium styling
-    if (data.businessDetails?.business_logo_url) {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
-      const img = await loadImage(logoUrl);
-      doc.addImage(img, 'PNG', 20, 5, 30, 30);
-    }
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text("DIAMOND CLASS", 105, 20, { align: "center" });
-    doc.setFontSize(12);
-    doc.text("EXCLUSIVE INVOICE", 105, 30, { align: "center" });
-    y += 30;
-
-    // Customer section with premium design
-    doc.setTextColor(72, 72, 72);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, y, 180, 60, 'F');
-    doc.setFontSize(14);
-    doc.text("BILLED TO", 20, y + 15);
-    doc.setFontSize(11);
-    doc.text(data.customerName, 20, y + 30);
-    doc.text(data.companyName, 20, y + 40);
-    doc.text(`${data.email} | ${data.phone}`, 20, y + 50);
-    y += 70;
-
-    // Premium table design
-    doc.setFillColor(72, 72, 72);
-    doc.rect(15, y, 180, 15, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text("Description", 20, y + 10);
-    doc.text("Quantity", 100, y + 10);
-    doc.text("Price", 140, y + 10);
-    doc.text("Amount", 170, y + 10);
-    y += 20;
-
-    // Table content with alternating backgrounds
-    data.products.forEach((product, index) => {
-      if (index % 2 === 0) {
-        doc.setFillColor(245, 245, 245);
-        doc.rect(15, y - 5, 180, 15, 'F');
+      // Elegant gradient header with dark blue to light blue
+      doc.setFillColor(28, 37, 65); // Rich dark blue
+      doc.rect(0, 0, doc.internal.pageSize.width, 50, 'F');
+      doc.setFillColor(41, 60, 118); // Medium blue for accent
+      doc.rect(0, 50, doc.internal.pageSize.width, 5, 'F');
+      
+      // Add business logo with proper error handling
+      if (data.businessDetails?.business_logo_url) {
+        try {
+          const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
+          console.log("Loading logo from:", logoUrl);
+          const img = await loadImage(logoUrl);
+          doc.addImage(img, 'PNG', 15, 8, 35, 35);
+        } catch (logoError) {
+          console.error('Error loading business logo:', logoError);
+        }
       }
-      doc.setTextColor(72, 72, 72);
-      doc.text(product.name, 20, y);
-      doc.text(product.quantity.toString(), 100, y);
-      doc.text(`Rs.${product.price}`, 140, y);
-      doc.text(`Rs.${product.quantity * product.price}`, 170, y);
-      y += 15;
-    });
 
-    y += 10;
-
-    // Premium totals section
-    doc.setFillColor(72, 72, 72);
-    doc.rect(120, y, 75, 60, 'F');
-    doc.setTextColor(255, 255, 255);
-    y += 15;
-    doc.text("Subtotal:", 125, y);
-    doc.text(`Rs.${data.subtotal}`, 185, y, { align: "right" });
-    y += 15;
-    doc.text("Tax:", 125, y);
-    doc.text(`Rs.${data.tax}`, 185, y, { align: "right" });
-    y += 15;
-    doc.setFontSize(14);
-    doc.text("Total:", 125, y);
-    doc.text(`Rs.${data.total}`, 185, y, { align: "right" });
-    y += 30;
-
-    // Signature section
-    y = await addSignature(doc, data.profile, y);
-
-    return doc;
-  },
-
-  funky: async (data: InvoiceData) => {
-    const doc = new jsPDF();
-    let y = 20;
-
-    // Funky header with vibrant colors
-    doc.setFillColor(255, 105, 180); // Hot pink
-    doc.rect(0, 0, doc.internal.pageSize.width, 50, 'F');
-    
-    if (data.businessDetails?.business_logo_url) {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
-      const img = await loadImage(logoUrl);
-      doc.addImage(img, 'PNG', 20, 5, 40, 40);
-    }
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(28);
-    doc.text("FUNKY INVOICE!", 105, 30, { align: "center" });
-    y += 60;
-
-    // Colorful customer section
-    doc.setFillColor(147, 112, 219); // Purple
-    doc.rect(15, y - 10, 180, 70, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.text("TO THE AWESOME:", 20, y);
-    doc.setFontSize(12);
-    doc.text(data.customerName, 20, y + 15);
-    doc.text(data.companyName, 20, y + 30);
-    doc.text(data.email, 20, y + 45);
-    doc.text(data.phone, 20, y + 60);
-    y += 80;
-
-    // Funky table header
-    const colors = ['#FF69B4', '#4169E1', '#32CD32', '#FFD700'];
-    doc.setFillColor(255, 105, 180);
-    doc.rect(15, y, 180, 15, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text("COOL STUFF", 20, y + 10);
-    doc.text("#", 100, y + 10);
-    doc.text("PRICE", 140, y + 10);
-    doc.text("TOTAL", 170, y + 10);
-    y += 20;
-
-    // Funky table content
-    data.products.forEach((product, index) => {
-      doc.setFillColor(colors[index % colors.length]);
-      doc.rect(15, y - 5, 180, 15, 'F');
+      // Add elegant business details
       doc.setTextColor(255, 255, 255);
-      doc.text(product.name, 20, y);
-      doc.text(product.quantity.toString(), 100, y);
-      doc.text(`Rs.${product.price}`, 140, y);
-      doc.text(`Rs.${product.quantity * product.price}`, 170, y);
-      y += 15;
-    });
-
-    y += 10;
-
-    // Funky totals
-    doc.setFillColor(255, 105, 180);
-    doc.rect(120, y, 75, 60, 'F');
-    doc.setTextColor(255, 255, 255);
-    y += 15;
-    doc.text("Subtotal:", 125, y);
-    doc.text(`Rs.${data.subtotal}`, 185, y, { align: "right" });
-    y += 15;
-    doc.text("Tax:", 125, y);
-    doc.text(`Rs.${data.tax}`, 185, y, { align: "right" });
-    y += 15;
-    doc.setFontSize(16);
-    doc.text("GRAND TOTAL:", 125, y);
-    doc.text(`Rs.${data.total}`, 185, y, { align: "right" });
-    y += 30;
-
-    // Signature
-    y = await addSignature(doc, data.profile, y);
-
-    return doc;
-  },
-
-  bold: async (data: InvoiceData) => {
-    const doc = new jsPDF();
-    let y = 20;
-
-    // Bold header with strong design
-    doc.setFillColor(0, 0, 0);
-    doc.rect(0, 0, doc.internal.pageSize.width, 60, 'F');
-    
-    if (data.businessDetails?.business_logo_url) {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${data.businessDetails.business_logo_url}`;
-      const img = await loadImage(logoUrl);
-      doc.addImage(img, 'PNG', 20, 10, 40, 40);
-    }
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(32);
-    doc.text("INVOICE", 105, 35, { align: "center" });
-    y += 70;
-
-    // Bold customer section
-    doc.setTextColor(0, 0, 0);
-    doc.setFillColor(240, 240, 240);
-    doc.rect(15, y - 10, 180, 70, 'F');
-    doc.setFontSize(18);
-    doc.text("BILL TO:", 20, y);
-    doc.setFontSize(12);
-    doc.text(data.customerName, 20, y + 15);
-    doc.text(data.companyName, 20, y + 30);
-    doc.text(data.email, 20, y + 45);
-    doc.text(data.phone, 20, y + 60);
-    y += 80;
-
-    // Bold table design
-    doc.setFillColor(0, 0, 0);
-    doc.rect(15, y, 180, 15, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.text("ITEM", 20, y + 10);
-    doc.text("QTY", 100, y + 10);
-    doc.text("PRICE", 140, y + 10);
-    doc.text("TOTAL", 170, y + 10);
-    y += 20;
-
-    // Table content with bold styling
-    doc.setTextColor(0, 0, 0);
-    data.products.forEach((product, index) => {
-      if (index % 2 === 0) {
-        doc.setFillColor(240, 240, 240);
-        doc.rect(15, y - 5, 180, 15, 'F');
+      doc.setFontSize(22);
+      doc.text(data.businessDetails?.business_name || "Premium Business", 60, 20);
+      doc.setFontSize(10);
+      doc.text(data.businessDetails?.business_address || "", 60, 30);
+      if (data.businessDetails?.business_category) {
+        doc.text(data.businessDetails.business_category, 60, 40);
       }
-      doc.text(product.name, 20, y);
-      doc.text(product.quantity.toString(), 100, y);
-      doc.text(`Rs.${product.price}`, 140, y);
-      doc.text(`Rs.${product.quantity * product.price}`, 170, y);
+      
+      // Premium invoice title
+      y = 70;
+      doc.setTextColor(28, 37, 65); // Match header blue
+      doc.setFontSize(24);
+      doc.text("DIAMOND PREMIUM", 20, y);
+      doc.setFontSize(14);
+      doc.text("INVOICE", 20, y + 10);
+      
+      // Add invoice details on right side
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Invoice Date: ${format(new Date(), 'MMMM dd, yyyy')}`, 150, y);
+      doc.text(`Invoice #: ${Math.floor(Math.random() * 10000)}`, 150, y + 10);
+      if (data.dueDate) {
+        doc.text(`Due Date: ${format(data.dueDate, 'MMMM dd, yyyy')}`, 150, y + 20);
+      }
+      
+      y += 25;
+      
+      // Elegant separator
+      doc.setDrawColor(28, 37, 65);
+      doc.setLineWidth(0.5);
+      doc.line(20, y, 190, y);
       y += 15;
-    });
-
-    y += 10;
-
-    // Totals section with bold styling
-    doc.setFillColor(0, 0, 0);
-    doc.rect(120, y, 75, 60, 'F');
-    doc.setTextColor(255, 255, 255);
-    y += 15;
-    doc.text("Subtotal:", 125, y);
-    doc.text(`Rs.${data.subtotal}`, 185, y, { align: "right" });
-    y += 15;
-    doc.text("Tax:", 125, y);
-    doc.text(`Rs.${data.tax}`, 185, y, { align: "right" });
-    y += 15;
-    doc.setFontSize(14);
-    doc.text("TOTAL:", 125, y);
-    doc.text(`Rs.${data.total}`, 185, y, { align: "right" });
-    y += 30;
-
-    // Signature section
-    y = await addSignature(doc, data.profile, y);
-
-    return doc;
-  }
-};
+      
+      // Customer section with premium design
+      doc.setFillColor(240, 242, 245);
+      doc.rect(15, y - 5, 180, 70, 'F');
+      doc.setTextColor(28, 37, 65);
+      doc.setFontSize(14);
+      doc.text("BILLED TO", 25, y + 10);
+      doc.setFontSize(11);
+      doc.setTextColor(60, 60, 60);
+      doc.text(data.customerName, 25, y + 25);
+      if (data.companyName) {
+        doc.text(data.companyName, 25, y + 35);
+      }
+      if (data.email) {
+        doc.text(`Email: ${data.email}`, 25, y + 45);
+      }
+      if (data.phone) {
+        doc.text(`Phone: ${data.phone}`, 25, y + 55);
+      }
+      y += 80;
+      
+      // Premium table header
+      doc.setFillColor(28, 37, 65);
+      doc.rect(15, y, 180, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text("DESCRIPTION", 20, y + 8);
+      doc.text("QTY", 110, y + 8);
+      doc.text("PRICE", 140, y + 8);
+      doc.text("AMOUNT", 170, y + 8);
+      y += 18;
+      
+      // Table content with alternating rows
+      data.products.forEach((product, index) => {
+        if (index % 2 === 0) {
+          doc.setFillColor(240, 242, 245);
+          doc.rect(15, y - 6, 180, 12, 'F');
+        }
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(9);
+        doc.text(product.name, 20, y);
+        doc.text(product.quantity.toString(), 110, y);
+        doc.text(`Rs.${product.price.toFixed(2)}`, 140, y);
+        doc.text(`Rs.${(product.quantity * product.price).toFixed(2)}`, 170, y);
+        y += 12;
+      });
+      
+      y += 10;
+      
+      // Totals section with elegant style
+      doc.setDrawColor(200, 200, 200);
+      doc.line(120, y - 5, 190, y - 5);
+      
+      // Create a box for subtotal and tax
+      doc.setFillColor(240, 242, 245);
+      doc.rect(120, y, 70, 30, 'F');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(9);
+      y += 10;
+      doc.text("Subtotal:", 125, y);
+      doc.text(`Rs.${data.subtotal.toFixed(2)}`, 190, y, { align: "right" });
+      y += 10;
+      doc.text("Tax:", 125, y);
+      doc.text(`Rs.${data.tax.toFixed(2)}`, 190, y, { align: "right" });
+      y += 15;
+      
+      // Total with premium styling
+      doc.setFillColor(28, 37, 65);
+      doc.rect(120, y - 5, 70, 20, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text("TOTAL", 125, y + 5);
+      doc.text(`Rs.${data.total.toFixed(2)}`, 190, y + 5, { align: "right" });
+      y += 30;
+      
+      // Payment information
+      doc.setTextColor(28, 37, 65);
+      doc.setFontSize(12);
+      doc.text("PAYMENT DETAILS", 20, y);
+      y += 10;
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(9);
+      doc.text("Please make payment to:", 20, y);
+      y += 8;
+      doc.text(`${data.businessDetails?.business_name || "Premium Business"}`, 20, y);
+      y += 8;
+      doc.text("Bank Transfer: Account details available upon request", 20, y);
+      y += 20;
+      
+      // Terms and conditions
+      doc.setTextColor(28, 37, 65);
+      doc.setFontSize(12);
+      doc.text("TERMS & CONDITIONS", 20, y);
+      y += 10;
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(8);
+      doc.text("1. Payment is due within 30 days

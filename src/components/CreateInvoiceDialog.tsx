@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Plus, Download, Trash, Eye } from "lucide-react";
+import { Plus, Download, Trash, Eye, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -375,6 +375,133 @@ export function CreateInvoiceDialog() {
     setSelectedTaxes({});
   };
 
+  // Add signature canvas ref
+  const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+
+  // Signature drawing functions
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    
+    setIsDrawing(true);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    let clientX, clientY;
+    
+    if ('touches' in e) {
+      // Touch event
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      // Mouse event
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    let clientX, clientY;
+    
+    if ('touches' in e) {
+      // Touch event
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+      e.preventDefault(); // Prevent scrolling while drawing
+    } else {
+      // Mouse event
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000';
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const saveSignature = async () => {
+    try {
+      const canvas = signatureCanvasRef.current;
+      if (!canvas) return;
+      
+      // Convert canvas to base64 image
+      const signatureBase64 = canvas.toDataURL('image/png');
+      
+      // Convert base64 to blob
+      const fetchResponse = await fetch(signatureBase64);
+      const blob = await fetchResponse.blob();
+      
+      // Create a File object
+      const file = new File([blob], 'signature.png', { type: 'image/png' });
+      
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const fileName = `signature_${userData.user.id}_${Date.now()}.png`;
+      
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('business_files')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
+      // Update user profile with signature URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ digital_signature_url: fileName })
+        .eq('id', userData.user.id);
+      
+      if (updateError) throw updateError;
+      
+      toast({
+        title: "Success",
+        description: "Signature saved successfully!",
+      });
+      
+      setShowSignatureCanvas(false);
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    } catch (error: any) {
+      console.error('Error saving signature:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -572,6 +699,65 @@ export function CreateInvoiceDialog() {
             </div>
           </div>
 
+          {showSignatureCanvas ? (
+            <div className="space-y-4">
+              <Label>Draw Your Signature</Label>
+              <div className="border border-gray-300 bg-white">
+                <canvas
+                  ref={signatureCanvasRef}
+                  width={500}
+                  height={200}
+                  className="w-full touch-none"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                />
+              </div>
+              <div className="flex space-x-2">
+                <Button type="button" variant="outline" onClick={clearCanvas}>
+                  Clear
+                </Button>
+                <Button type="button" onClick={saveSignature}>
+                  Save Signature
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setShowSignatureCanvas(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              
+              <div className="space-y-2">
+                <Label>Signature</Label>
+                <div>
+                  {profile?.digital_signature_url ? (
+                    <div className="flex flex-col space-y-2">
+                      <img 
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`} 
+                        alt="Your signature" 
+                        className="h-20 border border-gray-200 bg-white p-2"
+                      />
+                      <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                        Draw New Signature
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                      Draw Your Signature
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              
+            </>
+          )}
+          
           <div className="flex justify-end space-x-2">
             <Button type="submit">Create Invoice</Button>
           </div>
