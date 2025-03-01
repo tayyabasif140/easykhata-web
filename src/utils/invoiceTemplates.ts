@@ -1,3 +1,4 @@
+
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 
@@ -668,4 +669,58 @@ export const templates = {
       y += 10;
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(8);
-      doc.text("1. Payment is due within 30 days
+      doc.text("1. Payment is due within 30 days", 20, y);
+      y += 6;
+      doc.text("2. Please include invoice number on payment", 20, y);
+      y += 6;
+      doc.text("3. Make all checks payable to company name", 20, y);
+      y += 20;
+      
+      // Signature
+      y = await addSignature(doc, data.profile, y);
+      
+      // Professional footer
+      doc.setFillColor(28, 37, 65);
+      doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.text("Thank you for your business", doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 5, { align: "center" });
+      
+      return doc;
+    } catch (error) {
+      console.error('Error generating diamond invoice:', error);
+      
+      // Create a basic fallback template
+      const doc = new jsPDF();
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(20);
+      doc.text("DIAMOND INVOICE", 105, 20, { align: "center" });
+      
+      // Basic customer info
+      doc.setFontSize(12);
+      doc.text(`Customer: ${data.customerName}`, 20, 40);
+      doc.text(`Email: ${data.email || ""}`, 20, 50);
+      
+      // Add products
+      let y = 70;
+      doc.text("Products:", 20, y);
+      y += 10;
+      
+      data.products.forEach(product => {
+        doc.text(`${product.name} x${product.quantity} @ Rs.${product.price} = Rs.${product.quantity * product.price}`, 30, y);
+        y += 10;
+      });
+      
+      // Add totals
+      y += 10;
+      doc.text(`Subtotal: Rs.${data.subtotal}`, 20, y);
+      y += 10;
+      doc.text(`Tax: Rs.${data.tax}`, 20, y);
+      y += 10;
+      doc.setFontSize(14);
+      doc.text(`Total: Rs.${data.total}`, 20, y);
+      
+      return doc;
+    }
+  }
+};
