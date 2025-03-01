@@ -1,4 +1,3 @@
-
 import { Header } from "@/components/Header";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,7 +71,6 @@ const Reports = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Add mutation for marking invoices as paid
   const markAsPaidMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -102,7 +100,6 @@ const Reports = () => {
     }
   });
 
-  // Handle mark as paid
   const handleMarkAsPaid = (invoiceId: string) => {
     markAsPaidMutation.mutate(invoiceId);
   };
@@ -202,7 +199,6 @@ const Reports = () => {
           </Card>
         </div>
 
-        {/* Add a list of recent invoices with mark as paid button */}
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Recent Invoices</h2>
           <div className="bg-white rounded-lg shadow overflow-hidden">
