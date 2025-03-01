@@ -1,3 +1,4 @@
+
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 
@@ -649,4 +650,34 @@ export const templates = {
         doc.setFillColor(240, 240, 240);
         doc.rect(15, y - 5, 180, 15, 'F');
       }
-      doc.
+      doc.text(product.name, 20, y);
+      doc.text(product.quantity.toString(), 100, y);
+      doc.text(`Rs.${product.price}`, 140, y);
+      doc.text(`Rs.${product.quantity * product.price}`, 170, y);
+      y += 15;
+    });
+
+    y += 10;
+
+    // Totals section with bold styling
+    doc.setFillColor(0, 0, 0);
+    doc.rect(120, y, 75, 60, 'F');
+    doc.setTextColor(255, 255, 255);
+    y += 15;
+    doc.text("Subtotal:", 125, y);
+    doc.text(`Rs.${data.subtotal}`, 185, y, { align: "right" });
+    y += 15;
+    doc.text("Tax:", 125, y);
+    doc.text(`Rs.${data.tax}`, 185, y, { align: "right" });
+    y += 15;
+    doc.setFontSize(14);
+    doc.text("TOTAL:", 125, y);
+    doc.text(`Rs.${data.total}`, 185, y, { align: "right" });
+    y += 30;
+
+    // Signature section
+    y = await addSignature(doc, data.profile, y);
+
+    return doc;
+  }
+};
