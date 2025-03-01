@@ -251,6 +251,7 @@ const Reports = () => {
                           variant="success"
                           size="sm"
                           onClick={() => handleMarkAsPaid(invoice.id)}
+                          className="flex items-center gap-1"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Mark Paid
