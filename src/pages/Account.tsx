@@ -56,21 +56,7 @@ export default function Account() {
         .eq('user_id', session.user.id)
         .single();
       
-      if (error) {
-        // If no record exists, we need to create a default one
-        if (error.code === 'PGRST116') {
-          return {
-            business_name: '',
-            business_address: '',
-            business_category: '',
-            website: '',
-            social_media_links: {},
-            ntn_number: '',
-            invoice_template: 'modern'
-          };
-        }
-        throw error;
-      }
+      if (error) throw error;
       return data;
     },
     enabled: !!session?.user?.id
@@ -163,12 +149,6 @@ export default function Account() {
       try {
         if (!session?.user?.id) throw new Error("Not authenticated");
 
-        // Get the business name value, which is required
-        const businessName = formData.get('businessName');
-        if (!businessName) {
-          throw new Error("Business name is required");
-        }
-
         let businessLogoUrl = businessDetails?.business_logo_url;
         let digitalSignatureUrl = profile?.digital_signature_url;
 
@@ -233,57 +213,26 @@ export default function Account() {
           }
         }
 
-        // Check if business details record exists
-        const { data: existingBusiness, error: checkError } = await supabase
+        // Update invoice template
+        const { error: templateError } = await supabase
           .from('business_details')
-          .select('id')
+          .update({
+            invoice_template: selectedTemplate,
+            business_name: formData.get('businessName'),
+            business_logo_url: businessLogoUrl,
+            business_address: formData.get('businessAddress'),
+            ntn_number: formData.get('ntnNumber'),
+            business_category: formData.get('businessCategory'),
+            website: formData.get('website'),
+            social_media_links: {
+              facebook: formData.get('facebook'),
+              twitter: formData.get('twitter'),
+              linkedin: formData.get('linkedin'),
+            },
+          })
           .eq('user_id', session.user.id);
 
-        if (checkError) throw checkError;
-
-        if (existingBusiness && existingBusiness.length > 0) {
-          // Update existing business record
-          const { error: templateError } = await supabase
-            .from('business_details')
-            .update({
-              invoice_template: selectedTemplate,
-              business_name: formData.get('businessName'),
-              business_logo_url: businessLogoUrl,
-              business_address: formData.get('businessAddress'),
-              ntn_number: formData.get('ntnNumber'),
-              business_category: formData.get('businessCategory'),
-              website: formData.get('website'),
-              social_media_links: {
-                facebook: formData.get('facebook'),
-                twitter: formData.get('twitter'),
-                linkedin: formData.get('linkedin'),
-              },
-            })
-            .eq('user_id', session.user.id);
-
-          if (templateError) throw templateError;
-        } else {
-          // Insert new business record
-          const { error: insertError } = await supabase
-            .from('business_details')
-            .insert({
-              user_id: session.user.id,
-              invoice_template: selectedTemplate,
-              business_name: formData.get('businessName'),
-              business_logo_url: businessLogoUrl,
-              business_address: formData.get('businessAddress'),
-              ntn_number: formData.get('ntnNumber'),
-              business_category: formData.get('businessCategory'),
-              website: formData.get('website'),
-              social_media_links: {
-                facebook: formData.get('facebook'),
-                twitter: formData.get('twitter'),
-                linkedin: formData.get('linkedin'),
-              },
-            });
-
-          if (insertError) throw insertError;
-        }
+        if (templateError) throw templateError;
 
         // Update profile
         const { error: profileError } = await supabase
@@ -379,12 +328,12 @@ export default function Account() {
                       <div className="space-y-2">
                         <Label htmlFor="businessName" className="flex items-center gap-1">
                           <Building className="h-4 w-4" />
-                          Business Name <span className="text-red-500">*</span>
+                          Business Name
                         </Label>
                         <Input
                           id="businessName"
                           name="businessName"
-                          defaultValue={businessDetails?.business_name || ""}
+                          defaultValue={businessDetails?.business_name}
                           className="border-gray-300"
                           required
                         />
