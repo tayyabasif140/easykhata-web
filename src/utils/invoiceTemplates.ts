@@ -41,7 +41,7 @@ export interface InvoiceData {
 }
 
 export const templates = {
-  modern: classicTemplate, // Using classicTemplate for modern
+  modern: classicTemplate, // Renamed from classic to modern
   professional: professionalTemplate,
   diamond: diamondTemplate
 };
