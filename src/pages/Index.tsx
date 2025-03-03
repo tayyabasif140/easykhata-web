@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2 } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2, CheckCircle, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -689,6 +689,17 @@ const Index = () => {
                           Details
                         </Button>
                         <div className="flex space-x-2">
+                          {invoice.status === 'unpaid' && (
+                            <Button 
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleMarkAsPaid(invoice.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Mark Paid
+                            </Button>
+                          )}
                           <Button 
                             variant="outline" 
                             size="sm"
@@ -948,6 +959,18 @@ const Index = () => {
                     <p className="font-bold">Total: Rs.{selectedInvoice.total_amount + selectedInvoice.tax_amount}</p>
                   </div>
                   <div className="flex space-x-2">
+                    {selectedInvoice.status === 'unpaid' && (
+                      <Button 
+                        variant="success"
+                        onClick={() => {
+                          handleMarkAsPaid(selectedInvoice.id);
+                          setSelectedInvoice(null);
+                        }}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark as Paid
+                      </Button>
+                    )}
                     <Button onClick={() => handlePreviewInvoice(selectedInvoice)}>
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
