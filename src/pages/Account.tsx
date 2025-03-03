@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -621,7 +620,7 @@ export default function Account() {
                           <SelectValue placeholder="Select a template" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="classic">Classic</SelectItem>
+                          <SelectItem value="modern">Modern</SelectItem>
                           <SelectItem value="professional">Professional</SelectItem>
                           <SelectItem value="diamond">Diamond</SelectItem>
                         </SelectContent>
@@ -629,7 +628,7 @@ export default function Account() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                      <div className={`border rounded-lg p-4 ${selectedTemplate === 'classic' ? 'border-primary' : 'border-gray-200'}`}>
+                      <div className={`border rounded-lg p-4 ${selectedTemplate === 'modern' ? 'border-primary' : 'border-gray-200'}`}>
                         <div className="aspect-[8.5/11] bg-gray-100 rounded-lg flex items-center justify-center mb-4">
                           <div className="w-[80%] h-[90%] p-4 bg-white shadow-sm flex flex-col">
                             <div className="border-b pb-2 mb-4">
@@ -646,7 +645,7 @@ export default function Account() {
                             </div>
                           </div>
                         </div>
-                        <h3 className="font-medium text-center">Classic</h3>
+                        <h3 className="font-medium text-center">Modern</h3>
                       </div>
 
                       <div className={`border rounded-lg p-4 ${selectedTemplate === 'professional' ? 'border-primary' : 'border-gray-200'}`}>

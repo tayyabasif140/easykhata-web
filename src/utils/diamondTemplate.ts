@@ -1,23 +1,6 @@
 
 import jsPDF from 'jspdf';
-
-interface TemplateProps {
-  customerName: string;
-  companyName: string;
-  phone: string;
-  email: string;
-  products: {
-    name: string;
-    quantity: number;
-    price: number;
-  }[];
-  subtotal: number;
-  tax: number;
-  total: number;
-  dueDate?: Date;
-  businessDetails: any;
-  profile: any;
-}
+import { TemplateProps } from './invoiceTemplates';
 
 export const diamondTemplate = async (props: TemplateProps) => {
   const {
@@ -37,12 +20,13 @@ export const diamondTemplate = async (props: TemplateProps) => {
   // Create a new PDF document
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
   
   // Set color theme
   const primaryColor = [41, 98, 255]; // RGB
   const secondaryColor = [245, 247, 250]; // Light background
 
-  // Add gradient header
+  // Add header
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, pageWidth, 40, 'F');
   
@@ -74,7 +58,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('INVOICE', pageWidth - 60, 20);
+  doc.text('INVOICE', pageWidth - 60, 25);
 
   // Add decorative elements
   doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -142,7 +126,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
     yPos += 5;
   }
 
-  // Invoice details
+  // Invoice details with styled box
   doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.roundedRect(pageWidth - 90, yPos, 80, 25, 2, 2, 'F');
   
@@ -160,7 +144,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
   // Products table
   yPos = 110;
   
-  // Table header
+  // Table header with different style
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(10, yPos, pageWidth - 20, 10, 'F');
   
@@ -173,12 +157,43 @@ export const diamondTemplate = async (props: TemplateProps) => {
   
   yPos += 10;
   
-  // Table rows
+  // Table rows with alternating colors
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   
   let altRow = false;
-  products.forEach((product) => {
+  let totalRows = products.length;
+  let currentPage = 1;
+  
+  const startNewPage = () => {
+    doc.addPage();
+    currentPage++;
+    // Reset position for new page
+    yPos = 20;
+    // Add page header
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(10, yPos, pageWidth - 20, 10, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Product', 15, yPos + 7);
+    doc.text('Qty', pageWidth - 85, yPos + 7);
+    doc.text('Price', pageWidth - 60, yPos + 7);
+    doc.text('Total', pageWidth - 30, yPos + 7);
+    
+    yPos += 10;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+  };
+  
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i];
+    
+    // Check if we need a new page
+    if (yPos > pageHeight - 50) {
+      startNewPage();
+    }
+    
     if (altRow) {
       doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
       doc.rect(10, yPos, pageWidth - 20, 10, 'F');
@@ -191,9 +206,13 @@ export const diamondTemplate = async (props: TemplateProps) => {
     
     yPos += 10;
     altRow = !altRow;
-  });
+  }
 
-  // Totals
+  // Totals - check if we need a new page
+  if (yPos > pageHeight - 80) {
+    startNewPage();
+  }
+  
   yPos += 10;
   
   doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -224,7 +243,11 @@ export const diamondTemplate = async (props: TemplateProps) => {
   doc.text('Total:', pageWidth - 80, yPos);
   doc.text(`${total.toFixed(2)}`, pageWidth - 30, yPos);
 
-  // Add payment details and terms
+  // Add payment details and terms - check if we need a new page
+  if (yPos > pageHeight - 60) {
+    startNewPage();
+  }
+  
   yPos += 25;
   
   doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -268,6 +291,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
+  doc.text(`Page ${currentPage}`, 10, footerYPos);
   doc.text('Generated with Invoice Manager', pageWidth / 2, footerYPos, { align: 'center' });
 
   return doc;

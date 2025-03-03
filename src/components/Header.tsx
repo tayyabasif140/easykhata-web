@@ -1,3 +1,4 @@
+
 import { Bell, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -22,7 +23,7 @@ import { Switch } from "./ui/switch";
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedTab, setSelectedTab] = useState("templates");
+  const [selectedTab, setSelectedTab] = useState("taxes");
   const [taxes, setTaxes] = useState<{ name: string; rate: number; enabled: boolean; }[]>([]);
 
   const { data: notifications } = useQuery({
@@ -208,42 +209,10 @@ export const Header = () => {
               </SheetHeader>
               <div className="mt-4">
                 <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-                  <TabsList className="grid grid-cols-3 gap-4 mb-4">
-                    <TabsTrigger value="templates">Templates</TabsTrigger>
+                  <TabsList className="grid grid-cols-2 gap-4 mb-4">
                     <TabsTrigger value="taxes">Taxes</TabsTrigger>
                     <TabsTrigger value="profile">Profile</TabsTrigger>
                   </TabsList>
-
-                  <TabsContent value="templates">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Invoice Templates</CardTitle>
-                        <CardDescription>Choose your preferred invoice template</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {['classic', 'modern', 'professional'].map((template) => (
-                            <div
-                              key={template}
-                              className={`p-4 rounded-lg border cursor-pointer ${
-                                businessDetails?.invoice_template === template
-                                  ? 'border-primary bg-primary/5'
-                                  : 'hover:border-gray-400'
-                              }`}
-                              onClick={() => updateBusinessDetails({ invoice_template: template })}
-                            >
-                              <h3 className="font-medium capitalize">{template}</h3>
-                              <p className="text-sm text-gray-600">
-                                {template === 'classic' && 'Traditional and clean design'}
-                                {template === 'modern' && 'Contemporary and sleek layout'}
-                                {template === 'professional' && 'Formal and polished appearance'}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
 
                   <TabsContent value="taxes">
                     <Card>
