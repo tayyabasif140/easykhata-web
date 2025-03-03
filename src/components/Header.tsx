@@ -209,9 +209,8 @@ export const Header = () => {
               </SheetHeader>
               <div className="mt-4">
                 <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-                  <TabsList className="grid grid-cols-2 gap-4 mb-4">
+                  <TabsList className="grid grid-cols-1 gap-4 mb-4">
                     <TabsTrigger value="taxes">Taxes</TabsTrigger>
-                    <TabsTrigger value="profile">Profile</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="taxes">
@@ -275,30 +274,25 @@ export const Header = () => {
                       </CardContent>
                     </Card>
                   </TabsContent>
-
-                  <TabsContent value="profile">
-                    <div className="space-y-4">
-                      <Link to="/account" className="w-full">
-                        <Button className="w-full justify-start" variant="outline">
-                          Profile Settings
-                        </Button>
-                      </Link>
-                      <Button className="w-full justify-start" variant="outline">
-                        Notification Preferences
-                      </Button>
-                    </div>
-                  </TabsContent>
                 </Tabs>
+                
+                <div className="space-y-4 mt-6">
+                  <Link to="/account" className="w-full">
+                    <Button className="w-full justify-start" variant="outline">
+                      Profile Settings
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {businessDetails?.logoUrl ? (
+              {businessDetails?.business_logo_url ? (
                 <button className="w-9 h-9 rounded-full overflow-hidden">
                   <img
-                    src={businessDetails.logoUrl}
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
                     alt="Business Logo"
                     className="w-full h-full object-cover"
                   />

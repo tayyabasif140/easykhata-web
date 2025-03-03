@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,13 +20,13 @@ export default function Account() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureDataURL, setSignatureDataURL] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState("classic");
+  const [selectedTemplate, setSelectedTemplate] = useState("modern");
 
   const { data: session } = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session;
+      const { data } = await supabase.auth.getSession();
+      return data.session;
     }
   });
 
@@ -64,6 +65,7 @@ export default function Account() {
   useEffect(() => {
     if (profile?.digital_signature_url && canvasRef.current) {
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -137,6 +139,10 @@ export default function Account() {
     setSignatureDataURL(null);
   };
 
+  const selectTemplateByClick = (template: string) => {
+    setSelectedTemplate(template);
+  };
+
   const updateProfile = useMutation({
     mutationFn: async (formData: FormData) => {
       setLoading(true);
@@ -149,24 +155,30 @@ export default function Account() {
         // Handle business logo upload
         const businessLogo = formData.get('businessLogo') as File;
         if (businessLogo?.size) {
-          const filePath = `${session.user.id}/logos/${businessLogo.name}`;
+          const filePath = `${session.user.id}/logos/${Date.now()}_${businessLogo.name}`;
+          console.log('Uploading business logo:', filePath);
           const { data, error: uploadError } = await supabase.storage
             .from('business_files')
             .upload(filePath, businessLogo, {
               upsert: true
             });
           
-          if (uploadError) throw uploadError;
-          businessLogoUrl = data.path;
+          if (uploadError) {
+            console.error('Error uploading logo:', uploadError);
+            throw uploadError;
+          }
+          businessLogoUrl = filePath;
+          console.log('Logo uploaded successfully:', businessLogoUrl);
         }
 
         // Handle digital signature
         if (signatureMode === 'draw' && signatureDataURL) {
           // Convert base64 to blob
-          const response = await fetch(signatureDataURL);
-          const blob = await response.blob();
+          const fetchResponse = await fetch(signatureDataURL);
+          const blob = await fetchResponse.blob();
           
           const filePath = `${session.user.id}/signatures/drawn-signature-${Date.now()}.png`;
+          console.log('Uploading drawn signature:', filePath);
           const { data, error: uploadError } = await supabase.storage
             .from('business_files')
             .upload(filePath, blob, {
@@ -174,21 +186,30 @@ export default function Account() {
               upsert: true
             });
           
-          if (uploadError) throw uploadError;
-          digitalSignatureUrl = data.path;
+          if (uploadError) {
+            console.error('Error uploading signature:', uploadError);
+            throw uploadError;
+          }
+          digitalSignatureUrl = filePath;
+          console.log('Signature uploaded successfully:', digitalSignatureUrl);
         } else if (signatureMode === 'upload') {
           // Handle digital signature upload
           const digitalSignature = formData.get('digitalSignature') as File;
           if (digitalSignature?.size) {
-            const filePath = `${session.user.id}/signatures/${digitalSignature.name}`;
+            const filePath = `${session.user.id}/signatures/${Date.now()}_${digitalSignature.name}`;
+            console.log('Uploading signature file:', filePath);
             const { data, error: uploadError } = await supabase.storage
               .from('business_files')
               .upload(filePath, digitalSignature, {
                 upsert: true
               });
             
-            if (uploadError) throw uploadError;
-            digitalSignatureUrl = data.path;
+            if (uploadError) {
+              console.error('Error uploading signature file:', uploadError);
+              throw uploadError;
+            }
+            digitalSignatureUrl = filePath;
+            console.log('Signature file uploaded successfully:', digitalSignatureUrl);
           }
         }
 
@@ -245,6 +266,7 @@ export default function Account() {
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
       } catch (error: any) {
+        console.error('Profile update error:', error);
         toast({
           title: "Error",
           description: error.message,
@@ -628,7 +650,10 @@ export default function Account() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                      <div className={`border rounded-lg p-4 ${selectedTemplate === 'modern' ? 'border-primary' : 'border-gray-200'}`}>
+                      <div 
+                        className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${selectedTemplate === 'modern' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                        onClick={() => selectTemplateByClick('modern')}
+                      >
                         <div className="aspect-[8.5/11] bg-gray-100 rounded-lg flex items-center justify-center mb-4">
                           <div className="w-[80%] h-[90%] p-4 bg-white shadow-sm flex flex-col">
                             <div className="border-b pb-2 mb-4">
@@ -648,7 +673,10 @@ export default function Account() {
                         <h3 className="font-medium text-center">Modern</h3>
                       </div>
 
-                      <div className={`border rounded-lg p-4 ${selectedTemplate === 'professional' ? 'border-primary' : 'border-gray-200'}`}>
+                      <div 
+                        className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${selectedTemplate === 'professional' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                        onClick={() => selectTemplateByClick('professional')}
+                      >
                         <div className="aspect-[8.5/11] bg-gray-100 rounded-lg flex items-center justify-center mb-4">
                           <div className="w-[80%] h-[90%] p-4 bg-white shadow-sm flex flex-col">
                             <div className="flex justify-between items-start mb-6">
@@ -669,7 +697,10 @@ export default function Account() {
                         <h3 className="font-medium text-center">Professional</h3>
                       </div>
 
-                      <div className={`border rounded-lg p-4 ${selectedTemplate === 'diamond' ? 'border-primary' : 'border-gray-200'}`}>
+                      <div 
+                        className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${selectedTemplate === 'diamond' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                        onClick={() => selectTemplateByClick('diamond')}
+                      >
                         <div className="aspect-[8.5/11] bg-gray-100 rounded-lg flex items-center justify-center mb-4">
                           <div className="w-[80%] h-[90%] p-4 bg-gradient-to-br from-white to-gray-50 shadow-sm flex flex-col">
                             <div className="flex justify-between items-start mb-6">

@@ -193,12 +193,12 @@ export function CreateInvoiceDialog() {
   });
 
   const generatePDF = async () => {
-    const template = businessDetails?.invoice_template || 'classic';
+    const template = businessDetails?.invoice_template || 'modern';
     const templateFn = templates[template as keyof typeof templates];
 
     if (!templateFn) {
       console.error('Template not found:', template);
-      return templates.classic({
+      return templates.modern({
         customerName,
         companyName,
         phone,
