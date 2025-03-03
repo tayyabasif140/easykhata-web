@@ -302,7 +302,7 @@ const Index = () => {
       if (profileError) throw profileError;
 
       // Generate PDF
-      const template = businessDetails?.invoice_template || 'modern';
+      const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
 
       if (!templateFn) throw new Error('Invalid template');
@@ -393,12 +393,8 @@ const Index = () => {
 
       if (profileError) throw profileError;
 
-      console.log('Generating invoice with template:', businessDetails?.invoice_template);
-      console.log('Business details:', businessDetails);
-      console.log('Profile:', profile);
-
       // Generate PDF
-      const template = businessDetails?.invoice_template || 'modern';
+      const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
 
       if (!templateFn) throw new Error('Invalid template');

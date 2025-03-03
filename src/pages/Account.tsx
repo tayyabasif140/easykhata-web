@@ -218,17 +218,6 @@ export default function Account() {
           .from('business_details')
           .update({
             invoice_template: selectedTemplate,
-            business_name: formData.get('businessName'),
-            business_logo_url: businessLogoUrl,
-            business_address: formData.get('businessAddress'),
-            ntn_number: formData.get('ntnNumber'),
-            business_category: formData.get('businessCategory'),
-            website: formData.get('website'),
-            social_media_links: {
-              facebook: formData.get('facebook'),
-              twitter: formData.get('twitter'),
-              linkedin: formData.get('linkedin'),
-            },
           })
           .eq('user_id', session.user.id);
 
@@ -247,6 +236,26 @@ export default function Account() {
           .eq('id', session.user.id);
 
         if (profileError) throw profileError;
+
+        // Update business details
+        const { error: businessError } = await supabase
+          .from('business_details')
+          .update({
+            business_name: formData.get('businessName'),
+            business_logo_url: businessLogoUrl,
+            business_address: formData.get('businessAddress'),
+            ntn_number: formData.get('ntnNumber'),
+            business_category: formData.get('businessCategory'),
+            website: formData.get('website'),
+            social_media_links: {
+              facebook: formData.get('facebook'),
+              twitter: formData.get('twitter'),
+              linkedin: formData.get('linkedin'),
+            },
+          })
+          .eq('user_id', session.user.id);
+
+        if (businessError) throw businessError;
 
         toast({
           title: "Success",
