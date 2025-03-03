@@ -19,7 +19,7 @@ interface TemplateProps {
   profile: any;
 }
 
-export const diamondTemplate = async (props: TemplateProps) => {
+export const professionalTemplate = async (props: TemplateProps) => {
   const {
     customerName,
     companyName,
@@ -38,13 +38,9 @@ export const diamondTemplate = async (props: TemplateProps) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   
-  // Set color theme
-  const primaryColor = [41, 98, 255]; // RGB
-  const secondaryColor = [245, 247, 250]; // Light background
-
-  // Add gradient header
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.rect(0, 0, pageWidth, 40, 'F');
+  // Add header with color
+  doc.setFillColor(51, 102, 204); // Blue header
+  doc.rect(0, 0, pageWidth, 30, 'F');
   
   // Add business logo if available
   let logoHeight = 0;
@@ -53,7 +49,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
       const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
       const logoWidth = 50;
       logoHeight = 20;
-      doc.addImage(logoUrl, 'JPEG', 10, 10, logoWidth, logoHeight, undefined, 'FAST');
+      doc.addImage(logoUrl, 'JPEG', 10, 5, logoWidth, logoHeight, undefined, 'FAST');
     } catch (error) {
       console.error('Error loading logo:', error);
       // Fall back to text-based header
@@ -70,29 +66,17 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
   }
 
-  // Document title
+  // Document title on header
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text('INVOICE', pageWidth - 60, 20);
-
-  // Add decorative elements
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setLineWidth(1);
-  doc.line(10, 45, pageWidth - 10, 45);
 
   // Business details
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let yPos = 55;
-  
-  doc.text('From:', 10, yPos);
-  yPos += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text(businessDetails?.business_name || '', 10, yPos);
-  yPos += 5;
-  doc.setFont('helvetica', 'normal');
+  let yPos = 40;
   
   if (businessDetails?.business_address) {
     const addressLines = doc.splitTextToSize(businessDetails.business_address, 80);
@@ -114,54 +98,61 @@ export const diamondTemplate = async (props: TemplateProps) => {
   
   if (profile?.email) {
     doc.text(`Email: ${profile.email}`, 10, yPos);
+    yPos += 5;
   }
 
-  // Reset yPos for customer details
-  yPos = 55;
+  // Customer details in a box
+  doc.setDrawColor(51, 102, 204);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(pageWidth - 100, 40, 90, 40, 3, 3, 'S');
   
-  // Customer details
-  doc.text('Bill To:', pageWidth - 90, yPos);
-  yPos += 5;
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text(customerName, pageWidth - 90, yPos);
-  yPos += 5;
+  doc.text('Bill To:', pageWidth - 95, 48);
+  
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(customerName, pageWidth - 95, 55);
+  
+  let customerYPos = 60;
   
   if (companyName) {
-    doc.text(companyName, pageWidth - 90, yPos);
-    yPos += 5;
+    doc.text(companyName, pageWidth - 95, customerYPos);
+    customerYPos += 5;
   }
   
   if (phone) {
-    doc.text(`Phone: ${phone}`, pageWidth - 90, yPos);
-    yPos += 5;
+    doc.text(`Phone: ${phone}`, pageWidth - 95, customerYPos);
+    customerYPos += 5;
   }
   
   if (email) {
-    doc.text(`Email: ${email}`, pageWidth - 90, yPos);
-    yPos += 5;
+    doc.text(`Email: ${email}`, pageWidth - 95, customerYPos);
+    customerYPos += 5;
   }
 
   // Invoice details
-  doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.roundedRect(pageWidth - 90, yPos, 80, 25, 2, 2, 'F');
+  yPos = 75;
+  
+  doc.setFillColor(240, 240, 240);
+  doc.roundedRect(10, yPos, 80, 25, 3, 3, 'F');
   
   doc.setFont('helvetica', 'bold');
-  doc.text('Invoice Date:', pageWidth - 85, yPos + 8);
-  doc.text('Due Date:', pageWidth - 85, yPos + 18);
+  doc.text('Invoice Date:', 15, yPos + 8);
+  doc.text('Due Date:', 15, yPos + 18);
   
   const currentDate = new Date().toLocaleDateString();
   const formattedDueDate = dueDate ? dueDate.toLocaleDateString() : 'N/A';
   
   doc.setFont('helvetica', 'normal');
-  doc.text(currentDate, pageWidth - 40, yPos + 8);
-  doc.text(formattedDueDate, pageWidth - 40, yPos + 18);
+  doc.text(currentDate, 50, yPos + 8);
+  doc.text(formattedDueDate, 50, yPos + 18);
 
   // Products table
   yPos = 110;
   
-  // Table header
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  // Table header with professional styling
+  doc.setFillColor(51, 102, 204);
   doc.rect(10, yPos, pageWidth - 20, 10, 'F');
   
   doc.setTextColor(255, 255, 255);
@@ -173,32 +164,30 @@ export const diamondTemplate = async (props: TemplateProps) => {
   
   yPos += 10;
   
-  // Table rows
+  // Table rows with alternating colors
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   
-  let altRow = false;
-  products.forEach((product) => {
-    if (altRow) {
-      doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.rect(10, yPos, pageWidth - 20, 10, 'F');
+  products.forEach((product, index) => {
+    if (index % 2 === 0) {
+      doc.setFillColor(245, 245, 245);
+      doc.rect(10, yPos, pageWidth - 20, 8, 'F');
     }
     
-    doc.text(product.name, 15, yPos + 7);
-    doc.text(product.quantity.toString(), pageWidth - 85, yPos + 7);
-    doc.text(`${product.price.toFixed(2)}`, pageWidth - 60, yPos + 7);
-    doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 30, yPos + 7);
+    doc.text(product.name, 15, yPos + 6);
+    doc.text(product.quantity.toString(), pageWidth - 85, yPos + 6);
+    doc.text(`${product.price.toFixed(2)}`, pageWidth - 60, yPos + 6);
+    doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 30, yPos + 6);
     
-    yPos += 10;
-    altRow = !altRow;
+    yPos += 8;
   });
 
-  // Totals
+  // Totals in styled box
   yPos += 10;
   
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setDrawColor(51, 102, 204);
   doc.setLineWidth(0.5);
-  doc.line(pageWidth - 80, yPos, pageWidth - 10, yPos);
+  doc.roundedRect(pageWidth - 90, yPos, 80, 40, 3, 3, 'S');
   
   yPos += 10;
   
@@ -211,49 +200,30 @@ export const diamondTemplate = async (props: TemplateProps) => {
   doc.text('Tax:', pageWidth - 80, yPos);
   doc.text(`${tax.toFixed(2)}`, pageWidth - 30, yPos);
   
-  yPos += 5;
-  
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setLineWidth(0.5);
-  doc.line(pageWidth - 80, yPos, pageWidth - 10, yPos);
-  
   yPos += 10;
   
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
   doc.text('Total:', pageWidth - 80, yPos);
   doc.text(`${total.toFixed(2)}`, pageWidth - 30, yPos);
 
-  // Add payment details and terms
-  yPos += 25;
-  
-  doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.roundedRect(10, yPos, pageWidth - 20, 40, 2, 2, 'F');
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Payment Details', 15, yPos + 10);
+  // Add signature and notes
+  yPos += 30;
   
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Thank you for your business!', 15, yPos + 20);
-  doc.text('Please make payment by the due date.', 15, yPos + 30);
-
-  // Add signature if available
+  doc.setFontSize(9);
+  doc.text('Thank you for your business! Payment is due within the specified terms.', 10, yPos);
+  
   if (profile?.digital_signature_url) {
     try {
       const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-      const signatureWidth = 40;
-      const signatureHeight = 20;
-      doc.addImage(signatureUrl, 'PNG', pageWidth - 60, yPos + 10, signatureWidth, signatureHeight, undefined, 'FAST');
+      doc.addImage(signatureUrl, 'PNG', pageWidth - 60, yPos - 10, 40, 20, undefined, 'FAST');
       
       doc.setDrawColor(0);
-      doc.setLineWidth(0.5);
-      doc.line(pageWidth - 60, yPos + 35, pageWidth - 20, yPos + 35);
+      doc.setLineWidth(0.1);
+      doc.line(pageWidth - 60, yPos + 15, pageWidth - 20, yPos + 15);
       
-      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text('Authorized Signature', pageWidth - 60, yPos + 40);
+      doc.text('Authorized Signature', pageWidth - 60, yPos + 20);
     } catch (error) {
       console.error('Error loading signature:', error);
     }
@@ -262,9 +232,9 @@ export const diamondTemplate = async (props: TemplateProps) => {
   // Footer
   const footerYPos = doc.internal.pageSize.height - 10;
   
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setLineWidth(1);
-  doc.line(10, footerYPos - 15, pageWidth - 10, footerYPos - 15);
+  doc.setDrawColor(51, 102, 204);
+  doc.setLineWidth(0.5);
+  doc.line(10, footerYPos - 5, pageWidth - 10, footerYPos - 5);
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
