@@ -45,3 +45,28 @@ export const templates = {
   professional: professionalTemplate,
   diamond: diamondTemplate
 };
+
+// Try to create a PDF with error handling
+export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
+  try {
+    const templateFn = templates[templateName as keyof typeof templates] || templates.modern;
+    const pdf = await templateFn(data);
+    return pdf;
+  } catch (error) {
+    console.error("Error generating invoice PDF:", error);
+    // Create a fallback PDF with error message
+    const pdf = new jsPDF();
+    pdf.setFontSize(20);
+    pdf.text("Invoice Generation Error", 20, 30);
+    pdf.setFontSize(12);
+    pdf.text("There was an error generating this invoice.", 20, 50);
+    pdf.text("Please ensure all required information is provided:", 20, 60);
+    pdf.text("- Business name and details", 25, 70);
+    pdf.text("- Customer information", 25, 80);
+    pdf.text("- Product details", 25, 90);
+    
+    pdf.setFontSize(10);
+    pdf.text("If this error persists, please contact support.", 20, 110);
+    return pdf;
+  }
+};

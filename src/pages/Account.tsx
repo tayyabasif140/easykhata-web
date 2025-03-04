@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,8 +55,8 @@ export default function Account() {
         .eq('user_id', session.user.id)
         .single();
       
-      if (error) throw error;
-      return data;
+      if (error && error.code !== 'PGRST116') throw error;
+      return data || { business_name: "", business_address: "", business_category: "", user_id: session.user.id };
     },
     enabled: !!session?.user?.id
   });
@@ -149,10 +148,14 @@ export default function Account() {
       try {
         if (!session?.user?.id) throw new Error("Not authenticated");
 
+        const businessName = formData.get('businessName');
+        if (!businessName || businessName.toString().trim() === '') {
+          throw new Error("Business name is required");
+        }
+
         let businessLogoUrl = businessDetails?.business_logo_url;
         let digitalSignatureUrl = profile?.digital_signature_url;
 
-        // Handle business logo upload
         const businessLogo = formData.get('businessLogo') as File;
         if (businessLogo?.size) {
           const filePath = `${session.user.id}/logos/${Date.now()}_${businessLogo.name}`;
@@ -171,9 +174,7 @@ export default function Account() {
           console.log('Logo uploaded successfully:', businessLogoUrl);
         }
 
-        // Handle digital signature
         if (signatureMode === 'draw' && signatureDataURL) {
-          // Convert base64 to blob
           const fetchResponse = await fetch(signatureDataURL);
           const blob = await fetchResponse.blob();
           
@@ -193,7 +194,6 @@ export default function Account() {
           digitalSignatureUrl = filePath;
           console.log('Signature uploaded successfully:', digitalSignatureUrl);
         } else if (signatureMode === 'upload') {
-          // Handle digital signature upload
           const digitalSignature = formData.get('digitalSignature') as File;
           if (digitalSignature?.size) {
             const filePath = `${session.user.id}/signatures/${Date.now()}_${digitalSignature.name}`;
@@ -213,17 +213,55 @@ export default function Account() {
           }
         }
 
-        // Update invoice template
-        const { error: templateError } = await supabase
+        const { count, error: countError } = await supabase
           .from('business_details')
-          .update({
-            invoice_template: selectedTemplate,
-          })
+          .select('*', { count: 'exact', head: true })
           .eq('user_id', session.user.id);
+          
+        if (countError) throw countError;
+        
+        if (count === 0) {
+          const { error: businessCreateError } = await supabase
+            .from('business_details')
+            .insert({
+              user_id: session.user.id,
+              business_name: formData.get('businessName') as string,
+              business_logo_url: businessLogoUrl,
+              business_address: formData.get('businessAddress') as string,
+              ntn_number: formData.get('ntnNumber') as string,
+              business_category: formData.get('businessCategory') as string,
+              website: formData.get('website') as string,
+              social_media_links: {
+                facebook: formData.get('facebook') as string,
+                twitter: formData.get('twitter') as string,
+                linkedin: formData.get('linkedin') as string,
+              },
+              invoice_template: selectedTemplate,
+            });
 
-        if (templateError) throw templateError;
+          if (businessCreateError) throw businessCreateError;
+        } else {
+          const { error: templateError } = await supabase
+            .from('business_details')
+            .update({
+              business_name: formData.get('businessName') as string,
+              business_logo_url: businessLogoUrl,
+              business_address: formData.get('businessAddress') as string,
+              ntn_number: formData.get('ntnNumber') as string,
+              business_category: formData.get('businessCategory') as string,
+              website: formData.get('website') as string,
+              social_media_links: {
+                facebook: formData.get('facebook') as string,
+                twitter: formData.get('twitter') as string,
+                linkedin: formData.get('linkedin') as string,
+              },
+              invoice_template: selectedTemplate,
+            })
+            .eq('user_id', session.user.id);
 
-        // Update profile
+          if (templateError) throw templateError;
+        }
+
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -237,32 +275,11 @@ export default function Account() {
 
         if (profileError) throw profileError;
 
-        // Update business details
-        const { error: businessError } = await supabase
-          .from('business_details')
-          .update({
-            business_name: formData.get('businessName'),
-            business_logo_url: businessLogoUrl,
-            business_address: formData.get('businessAddress'),
-            ntn_number: formData.get('ntnNumber'),
-            business_category: formData.get('businessCategory'),
-            website: formData.get('website'),
-            social_media_links: {
-              facebook: formData.get('facebook'),
-              twitter: formData.get('twitter'),
-              linkedin: formData.get('linkedin'),
-            },
-          })
-          .eq('user_id', session.user.id);
-
-        if (businessError) throw businessError;
-
         toast({
           title: "Success",
           description: "Your profile has been updated successfully.",
         });
 
-        // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
       } catch (error: any) {
@@ -337,12 +354,12 @@ export default function Account() {
                       <div className="space-y-2">
                         <Label htmlFor="businessName" className="flex items-center gap-1">
                           <Building className="h-4 w-4" />
-                          Business Name
+                          Business Name <span className="text-red-500">*</span>
                         </Label>
                         <Input
                           id="businessName"
                           name="businessName"
-                          defaultValue={businessDetails?.business_name}
+                          defaultValue={businessDetails?.business_name || ""}
                           className="border-gray-300"
                           required
                         />
