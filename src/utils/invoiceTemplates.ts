@@ -46,6 +46,29 @@ export const templates = {
   diamond: diamondTemplate
 };
 
+// Clean and normalize data to prevent null values
+const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
+  return {
+    customerName: data.customerName || 'Customer',
+    companyName: data.companyName || '',
+    phone: data.phone || '',
+    email: data.email || '',
+    products: data.products && data.products.length > 0 ? 
+      data.products.map(product => ({
+        name: product.name || 'Product',
+        quantity: product.quantity || 1,
+        price: product.price || 0
+      })) : 
+      [{ name: 'Product', quantity: 1, price: 0 }],
+    subtotal: data.subtotal || 0,
+    tax: data.tax || 0,
+    total: data.total || 0,
+    dueDate: data.dueDate,
+    businessDetails: data.businessDetails || {},
+    profile: data.profile || {}
+  };
+};
+
 // Try to create a PDF with error handling
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
@@ -56,12 +79,15 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       
     const templateFn = templates[templateKey];
     
-    if (!data.companyName && data.businessDetails?.business_name) {
+    // Sanitize data to prevent null values
+    const cleanData = sanitizeInvoiceData(data);
+    
+    if (!cleanData.companyName && cleanData.businessDetails?.business_name) {
       // Ensure we have a company name from business details if not provided directly
-      data.companyName = data.businessDetails.business_name;
+      cleanData.companyName = cleanData.businessDetails.business_name;
     }
     
-    const pdf = await templateFn(data);
+    const pdf = await templateFn(cleanData);
     return pdf;
   } catch (error) {
     console.error("Error generating invoice PDF:", error);

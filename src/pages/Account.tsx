@@ -1,25 +1,22 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Building, Phone, Mail, Globe, Diamond, Brush, Save, Image, FileSignature } from "lucide-react";
+import { Loader2, User, Building, Phone, Mail, Globe, Diamond, Save, Image } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SignatureManager } from "@/components/SignatureManager";
 
 export default function Account() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [signatureMode, setSignatureMode] = useState<'upload' | 'draw'>('upload');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [signatureDataURL, setSignatureDataURL] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
+  const [selectedSignature, setSelectedSignature] = useState<string>('');
 
   const { data: session } = useQuery({
     queryKey: ['session'],
@@ -62,21 +59,8 @@ export default function Account() {
   });
 
   useEffect(() => {
-    if (profile?.digital_signature_url && canvasRef.current) {
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            setSignatureDataURL(canvas.toDataURL('image/png'));
-          }
-        }
-      };
-      img.src = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
+    if (profile?.digital_signature_url) {
+      setSelectedSignature(profile.digital_signature_url);
     }
 
     if (businessDetails?.invoice_template) {
@@ -84,62 +68,12 @@ export default function Account() {
     }
   }, [profile, businessDetails]);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.beginPath();
-    ctx.moveTo(
-      e.nativeEvent.offsetX,
-      e.nativeEvent.offsetY
-    );
-    setIsDrawing(true);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#000';
-    
-    ctx.lineTo(
-      e.nativeEvent.offsetX,
-      e.nativeEvent.offsetY
-    );
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    const canvas = canvasRef.current;
-    if (canvas) {
-      setSignatureDataURL(canvas.toDataURL('image/png'));
-    }
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignatureDataURL(null);
-  };
-
   const selectTemplateByClick = (template: string) => {
     setSelectedTemplate(template);
+  };
+
+  const handleSignatureSelect = (signatureUrl: string) => {
+    setSelectedSignature(signatureUrl);
   };
 
   const updateProfile = useMutation({
@@ -169,7 +103,6 @@ export default function Account() {
         }
 
         let businessLogoUrl = businessDetails?.business_logo_url;
-        let digitalSignatureUrl = profile?.digital_signature_url;
 
         const businessLogo = formData.get('businessLogo') as File;
         if (businessLogo?.size) {
@@ -187,45 +120,6 @@ export default function Account() {
           }
           businessLogoUrl = filePath;
           console.log('Logo uploaded successfully:', businessLogoUrl);
-        }
-
-        if (signatureMode === 'draw' && signatureDataURL) {
-          const fetchResponse = await fetch(signatureDataURL);
-          const blob = await fetchResponse.blob();
-          
-          const filePath = `${session.user.id}/signatures/drawn-signature-${Date.now()}.png`;
-          console.log('Uploading drawn signature:', filePath);
-          const { data, error: uploadError } = await supabase.storage
-            .from('business_files')
-            .upload(filePath, blob, {
-              contentType: 'image/png',
-              upsert: true
-            });
-          
-          if (uploadError) {
-            console.error('Error uploading signature:', uploadError);
-            throw uploadError;
-          }
-          digitalSignatureUrl = filePath;
-          console.log('Signature uploaded successfully:', digitalSignatureUrl);
-        } else if (signatureMode === 'upload') {
-          const digitalSignature = formData.get('digitalSignature') as File;
-          if (digitalSignature?.size) {
-            const filePath = `${session.user.id}/signatures/${Date.now()}_${digitalSignature.name}`;
-            console.log('Uploading signature file:', filePath);
-            const { data, error: uploadError } = await supabase.storage
-              .from('business_files')
-              .upload(filePath, digitalSignature, {
-                upsert: true
-              });
-            
-            if (uploadError) {
-              console.error('Error uploading signature file:', uploadError);
-              throw uploadError;
-            }
-            digitalSignatureUrl = filePath;
-            console.log('Signature file uploaded successfully:', digitalSignatureUrl);
-          }
         }
 
         const { count, error: countError } = await supabase
@@ -284,7 +178,6 @@ export default function Account() {
             username: username.toString(),
             email: email.toString(),
             phone_number: formData.get('phoneNumber') as string || profile?.phone_number || '',
-            digital_signature_url: digitalSignatureUrl,
           })
           .eq('id', session.user.id);
 
@@ -600,75 +493,16 @@ export default function Account() {
 
                     <div className="space-y-2">
                       <Label className="flex items-center gap-1">
-                        <FileSignature className="h-4 w-4" />
+                        <Image className="h-4 w-4" />
                         Digital Signature
                       </Label>
                       
-                      <div className="flex items-center space-x-4 mb-4">
-                        <Button 
-                          type="button" 
-                          variant={signatureMode === 'upload' ? 'default' : 'outline'} 
-                          onClick={() => setSignatureMode('upload')}
-                          className="flex items-center gap-2"
-                        >
-                          <Image className="h-4 w-4" />
-                          Upload Signature
-                        </Button>
-                        <Button 
-                          type="button" 
-                          variant={signatureMode === 'draw' ? 'default' : 'outline'} 
-                          onClick={() => setSignatureMode('draw')}
-                          className="flex items-center gap-2"
-                        >
-                          <Brush className="h-4 w-4" />
-                          Draw Signature
-                        </Button>
-                      </div>
-
-                      {signatureMode === 'upload' ? (
-                        <div>
-                          {profile?.digital_signature_url && (
-                            <div className="mb-4">
-                              <img
-                                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`}
-                                alt="Digital Signature"
-                                className="h-24 w-auto object-contain rounded-lg border p-2"
-                              />
-                            </div>
-                          )}
-                          <Input
-                            id="digitalSignature"
-                            name="digitalSignature"
-                            type="file"
-                            accept=".png,.jpg,.jpeg"
-                            className="border-gray-300"
-                          />
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="border rounded-lg p-2">
-                            <canvas
-                              ref={canvasRef}
-                              width={400}
-                              height={200}
-                              className="border rounded touch-none cursor-crosshair bg-white"
-                              onMouseDown={startDrawing}
-                              onMouseMove={draw}
-                              onMouseUp={stopDrawing}
-                              onMouseLeave={stopDrawing}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={clearCanvas}
-                              className="flex items-center gap-2"
-                            >
-                              Clear Signature
-                            </Button>
-                          </div>
-                        </div>
+                      {session?.user?.id && (
+                        <SignatureManager
+                          userId={session.user.id}
+                          onSignatureSelect={handleSignatureSelect}
+                          defaultSignature={profile?.digital_signature_url}
+                        />
                       )}
                     </div>
                   </CardContent>
