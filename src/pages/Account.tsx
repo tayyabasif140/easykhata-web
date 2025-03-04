@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Building, Phone, Mail, Globe, Diamond, Save, Image } from "lucide-react";
+import { Loader2, User, Building, Phone, Mail, Globe, Diamond, Save, Image, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -349,7 +349,7 @@ export default function Account() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="ntnNumber" className="flex items-center gap-1">
-                          <FileSignature className="h-4 w-4" />
+                          <FileText className="h-4 w-4" />
                           NTN Number
                         </Label>
                         <Input
