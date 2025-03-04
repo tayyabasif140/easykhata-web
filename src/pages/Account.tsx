@@ -64,7 +64,7 @@ export default function Account() {
 
   useEffect(() => {
     if (profile?.digital_signature_url && canvasRef.current) {
-      const img = new Image();
+      const img = new window.Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
         const canvas = canvasRef.current;
