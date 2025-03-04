@@ -148,7 +148,7 @@ export default function Account() {
       try {
         if (!session?.user?.id) throw new Error("Not authenticated");
 
-        const businessName = formData.get('businessName');
+        const businessName = formData.get('businessName') || businessDetails?.business_name;
         if (!businessName || businessName.toString().trim() === '') {
           throw new Error("Business name is required");
         }
@@ -225,7 +225,7 @@ export default function Account() {
             .from('business_details')
             .insert({
               user_id: session.user.id,
-              business_name: formData.get('businessName') as string,
+              business_name: businessName.toString(),
               business_logo_url: businessLogoUrl,
               business_address: formData.get('businessAddress') as string,
               ntn_number: formData.get('ntnNumber') as string,
@@ -244,16 +244,16 @@ export default function Account() {
           const { error: templateError } = await supabase
             .from('business_details')
             .update({
-              business_name: formData.get('businessName') as string,
+              business_name: businessName.toString(),
               business_logo_url: businessLogoUrl,
-              business_address: formData.get('businessAddress') as string,
-              ntn_number: formData.get('ntnNumber') as string,
-              business_category: formData.get('businessCategory') as string,
-              website: formData.get('website') as string,
+              business_address: formData.get('businessAddress') as string || businessDetails?.business_address || '',
+              ntn_number: formData.get('ntnNumber') as string || businessDetails?.ntn_number || '',
+              business_category: formData.get('businessCategory') as string || businessDetails?.business_category || '',
+              website: formData.get('website') as string || businessDetails?.website || '',
               social_media_links: {
-                facebook: formData.get('facebook') as string,
-                twitter: formData.get('twitter') as string,
-                linkedin: formData.get('linkedin') as string,
+                facebook: formData.get('facebook') as string || businessDetails?.social_media_links?.facebook || '',
+                twitter: formData.get('twitter') as string || businessDetails?.social_media_links?.twitter || '',
+                linkedin: formData.get('linkedin') as string || businessDetails?.social_media_links?.linkedin || '',
               },
               invoice_template: selectedTemplate,
             })
@@ -335,9 +335,20 @@ export default function Account() {
               className="space-y-8"
               onSubmit={(e) => {
                 e.preventDefault();
-                updateProfile.mutate(new FormData(e.currentTarget));
+                const formData = new FormData(e.currentTarget);
+                
+                if (!formData.get('businessName') && businessDetails?.business_name) {
+                  formData.append('businessName', businessDetails.business_name);
+                }
+                
+                updateProfile.mutate(formData);
               }}
             >
+              <input 
+                type="hidden" 
+                name="businessName" 
+                value={businessDetails?.business_name || ""} 
+              />
               <TabsContent value="business">
                 <Card>
                   <CardHeader>

@@ -49,7 +49,18 @@ export const templates = {
 // Try to create a PDF with error handling
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
-    const templateFn = templates[templateName as keyof typeof templates] || templates.modern;
+    // Make sure we have a valid template name or default to modern
+    const templateKey = (templateName && templateName in templates) ? 
+      templateName as keyof typeof templates : 
+      'modern';
+      
+    const templateFn = templates[templateKey];
+    
+    if (!data.companyName && data.businessDetails?.business_name) {
+      // Ensure we have a company name from business details if not provided directly
+      data.companyName = data.businessDetails.business_name;
+    }
+    
     const pdf = await templateFn(data);
     return pdf;
   } catch (error) {
