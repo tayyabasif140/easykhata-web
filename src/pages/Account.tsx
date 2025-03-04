@@ -153,6 +153,21 @@ export default function Account() {
           throw new Error("Business name is required");
         }
 
+        const fullName = formData.get('fullName') || profile?.full_name;
+        if (!fullName || fullName.toString().trim() === '') {
+          throw new Error("Full name is required");
+        }
+
+        const username = formData.get('username') || profile?.username;
+        if (!username || username.toString().trim() === '') {
+          throw new Error("Username is required");
+        }
+
+        const email = formData.get('email') || profile?.email;
+        if (!email || email.toString().trim() === '') {
+          throw new Error("Email is required");
+        }
+
         let businessLogoUrl = businessDetails?.business_logo_url;
         let digitalSignatureUrl = profile?.digital_signature_url;
 
@@ -265,10 +280,10 @@ export default function Account() {
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
-            full_name: formData.get('fullName'),
-            username: formData.get('username'),
-            phone_number: formData.get('phoneNumber'),
-            email: formData.get('email'),
+            full_name: fullName.toString(),
+            username: username.toString(),
+            email: email.toString(),
+            phone_number: formData.get('phoneNumber') as string || profile?.phone_number || '',
             digital_signature_url: digitalSignatureUrl,
           })
           .eq('id', session.user.id);
@@ -341,14 +356,26 @@ export default function Account() {
                   formData.append('businessName', businessDetails.business_name);
                 }
                 
+                if (!formData.get('fullName') && profile?.full_name) {
+                  formData.append('fullName', profile.full_name);
+                }
+                
+                if (!formData.get('username') && profile?.username) {
+                  formData.append('username', profile.username);
+                }
+                
+                if (!formData.get('email') && profile?.email) {
+                  formData.append('email', profile.email);
+                }
+                
                 updateProfile.mutate(formData);
               }}
             >
-              <input 
-                type="hidden" 
-                name="businessName" 
-                value={businessDetails?.business_name || ""} 
-              />
+              <input type="hidden" name="businessName" value={businessDetails?.business_name || ""} />
+              <input type="hidden" name="fullName" value={profile?.full_name || ""} />
+              <input type="hidden" name="username" value={profile?.username || ""} />
+              <input type="hidden" name="email" value={profile?.email || ""} />
+              
               <TabsContent value="business">
                 <Card>
                   <CardHeader>
