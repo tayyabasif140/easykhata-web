@@ -69,6 +69,24 @@ const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
   };
 };
 
+// Create a fallback PDF with error message
+const createFallbackPDF = (error: any): jsPDF => {
+  console.error("Error generating invoice PDF:", error);
+  const pdf = new jsPDF();
+  pdf.setFontSize(20);
+  pdf.text("Invoice Generation Error", 20, 30);
+  pdf.setFontSize(12);
+  pdf.text("There was an error generating this invoice.", 20, 50);
+  pdf.text("Please ensure all required information is provided:", 20, 60);
+  pdf.text("- Business name and details", 25, 70);
+  pdf.text("- Customer information", 25, 80);
+  pdf.text("- Product details", 25, 90);
+  
+  pdf.setFontSize(10);
+  pdf.text("If this error persists, please contact support.", 20, 110);
+  return pdf;
+};
+
 // Try to create a PDF with error handling
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
@@ -87,23 +105,34 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       cleanData.companyName = cleanData.businessDetails.business_name;
     }
     
-    const pdf = await templateFn(cleanData);
-    return pdf;
+    // Attempt to generate PDF with the selected template
+    let pdf: jsPDF;
+    try {
+      pdf = await templateFn(cleanData);
+      
+      // Verify the PDF was actually created
+      if (!pdf || !(pdf instanceof jsPDF)) {
+        throw new Error("PDF object was not properly created");
+      }
+      
+      return pdf;
+    } catch (templateError) {
+      console.error(`Error with ${templateKey} template:`, templateError);
+      
+      // If the selected template fails, try modern as fallback
+      if (templateKey !== 'modern') {
+        console.log("Falling back to modern template");
+        try {
+          pdf = await templates.modern(cleanData);
+          return pdf;
+        } catch (fallbackError) {
+          return createFallbackPDF(fallbackError);
+        }
+      } else {
+        return createFallbackPDF(templateError);
+      }
+    }
   } catch (error) {
-    console.error("Error generating invoice PDF:", error);
-    // Create a fallback PDF with error message
-    const pdf = new jsPDF();
-    pdf.setFontSize(20);
-    pdf.text("Invoice Generation Error", 20, 30);
-    pdf.setFontSize(12);
-    pdf.text("There was an error generating this invoice.", 20, 50);
-    pdf.text("Please ensure all required information is provided:", 20, 60);
-    pdf.text("- Business name and details", 25, 70);
-    pdf.text("- Customer information", 25, 80);
-    pdf.text("- Product details", 25, 90);
-    
-    pdf.setFontSize(10);
-    pdf.text("If this error persists, please contact support.", 20, 110);
-    return pdf;
+    return createFallbackPDF(error);
   }
 };

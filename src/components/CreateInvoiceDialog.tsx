@@ -193,24 +193,22 @@ export function CreateInvoiceDialog() {
     }
   });
 
-  // Add signature canvas ref
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
 
-  // Update the signature selection handler
   const handleSignatureSelect = (signatureUrl: string) => {
     setSelectedSignature(signatureUrl);
-    // Close signature canvas if it's open
     setShowSignatureCanvas(false);
   };
 
-  // Modify generatePDF to ensure it always generates with the selected template
   const generatePDF = async () => {
-    const template = businessDetails?.invoice_template || 'modern';
     try {
-      return await templates[template as keyof typeof templates]({
+      const template = businessDetails?.invoice_template || 'modern';
+      console.log('Generating PDF with template:', template);
+      
+      return await generateInvoicePDF(template, {
         customerName,
         companyName,
         phone,
@@ -227,24 +225,15 @@ export function CreateInvoiceDialog() {
         }
       });
     } catch (error) {
-      console.error("Error generating PDF with template:", template, error);
-      // Fallback to modern template if the selected one fails
-      return templates.modern({
-        customerName,
-        companyName,
-        phone,
-        email,
-        products,
-        subtotal: calculateSubtotal(),
-        tax: calculateTotalTax(),
-        total: calculateSubtotal() + calculateTotalTax(),
-        dueDate,
-        businessDetails,
-        profile: {
-          ...profile,
-          digital_signature_url: selectedSignature || profile?.digital_signature_url
-        }
-      });
+      console.error("Error generating PDF:", error);
+      
+      const doc = new jsPDF();
+      doc.setFontSize(20);
+      doc.text("Invoice Generation Error", 20, 30);
+      doc.setFontSize(12);
+      doc.text("There was an error generating your invoice.", 20, 50);
+      doc.text("Please try again or contact support.", 20, 60);
+      return doc;
     }
   };
 
@@ -279,7 +268,6 @@ export function CreateInvoiceDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Update inventory quantities
       for (const product of products) {
         await updateInventory.mutateAsync({
           productName: product.name,
@@ -290,7 +278,6 @@ export function CreateInvoiceDialog() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      // Check if customer already exists
       const { data: existingCustomers } = await supabase
         .from('customers')
         .select('*')
@@ -321,7 +308,6 @@ export function CreateInvoiceDialog() {
         customerId = customer.id;
       }
 
-      // Create invoice with proper tax calculation
       const totalTax = calculateTotalTax();
       const totalAmount = calculateSubtotal();
 
@@ -344,7 +330,6 @@ export function CreateInvoiceDialog() {
 
       if (invoiceError) throw invoiceError;
 
-      // Create invoice items
       const { error: itemsError } = await supabase
         .from('invoice_items')
         .insert(
@@ -359,7 +344,6 @@ export function CreateInvoiceDialog() {
 
       if (itemsError) throw itemsError;
 
-      // Generate PDF and trigger download
       console.log('Generating PDF for download...');
       await handleDownloadInvoice(invoice);
 
@@ -368,7 +352,6 @@ export function CreateInvoiceDialog() {
         description: "Invoice created successfully!",
       });
 
-      // Refresh queries and reset form
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       
