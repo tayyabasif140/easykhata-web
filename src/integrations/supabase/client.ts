@@ -12,6 +12,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     detectSessionInUrl: true
   },
   global: {
-    fetch: (...args) => fetch(...args)
+    fetch: (...args) => fetch(args[0], args[1])
   }
 });
