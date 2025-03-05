@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,19 +18,45 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureDataURL, setSignatureDataURL] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch all user signatures
   const { data: signatures, isLoading } = useQuery({
     queryKey: ['signatures', userId],
     queryFn: async () => {
-      const { data, error } = await supabase.storage
-        .from('business_files')
-        .list(`${userId}/signatures`, {
-          sortBy: { column: 'name', order: 'desc' }
+      try {
+        // First check if session is valid
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            toast({
+              title: "Session expired",
+              description: "Please sign in again to continue.",
+              variant: "destructive",
+            });
+            throw new Error("Authentication required");
+          }
+        }
+        
+        // Then fetch signatures
+        const { data, error } = await supabase.storage
+          .from('business_files')
+          .list(`${userId}/signatures`, {
+            sortBy: { column: 'name', order: 'desc' }
+          });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error: any) {
+        console.error("Error fetching signatures:", error);
+        toast({
+          title: "Error loading signatures",
+          description: error.message,
+          variant: "destructive",
         });
-      
-      if (error) throw error;
-      return data || [];
+        return [];
+      }
     },
     enabled: !!userId
   });
@@ -132,8 +157,19 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
 
   const saveSignature = async () => {
     try {
+      setIsUploading(true);
       const canvas = canvasRef.current;
       if (!canvas || !signatureDataURL) return;
+      
+      // Check for valid session first
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        console.log("Session expired, attempting to refresh...");
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          throw new Error("Your session has expired. Please sign in again.");
+        }
+      }
       
       // Convert canvas to blob
       const fetchResponse = await fetch(signatureDataURL);
@@ -178,9 +214,11 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       console.error('Error saving signature:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to save signature. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -250,7 +288,18 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
 
   const handleUploadSignature = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
+      setIsUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
+      
+      // Check for valid session first
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        console.log("Session expired, attempting to refresh...");
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          throw new Error("Your session has expired. Please sign in again.");
+        }
+      }
       
       const file = e.target.files[0];
       const filePath = `${userId}/signatures/${Date.now()}_${file.name}`;
@@ -286,9 +335,11 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       console.error('Error uploading signature:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to upload signature. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -325,6 +376,7 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
               accept=".png,.jpg,.jpeg"
               className="border border-gray-300 rounded p-2 w-full"
               onChange={handleUploadSignature}
+              disabled={isUploading}
             />
           </div>
           
@@ -354,7 +406,7 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
                           variant="outline" 
                           size="sm"
                           onClick={() => selectSignature(signaturePath)}
-                          disabled={isSelected}
+                          disabled={isSelected || isUploading}
                         >
                           {isSelected ? 'Selected' : 'Select'}
                         </Button>
@@ -363,6 +415,7 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
                           variant="outline" 
                           size="sm"
                           onClick={() => deleteSignature(signaturePath)}
+                          disabled={isUploading}
                         >
                           <Trash className="h-4 w-4 text-red-500" />
                         </Button>
@@ -397,15 +450,16 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
               variant="outline" 
               onClick={clearCanvas}
               className="flex items-center gap-2"
+              disabled={isUploading}
             >
               Clear Signature
             </Button>
             <Button 
               type="button" 
               onClick={saveSignature}
-              disabled={!signatureDataURL}
+              disabled={!signatureDataURL || isUploading}
             >
-              Save Signature
+              {isUploading ? 'Saving...' : 'Save Signature'}
             </Button>
           </div>
         </div>
