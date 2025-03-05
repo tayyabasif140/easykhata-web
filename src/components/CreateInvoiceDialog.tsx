@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -15,7 +16,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
-import { templates } from "@/utils/invoiceTemplates";
+import { templates, generateInvoicePDF } from "@/utils/invoiceTemplates";
 import { SignatureManager } from "./SignatureManager";
 
 interface Product {
