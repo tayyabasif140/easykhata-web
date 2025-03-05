@@ -48,25 +48,30 @@ export const templates = {
 
 // Clean and normalize data to prevent null values
 const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
-  return {
+  console.log("Sanitizing invoice data:", data);
+  
+  const sanitizedData = {
     customerName: data.customerName || 'Customer',
     companyName: data.companyName || '',
     phone: data.phone || '',
     email: data.email || '',
-    products: data.products && data.products.length > 0 ? 
+    products: data.products && Array.isArray(data.products) && data.products.length > 0 ? 
       data.products.map(product => ({
         name: product.name || 'Product',
-        quantity: product.quantity || 1,
-        price: product.price || 0
+        quantity: isNaN(product.quantity) ? 1 : product.quantity || 1,
+        price: isNaN(product.price) ? 0 : product.price || 0
       })) : 
       [{ name: 'Product', quantity: 1, price: 0 }],
-    subtotal: data.subtotal || 0,
-    tax: data.tax || 0,
-    total: data.total || 0,
+    subtotal: isNaN(data.subtotal) ? 0 : data.subtotal || 0,
+    tax: isNaN(data.tax) ? 0 : data.tax || 0,
+    total: isNaN(data.total) ? 0 : data.total || 0,
     dueDate: data.dueDate,
     businessDetails: data.businessDetails || {},
     profile: data.profile || {}
   };
+  
+  console.log("Sanitized invoice data:", sanitizedData);
+  return sanitizedData;
 };
 
 // Create a fallback PDF with error message
@@ -90,11 +95,14 @@ const createFallbackPDF = (error: any): jsPDF => {
 // Try to create a PDF with error handling
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
+    console.log(`Generating invoice PDF with template: ${templateName}`, data);
+    
     // Make sure we have a valid template name or default to modern
     const templateKey = (templateName && templateName in templates) ? 
       templateName as keyof typeof templates : 
       'modern';
       
+    console.log(`Using template: ${templateKey}`);
     const templateFn = templates[templateKey];
     
     // Sanitize data to prevent null values
@@ -108,13 +116,16 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
     // Attempt to generate PDF with the selected template
     let pdf: jsPDF;
     try {
+      console.log(`Calling ${templateKey} template function with data:`, cleanData);
       pdf = await templateFn(cleanData);
       
       // Verify the PDF was actually created
       if (!pdf || !(pdf instanceof jsPDF)) {
+        console.error(`PDF object was not properly created by ${templateKey} template`);
         throw new Error("PDF object was not properly created");
       }
       
+      console.log("PDF successfully generated");
       return pdf;
     } catch (templateError) {
       console.error(`Error with ${templateKey} template:`, templateError);
@@ -124,8 +135,10 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
         console.log("Falling back to modern template");
         try {
           pdf = await templates.modern(cleanData);
+          console.log("Fallback template (modern) succeeded");
           return pdf;
         } catch (fallbackError) {
+          console.error("Fallback template also failed:", fallbackError);
           return createFallbackPDF(fallbackError);
         }
       } else {
@@ -133,6 +146,7 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       }
     }
   } catch (error) {
+    console.error("Unexpected error in generateInvoicePDF:", error);
     return createFallbackPDF(error);
   }
 };

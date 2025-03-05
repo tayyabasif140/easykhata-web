@@ -14,17 +14,27 @@ import Reports from "./pages/Reports";
 import Inventory from "./pages/Inventory";
 import SetupWizard from "./components/SetupWizard";
 import Account from "./pages/Account";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "./hooks/use-toast";
 
+// Create QueryClient with better error handling and retry logic
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 3, // Increased from 1 to handle transient network errors
       staleTime: 30 * 1000, // 30 seconds
       refetchOnWindowFocus: true,
+      refetchOnReconnect: true, // Added to refresh data when connection is restored
+      refetchOnMount: true, // Added to ensure fresh data on component mount
       meta: {
         onError: (error) => {
           console.error("Query error:", error);
+          // Show user-friendly toast for query errors
+          toast({
+            title: "Data loading error",
+            description: "Please try refreshing the page or sign in again",
+            variant: "destructive"
+          });
         }
       }
     }
@@ -32,25 +42,59 @@ const queryClient = new QueryClient({
 });
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const [isInitializing, setIsInitializing] = useState(true);
+  
+  // First, check and refresh session before even starting the query
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        await checkAndRefreshSession();
+      } catch (err) {
+        console.error("Failed to initialize session:", err);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+    
+    initializeAuth();
+  }, []);
+  
   const { data: session, isLoading, error, refetch } = useQuery({
     queryKey: ['session'],
     queryFn: async () => {
-      // Try to refresh the session first
-      await checkAndRefreshSession();
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("No active session");
+      try {
+        console.log("Fetching session in PrivateRoute...");
+        // Try to refresh the session first to ensure we have a valid token
+        await checkAndRefreshSession();
+        
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Session error in PrivateRoute:", error);
+          throw error;
+        }
+        
+        if (!data.session) {
+          console.log("No active session found in PrivateRoute");
+          throw new Error("No active session");
+        }
+        
+        console.log("Valid session found in PrivateRoute");
+        return data.session;
+      } catch (err) {
+        console.error("Session fetch error:", err);
+        throw err;
       }
-      return session;
     },
     retry: 2,
-    refetchOnMount: true
+    enabled: !isInitializing, // Only run query after initialization
+    refetchInterval: 5 * 60 * 1000, // Refresh session every 5 minutes
   });
 
   useEffect(() => {
     // Set up auth state change listener to refetch session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log("Auth state changed in PrivateRoute:", event);
       refetch();
     });
 
@@ -61,14 +105,21 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (error) {
-      console.error("Session error:", error);
+      console.error("Session error in PrivateRoute:", error);
+      // Show user-friendly toast for auth errors
+      toast({
+        title: "Authentication error",
+        description: "Please sign in again",
+        variant: "destructive"
+      });
     }
   }, [error]);
 
-  if (isLoading) {
+  if (isInitializing || isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="ml-4 text-lg text-gray-600">Loading your account...</p>
       </div>
     );
   }
