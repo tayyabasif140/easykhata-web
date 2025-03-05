@@ -16,33 +16,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 // Improved token handling and refresh mechanism
 let refreshPromise: Promise<any> | null = null;
 
-const originalAuthRequest = supabase.auth.api?.fetchWithAuth;
-if (originalAuthRequest) {
-  supabase.auth.api.fetchWithAuth = async (url, options) => {
-    // Try to get the current session
-    const { data } = await supabase.auth.getSession();
-    
-    // If no session or token is about to expire (within 5 minutes)
-    if (!data.session || 
-        (data.session.expires_at && 
-         new Date(data.session.expires_at * 1000).getTime() - Date.now() < 5 * 60 * 1000)) {
-      console.log("Session needs refresh, attempting to refresh token...");
-      
-      // Use a single promise for concurrent refresh attempts
-      if (!refreshPromise) {
-        refreshPromise = supabase.auth.refreshSession().then(result => {
-          console.log("Token refresh result:", result.error ? "Failed" : "Success");
-          refreshPromise = null;
-          return result;
-        });
-      }
-      
-      await refreshPromise;
-    }
-    
-    return originalAuthRequest(url, options);
-  };
-}
+// The old api.fetchWithAuth is no longer available in newer Supabase versions
+// We'll use a more modern approach for token refresh
 
 // Set up a listener for auth state changes
 supabase.auth.onAuthStateChange((event, session) => {
