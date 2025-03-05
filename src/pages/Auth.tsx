@@ -4,49 +4,96 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+
+// Preload important images
+const preloadResources = () => {
+  // Preload any critical assets that would otherwise delay rendering
+  const imagesToPreload = ['/favicon.ico']; // Add any other critical images
+  
+  imagesToPreload.forEach(src => {
+    const img = new Image();
+    img.src = src;
+  });
+};
 
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isAuthPage, setIsAuthPage] = useState(true);
+  const [isAuthPage, setIsAuthPage] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const authCheckCompleted = useRef(false);
+  const authStateMounted = useRef(false);
 
-  // Check if user is already logged in and redirect away from auth page
+  // Optimize session check to prevent flickering
   useEffect(() => {
+    // Start preloading resources immediately
+    preloadResources();
+    
+    // Only perform this check once
+    if (authCheckCompleted.current) return;
+    
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // User is already logged in, redirect to home
-        navigate('/', { replace: true });
-      } else {
-        // Confirm this is the auth page so we can show the UI
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session) {
+          // User is already logged in, redirect to home
+          console.log("User already logged in, redirecting to home");
+          navigate('/', { replace: true });
+        } else {
+          // Confirm this is the auth page so we can show the UI
+          setIsAuthPage(true);
+        }
+        
+        authCheckCompleted.current = true;
+      } catch (error) {
+        console.error("Error checking session:", error);
+        // If there's an error, still show the auth page to let user log in
         setIsAuthPage(true);
+        authCheckCompleted.current = true;
       }
     };
     
     checkSession();
+  }, [navigate]);
+
+  // Optimize auth state change handler
+  useEffect(() => {
+    // Prevent multiple subscriptions
+    if (authStateMounted.current) return;
+    authStateMounted.current = true;
     
-    // Clean up any auth state change handlers to prevent duplicate redirects
+    // Setup auth state handler with reduced frequency
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        // Wait a moment before redirecting to prevent UI flicker
-        setTimeout(() => {
+        // Use more appropriate timing to prevent UI flicker
+        requestAnimationFrame(() => {
           navigate('/', { replace: true });
-        }, 100);
+        });
       }
     });
     
+    // Cleanup subscription
     return () => {
       data.subscription.unsubscribe();
     };
   }, [navigate]);
 
   const handleAuth = async (type: 'login' | 'signup') => {
+    if (!email || !password) {
+      toast({
+        title: "Missing information",
+        description: "Please provide both email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setLoading(true);
       let result;
@@ -67,7 +114,7 @@ export default function Auth() {
         // Check if user profile exists
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id') // Only select necessary fields
           .eq('id', result.data.user?.id)
           .single();
 
@@ -86,10 +133,10 @@ export default function Auth() {
 
         if (result.error) throw result.error;
 
-        // Check if user profile exists after login
+        // Only check if profile exists, with minimal data
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id') // Only select necessary fields
           .eq('id', result.data.user?.id)
           .single();
 
@@ -113,18 +160,17 @@ export default function Auth() {
     }
   };
 
-  // Only render the auth UI when we've confirmed this is the auth page
-  // and there's no active session (prevents flickering)
+  // Show loading state - optimized to avoid layout shift
   if (!isAuthPage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 transition-opacity duration-300">
         <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 transition-opacity duration-300">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome to EasyKhata</CardTitle>
@@ -145,6 +191,7 @@ export default function Auth() {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -155,6 +202,7 @@ export default function Auth() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
             </div>
             <div className="space-y-4 pt-4">
@@ -163,7 +211,7 @@ export default function Auth() {
                 className="w-full"
                 disabled={loading}
               >
-                Sign In
+                {loading ? 'Processing...' : 'Sign In'}
               </Button>
               <Button
                 type="button"
@@ -172,7 +220,7 @@ export default function Auth() {
                 onClick={() => handleAuth('signup')}
                 disabled={loading}
               >
-                Create Account
+                {loading ? 'Processing...' : 'Create Account'}
               </Button>
             </div>
           </form>

@@ -1,21 +1,43 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
 
-// Create Supabase client with improved session handling
+// Improve client configuration for better performance
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: 'invoicing-app-auth-token', // Ensure a unique key to avoid conflicts
-  }
+    storageKey: 'invoicing-app-auth-token',
+  },
+  global: {
+    headers: {
+      'Cache-Control': 'max-age=300', // Cache responses for 5 minutes when possible
+    },
+    fetch: async (url, options) => {
+      // Use custom fetch implementation with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+      
+      try {
+        options.signal = controller.signal;
+        const response = await fetch(url, options);
+        return response;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+  },
+  // Set default fetch caching behavior
+  realtime: {
+    timeout: 10000, // Reduce realtime connection timeout to 10 seconds
+  },
 });
 
-// Set up a listener for auth state changes with improved error handling
+// Optimize auth state change handling
 let authChangeProcessing = false;
+const authChangeDebounceTime = 300;
 
 supabase.auth.onAuthStateChange((event, session) => {
   console.log(`Auth state changed: ${event}`);
@@ -30,7 +52,7 @@ supabase.auth.onAuthStateChange((event, session) => {
   
   setTimeout(() => {
     authChangeProcessing = false;
-  }, 300); // Add debounce to prevent rapid changes
+  }, authChangeDebounceTime);
   
   if (event === 'TOKEN_REFRESHED') {
     console.log('Token has been refreshed successfully');
@@ -62,60 +84,60 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
-// Add an interceptor to the global fetch for better debugging of auth issues
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-  const [url, options] = args;
+// Optimize session checking with caching
+let cachedSessionPromise = null;
+let lastSessionCheck = 0;
+const sessionCacheTime = 60000; // 1 minute cache
+
+export const checkAndRefreshSession = async () => {
+  const now = Date.now();
   
-  // Only log auth-related requests
-  if (typeof url === 'string' && url.includes('supabase') && url.includes('auth')) {
-    console.log(`Auth request to: ${url}`);
+  // Use cached result if available and not expired
+  if (cachedSessionPromise && (now - lastSessionCheck < sessionCacheTime)) {
+    return cachedSessionPromise;
+  }
+  
+  console.log('Checking current session status...');
+  lastSessionCheck = now;
+  
+  // Create new promise and cache it
+  cachedSessionPromise = (async () => {
     try {
-      const response = await originalFetch(...args);
+      const { data, error: sessionError } = await supabase.auth.getSession();
       
-      // Clone the response to inspect it without consuming it
-      const clonedResponse = response.clone();
-      try {
-        const data = await clonedResponse.json();
-        if (!response.ok) {
-          console.error('Auth request failed:', data);
-          // If we get a 401 (expired token), try to force a refresh
-          if (response.status === 401) {
-            console.log('Token expired, attempting to refresh...');
-            await supabase.auth.refreshSession();
+      if (sessionError) {
+        console.error('Session check error:', sessionError);
+        return false;
+      }
+      
+      if (!data.session) {
+        console.log("No session found, attempting to refresh...");
+        try {
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Failed to refresh session:", refreshError.message);
+            return false;
           }
-        }
-      } catch (e) {
-        // If we can't parse as JSON, just log the status
-        if (!response.ok) {
-          console.error('Auth request failed with status:', response.status);
+          
+          if (refreshData.session) {
+            console.log("Session refreshed successfully");
+            return true;
+          }
+          
+          return false;
+        } catch (err) {
+          console.error("Failed to refresh session:", err);
+          return false;
         }
       }
       
-      return response;
-    } catch (error) {
-      console.error('Auth request error:', error);
-      throw error;
-    }
-  }
-  
-  return originalFetch(...args);
-};
-
-// Add a function to check and refresh the session on demand with improved error handling
-export const checkAndRefreshSession = async () => {
-  try {
-    console.log('Checking current session status...');
-    const { data, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error('Session check error:', sessionError);
-      return false;
-    }
-    
-    if (!data.session) {
-      console.log("No session found, attempting to refresh...");
-      try {
+      // Check if token is about to expire (within 10 minutes - increased from 5)
+      const expiresAt = data.session.expires_at ? new Date(data.session.expires_at * 1000) : null;
+      const now = new Date();
+      
+      if (expiresAt && expiresAt.getTime() - now.getTime() < 10 * 60 * 1000) {
+        console.log("Token about to expire, refreshing...");
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError) {
@@ -123,40 +145,73 @@ export const checkAndRefreshSession = async () => {
           return false;
         }
         
-        if (refreshData.session) {
-          console.log("Session refreshed successfully");
-          return true;
-        }
-        
-        return false;
-      } catch (err) {
-        console.error("Failed to refresh session:", err);
-        return false;
-      }
-    }
-    
-    // Check if token is about to expire (within 10 minutes - increased from 5)
-    const expiresAt = data.session.expires_at ? new Date(data.session.expires_at * 1000) : null;
-    const now = new Date();
-    
-    if (expiresAt && expiresAt.getTime() - now.getTime() < 10 * 60 * 1000) {
-      console.log("Token about to expire, refreshing...");
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error("Failed to refresh session:", refreshError.message);
-        return false;
+        console.log("Proactive token refresh successful");
+        return true;
       }
       
-      console.log("Proactive token refresh successful");
+      console.log("Session is valid and not near expiration");
       return true;
+    } catch (error) {
+      console.error("Error checking session:", error);
+      return false;
     }
-    
-    console.log("Session is valid and not near expiration");
-    return true;
-  } catch (error) {
-    console.error("Error checking session:", error);
-    return false;
+  })();
+  
+  return cachedSessionPromise;
+};
+
+// Implement optimized data fetching helper
+export const fetchWithCache = async (tableName, query, options = {}) => {
+  const cacheKey = `supabase-cache-${tableName}-${JSON.stringify(query)}`;
+  const cachedData = sessionStorage.getItem(cacheKey);
+  
+  // Use cached data if available and not expired
+  if (cachedData && options.useCachedData !== false) {
+    try {
+      const { data, timestamp } = JSON.parse(cachedData);
+      const now = Date.now();
+      const maxAge = options.maxAge || 60000; // Default 1 minute cache
+      
+      if (now - timestamp < maxAge) {
+        console.log(`Using cached data for ${tableName}`);
+        return { data, source: 'cache' };
+      }
+    } catch (e) {
+      console.error('Cache parsing error:', e);
+    }
+  }
+  
+  // Fetch fresh data
+  const result = await query;
+  
+  // Cache the fresh data if no error
+  if (!result.error && result.data && options.cacheResults !== false) {
+    try {
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: result.data,
+        timestamp: Date.now()
+      }));
+    } catch (e) {
+      console.error('Cache storage error:', e);
+    }
+  }
+  
+  return { ...result, source: 'network' };
+};
+
+// Add selective revalidation function
+export const invalidateCache = (pattern) => {
+  try {
+    // Remove matching items from sessionStorage
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('supabase-cache-') && (
+        !pattern || key.includes(pattern)
+      )) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  } catch (e) {
+    console.error('Cache invalidation error:', e);
   }
 };
 
