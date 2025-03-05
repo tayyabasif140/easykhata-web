@@ -15,8 +15,22 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 });
 
 // Set up a listener for auth state changes with improved error handling
+let authChangeProcessing = false;
+
 supabase.auth.onAuthStateChange((event, session) => {
   console.log(`Auth state changed: ${event}`);
+  
+  // Prevent multiple rapid auth state changes from causing UI flickering
+  if (authChangeProcessing) {
+    console.log('Auth change already processing, skipping');
+    return;
+  }
+  
+  authChangeProcessing = true;
+  
+  setTimeout(() => {
+    authChangeProcessing = false;
+  }, 300); // Add debounce to prevent rapid changes
   
   if (event === 'TOKEN_REFRESHED') {
     console.log('Token has been refreshed successfully');
@@ -25,10 +39,24 @@ supabase.auth.onAuthStateChange((event, session) => {
     // Clear any cached data that might be causing issues
     localStorage.removeItem('invoicing-app-auth-token');
     sessionStorage.clear();
-    // Redirect to login page
-    window.location.href = '/auth';
+    
+    // Use setTimeout to prevent immediate redirects that cause flickering
+    setTimeout(() => {
+      // Only redirect if we're not already on the auth page
+      if (!window.location.pathname.includes('/auth')) {
+        window.location.href = '/auth';
+      }
+    }, 100);
   } else if (event === 'SIGNED_IN') {
     console.log('User signed in successfully');
+    
+    // Add delay before redirect to prevent flickering
+    setTimeout(() => {
+      // Only redirect if we're on the auth page
+      if (window.location.pathname.includes('/auth')) {
+        window.location.href = '/';
+      }
+    }, 100);
   } else if (event === 'USER_UPDATED') {
     console.log('User details updated');
   }
@@ -87,24 +115,24 @@ export const checkAndRefreshSession = async () => {
     
     if (!data.session) {
       console.log("No session found, attempting to refresh...");
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error("Failed to refresh session:", refreshError.message);
-        // Force sign out if refresh fails to clear any invalid state
-        await supabase.auth.signOut();
-        window.location.href = '/auth';
+      try {
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          console.error("Failed to refresh session:", refreshError.message);
+          return false;
+        }
+        
+        if (refreshData.session) {
+          console.log("Session refreshed successfully");
+          return true;
+        }
+        
+        return false;
+      } catch (err) {
+        console.error("Failed to refresh session:", err);
         return false;
       }
-      
-      if (refreshData.session) {
-        console.log("Session refreshed successfully");
-        return true;
-      }
-      
-      console.log("No session after refresh, redirecting to auth");
-      window.location.href = '/auth';
-      return false;
     }
     
     // Check if token is about to expire (within 10 minutes - increased from 5)

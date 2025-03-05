@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
@@ -12,8 +12,39 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isAuthPage, setIsAuthPage] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check if user is already logged in and redirect away from auth page
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        // User is already logged in, redirect to home
+        navigate('/', { replace: true });
+      } else {
+        // Confirm this is the auth page so we can show the UI
+        setIsAuthPage(true);
+      }
+    };
+    
+    checkSession();
+    
+    // Clean up any auth state change handlers to prevent duplicate redirects
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        // Wait a moment before redirecting to prevent UI flicker
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 100);
+      }
+    });
+    
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   const handleAuth = async (type: 'login' | 'signup') => {
     try {
@@ -28,6 +59,11 @@ export default function Auth() {
 
         if (result.error) throw result.error;
 
+        toast({
+          title: "Account created",
+          description: "Please check your email to verify your account.",
+        });
+
         // Check if user profile exists
         const { data: profile } = await supabase
           .from('profiles')
@@ -37,9 +73,11 @@ export default function Auth() {
 
         if (!profile) {
           // Redirect to setup wizard if profile doesn't exist
-          navigate('/setup');
+          navigate('/setup', { replace: true });
           return;
         }
+
+        navigate('/', { replace: true });
       } else {
         result = await supabase.auth.signInWithPassword({
           email,
@@ -57,11 +95,11 @@ export default function Auth() {
 
         if (!profile) {
           // Redirect to setup wizard if profile doesn't exist
-          navigate('/setup');
+          navigate('/setup', { replace: true });
           return;
         }
 
-        navigate('/');
+        navigate('/', { replace: true });
       }
 
     } catch (error: any) {
@@ -74,6 +112,16 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  // Only render the auth UI when we've confirmed this is the auth page
+  // and there's no active session (prevents flickering)
+  if (!isAuthPage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
