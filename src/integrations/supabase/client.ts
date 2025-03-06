@@ -160,8 +160,15 @@ export const checkAndRefreshSession = async () => {
   return cachedSessionPromise;
 };
 
-// Implement optimized data fetching helper
-export const fetchWithCache = async (tableName, query, options = {}) => {
+// Define proper types for the fetch cache options
+interface FetchCacheOptions {
+  useCachedData?: boolean;
+  maxAge?: number;
+  cacheResults?: boolean;
+}
+
+// Implement optimized data fetching helper with proper type definitions
+export const fetchWithCache = async (tableName: string, query: any, options: FetchCacheOptions = {}) => {
   const cacheKey = `supabase-cache-${tableName}-${JSON.stringify(query)}`;
   const cachedData = sessionStorage.getItem(cacheKey);
   

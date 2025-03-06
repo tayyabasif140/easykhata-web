@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 2, // Reduced retries to prevent excessive network requests
       staleTime: 2 * 60 * 1000, // 2 minutes - increased to reduce API calls
-      cacheTime: 10 * 60 * 1000, // 10 minutes - increased for better caching
+      gcTime: 10 * 60 * 1000, // 10 minutes - increased for better caching (was cacheTime)
       refetchOnWindowFocus: import.meta.env.PROD, // Only in production
       refetchOnReconnect: true,
       refetchOnMount: true,
