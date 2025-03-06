@@ -19,6 +19,7 @@ export type Database = {
           id: string
           invoice_template: string | null
           ntn_number: string | null
+          privacy_policy: string | null
           social_media_links: Json | null
           tax_configuration: Json | null
           user_id: string
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           invoice_template?: string | null
           ntn_number?: string | null
+          privacy_policy?: string | null
           social_media_links?: Json | null
           tax_configuration?: Json | null
           user_id: string
@@ -47,6 +49,7 @@ export type Database = {
           id?: string
           invoice_template?: string | null
           ntn_number?: string | null
+          privacy_policy?: string | null
           social_media_links?: Json | null
           tax_configuration?: Json | null
           user_id?: string
@@ -258,6 +261,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           digital_signature_url: string | null
           email: string
@@ -267,6 +271,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           digital_signature_url?: string | null
           email: string
@@ -276,6 +281,7 @@ export type Database = {
           username: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           digital_signature_url?: string | null
           email?: string
