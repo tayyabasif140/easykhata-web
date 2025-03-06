@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: import.meta.env.PROD, // Only in production
       refetchOnReconnect: true,
       refetchOnMount: true,
-      suspense: false, // Explicit control over loading states
+      // Remove the suspense property as it's not supported in this context
       meta: {
         errorHandler: (error) => {
           console.error("Query error:", error);
