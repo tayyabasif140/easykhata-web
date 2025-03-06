@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { BackButton } from "@/components/BackButton";
 
 const Inventory = () => {
   const { toast } = useToast();
@@ -135,7 +136,8 @@ const Inventory = () => {
   return (
     <div className="min-h-screen bg-gray-50 overflow-y-auto">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <BackButton className="mb-4" />
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">Inventory Management</h1>

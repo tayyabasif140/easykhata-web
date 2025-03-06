@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,14 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, checkAndRefreshSession } from "@/integrations/supabase/client";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { toast } from "./hooks/use-toast";
-
-// Create optimized loading component
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center h-screen">
-    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    <p className="ml-4 text-lg text-gray-600">Loading...</p>
-  </div>
-);
+import { LoadingSpinner } from "./components/LoadingSpinner";
 
 // Lazy load components that aren't needed immediately
 const Auth = lazy(() => import("./pages/Auth"));
@@ -119,7 +111,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }, [error]);
 
   if (isInitializing || isLoading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner fullScreen message="Loading your account..." />;
   }
 
   if (!session) {
@@ -136,7 +128,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={<LoadingSpinner fullScreen message="Loading application..." />}>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/setup" element={

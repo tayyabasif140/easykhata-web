@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -241,6 +240,11 @@ export function CreateInvoiceDialog() {
   const handleDownloadInvoice = async (invoice: any) => {
     try {
       console.log('Starting PDF download...');
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we prepare your invoice...",
+      });
+      
       const doc = await generatePDF();
       
       if (!doc) {
@@ -249,20 +253,64 @@ export function CreateInvoiceDialog() {
       
       console.log('PDF generated, saving...');
       const fileName = `invoice_${invoice.id}.pdf`;
-      doc.save(fileName);
-      console.log('PDF saved as:', fileName);
+      
+      try {
+        doc.save(fileName);
+        console.log('PDF saved as:', fileName);
+      } catch (saveError) {
+        console.error('Error saving PDF, attempting alternative method:', saveError);
+        const blob = doc.output('blob');
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
       
       toast({
         title: "Success",
         description: "Invoice downloaded successfully!",
+        variant: "default",
       });
     } catch (error) {
       console.error('Error downloading invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to download invoice. Please try again.",
+        description: "Failed to download invoice. Trying simpler version...",
         variant: "destructive",
       });
+      
+      try {
+        const fallbackDoc = new jsPDF();
+        fallbackDoc.setFontSize(18);
+        fallbackDoc.text("INVOICE", 105, 20, { align: "center" });
+        fallbackDoc.setFontSize(12);
+        fallbackDoc.text(`Customer: ${customerName}`, 20, 40);
+        fallbackDoc.text(`Total Amount: ${calculateSubtotal() + calculateTotalTax()}`, 20, 50);
+        fallbackDoc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 60);
+        fallbackDoc.text(`Products:`, 20, 70);
+        
+        let y = 80;
+        products.forEach((product, index) => {
+          fallbackDoc.text(`${index + 1}. ${product.name} (${product.quantity} x ${product.price})`, 30, y);
+          y += 10;
+        });
+        
+        fallbackDoc.save(`fallback_invoice_${invoice.id}.pdf`);
+        
+        toast({
+          title: "Success",
+          description: "Simplified invoice downloaded successfully!",
+        });
+      } catch (fallbackError) {
+        console.error('Even fallback PDF failed:', fallbackError);
+        toast({
+          title: "Critical Error",
+          description: "Could not generate any PDF. Please try again later.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

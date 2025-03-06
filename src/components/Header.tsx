@@ -159,7 +159,21 @@ export const Header = () => {
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          <h1 className="text-2xl font-bold text-primary">EasyKhata</h1>
+          <Link to="/" className="flex items-center">
+            {businessDetails?.business_logo_url ? (
+              <img
+                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                alt="Business Logo"
+                className="h-10 w-auto object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/placeholder.svg";
+                  console.log("Logo failed to load, using placeholder");
+                }}
+              />
+            ) : (
+              <h1 className="text-2xl font-bold text-primary">EasyKhata</h1>
+            )}
+          </Link>
         </div>
         <div className="flex items-center space-x-6">
           <Sheet open={showNotifications} onOpenChange={setShowNotifications}>
@@ -295,6 +309,10 @@ export const Header = () => {
                     src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
                     alt="Business Logo"
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/placeholder.svg";
+                      console.log("Profile logo failed to load, using placeholder");
+                    }}
                   />
                 </button>
               ) : (

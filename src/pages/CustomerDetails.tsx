@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Building, Mail, Phone, FileText } from "lucide-react";
+import { BackButton } from "@/components/BackButton";
 
 export default function CustomerDetails() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +63,8 @@ export default function CustomerDetails() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <BackButton className="mb-4" />
+        
         {customer && (
           <>
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">

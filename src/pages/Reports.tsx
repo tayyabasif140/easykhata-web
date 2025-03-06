@@ -14,6 +14,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { BackButton } from "@/components/BackButton";
 
 const Reports = () => {
   const { data: invoices } = useQuery({
@@ -108,6 +109,7 @@ const Reports = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <BackButton className="mb-4" />
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Financial Reports</h1>
           <p className="text-gray-600 mt-1">Track your business performance</p>
