@@ -1,4 +1,3 @@
-
 import { Bell, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
@@ -161,15 +160,20 @@ export const Header = () => {
         <div className="flex items-center space-x-4">
           <Link to="/" className="flex items-center">
             {businessDetails?.business_logo_url ? (
-              <img
-                src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
-                alt="Business Logo"
-                className="h-10 w-auto object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder.svg";
-                  console.log("Logo failed to load, using placeholder");
-                }}
-              />
+              <div className="flex items-center space-x-2">
+                <img
+                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                  alt="Business Logo"
+                  className="h-10 w-auto object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    console.log("Logo failed to load, using placeholder");
+                  }}
+                />
+                <h1 className="text-xl font-bold text-primary hidden md:block">
+                  {businessDetails?.business_name || "EasyKhata"}
+                </h1>
+              </div>
             ) : (
               <h1 className="text-2xl font-bold text-primary">EasyKhata</h1>
             )}
@@ -303,17 +307,9 @@ export const Header = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              {businessDetails?.business_logo_url ? (
-                <button className="w-9 h-9 rounded-full overflow-hidden">
-                  <img
-                    src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
-                    alt="Business Logo"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/placeholder.svg";
-                      console.log("Profile logo failed to load, using placeholder");
-                    }}
-                  />
+              {session?.user ? (
+                <button className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
+                  <User className="w-5 h-5 text-primary" />
                 </button>
               ) : (
                 <button className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">

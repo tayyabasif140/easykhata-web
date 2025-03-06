@@ -12,7 +12,7 @@ export const BackButton = ({ className }: BackButtonProps) => {
   
   return (
     <Button 
-      variant="ghost" 
+      variant="outline" 
       className={`flex items-center gap-2 hover:bg-gray-100 ${className || ""}`}
       onClick={() => navigate(-1)}
       aria-label="Go back"
