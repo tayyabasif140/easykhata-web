@@ -20,6 +20,7 @@ export default function Account() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [digitalSignature, setDigitalSignature] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
   const [userId, setUserId] = useState("");
@@ -30,6 +31,15 @@ export default function Account() {
   useEffect(() => {
     getProfile();
   }, []);
+
+  // Update avatar preview URL when avatarUrl changes
+  useEffect(() => {
+    if (avatarUrl) {
+      // Create the public URL for preview
+      const previewUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${avatarUrl}`;
+      setAvatarPreviewUrl(previewUrl);
+    }
+  }, [avatarUrl]);
 
   async function getProfile() {
     try {
@@ -224,17 +234,10 @@ export default function Account() {
       
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}.${fileExt}`;
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = `${userId}/avatar/${fileName}`;
       
-      // Check if storage bucket exists
-      const { data: bucketData, error: bucketError } = await supabase
-        .storage
-        .getBucket('business_files');
-      
-      if (bucketError) {
-        console.error("Error checking bucket:", bucketError);
-      }
+      console.log("Uploading avatar to path:", filePath);
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
@@ -248,7 +251,10 @@ export default function Account() {
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: filePath })
+        .update({ 
+          avatar_url: filePath,
+          updated_at: new Date()
+        })
         .eq('id', userId);
       
       if (updateError) {
@@ -260,13 +266,17 @@ export default function Account() {
         .from('business_files')
         .getPublicUrl(filePath);
       
+      console.log("Avatar uploaded, public URL:", data.publicUrl);
+      
       setAvatarUrl(filePath);
+      setAvatarPreviewUrl(data.publicUrl);
       
       toast({
         title: "Success",
         description: "Profile picture updated successfully!",
       });
     } catch (error: any) {
+      console.error("Upload error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -307,9 +317,9 @@ export default function Account() {
                 <div className="flex items-center space-x-4">
                   <div className="relative">
                     <Avatar className="w-20 h-20">
-                      {avatarUrl ? (
+                      {avatarPreviewUrl ? (
                         <AvatarImage 
-                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${avatarUrl}`} 
+                          src={avatarPreviewUrl} 
                           alt="Avatar" 
                         />
                       ) : (

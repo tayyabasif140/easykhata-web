@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
@@ -83,6 +84,17 @@ supabase.auth.onAuthStateChange((event, session) => {
     console.log('User details updated');
   }
 });
+
+// Helper function to get a public URL for an avatar or image
+export const getPublicImageUrl = (path: string) => {
+  if (!path) return null;
+  
+  const { data } = supabase.storage
+    .from('business_files')
+    .getPublicUrl(path);
+    
+  return data.publicUrl;
+};
 
 // Optimize session checking with caching
 let cachedSessionPromise = null;
