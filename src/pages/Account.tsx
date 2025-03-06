@@ -11,6 +11,8 @@ import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignatureManager } from "@/components/SignatureManager";
+import { Textarea } from "@/components/ui/textarea";
+import { Camera, Upload } from "lucide-react";
 
 export default function Account() {
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,8 @@ export default function Account() {
   const [digitalSignature, setDigitalSignature] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
   const [userId, setUserId] = useState("");
+  const [privacyPolicy, setPrivacyPolicy] = useState("");
+  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,10 +39,13 @@ export default function Account() {
       
       // Set the userId state
       setUserId(userData.user.id);
+      
+      // Get the email from auth
+      setEmail(userData.user.email || "");
 
       let { data, error, status } = await supabase
         .from("profiles")
-        .select(`full_name, username, email, digital_signature_url`)
+        .select(`full_name, username, avatar_url, digital_signature_url`)
         .eq("id", userData.user.id)
         .single();
 
@@ -46,10 +53,10 @@ export default function Account() {
         throw error;
       }
 
-      // Get business details to fetch selected template
+      // Get business details to fetch selected template and privacy policy
       const { data: businessData, error: businessError } = await supabase
         .from("business_details")
-        .select("invoice_template")
+        .select("invoice_template, privacy_policy")
         .eq("user_id", userData.user.id)
         .single();
 
@@ -57,12 +64,13 @@ export default function Account() {
         console.error("Error fetching business details:", businessError);
       } else if (businessData) {
         setSelectedTemplate(businessData.invoice_template || "classic");
+        setPrivacyPolicy(businessData.privacy_policy || "");
       }
 
       if (data) {
         setFullName(data.full_name || "");
         setUsername(data.username || "");
-        setEmail(data.email || "");
+        setAvatarUrl(data.avatar_url || "");
         setDigitalSignature(data.digital_signature_url || "");
       }
     } catch (error: any) {
@@ -152,6 +160,123 @@ export default function Account() {
     }
   }
 
+  async function updatePrivacyPolicy() {
+    try {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Check if business details already exist
+      const { data, error: checkError } = await supabase
+        .from("business_details")
+        .select("id")
+        .eq("user_id", userData.user.id)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+      
+      // Insert or update privacy policy
+      if (data) {
+        // Update existing record
+        const { error } = await supabase
+          .from("business_details")
+          .update({ privacy_policy: privacyPolicy })
+          .eq("user_id", userData.user.id);
+        
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from("business_details")
+          .insert({ 
+            user_id: userData.user.id, 
+            privacy_policy: privacyPolicy,
+            invoice_template: selectedTemplate
+          });
+        
+        if (error) throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Privacy policy updated successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      setUploading(true);
+      
+      if (!e.target.files || e.target.files.length === 0) {
+        return;
+      }
+      
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}.${fileExt}`;
+      const filePath = `${userId}/avatar/${fileName}`;
+      
+      // Check if storage bucket exists
+      const { data: bucketData, error: bucketError } = await supabase
+        .storage
+        .getBucket('business_files');
+      
+      if (bucketError) {
+        console.error("Error checking bucket:", bucketError);
+      }
+      
+      // Upload the file
+      const { error: uploadError } = await supabase.storage
+        .from('business_files')
+        .upload(filePath, file, { upsert: true });
+      
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      // Update the profile with the new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: filePath })
+        .eq('id', userId);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Get the public URL for preview
+      const { data } = supabase.storage
+        .from('business_files')
+        .getPublicUrl(filePath);
+      
+      setAvatarUrl(filePath);
+      
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function signOut() {
     try {
       await supabase.auth.signOut();
@@ -180,13 +305,33 @@ export default function Account() {
             <TabsContent value="profile">
               <div className="bg-white shadow-md rounded-md p-6">
                 <div className="flex items-center space-x-4">
-                  <Avatar className="w-16 h-16">
-                    {avatarUrl ? (
-                      <AvatarImage src={avatarUrl} alt="Avatar" />
-                    ) : (
-                      <AvatarFallback>{fullName?.charAt(0).toUpperCase() || '?'}</AvatarFallback>
-                    )}
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="w-20 h-20">
+                      {avatarUrl ? (
+                        <AvatarImage 
+                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${avatarUrl}`} 
+                          alt="Avatar" 
+                        />
+                      ) : (
+                        <AvatarFallback>{fullName?.charAt(0).toUpperCase() || '?'}</AvatarFallback>
+                      )}
+                    </Avatar>
+                    <label 
+                      htmlFor="avatar-upload" 
+                      className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
+                      title="Upload profile picture"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <input 
+                        id="avatar-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={uploadAvatar}
+                        disabled={uploading}
+                      />
+                    </label>
+                  </div>
                   <div>
                     <h2 className="text-lg font-semibold">Profile Information</h2>
                     <p className="text-gray-500">Update your personal details here.</p>
@@ -298,6 +443,26 @@ export default function Account() {
                         defaultSignature={digitalSignature}
                       />
                     )}
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Privacy Policy</CardTitle>
+                    <CardDescription>Add your business privacy policy to include on invoices</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <Textarea 
+                        placeholder="Enter your privacy policy here..." 
+                        value={privacyPolicy}
+                        onChange={(e) => setPrivacyPolicy(e.target.value)}
+                        className="min-h-[200px]"
+                      />
+                      <Button onClick={updatePrivacyPolicy} disabled={loading}>
+                        {loading ? "Saving..." : "Save Privacy Policy"}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

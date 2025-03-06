@@ -203,12 +203,13 @@ export function CreateInvoiceDialog() {
     setShowSignatureCanvas(false);
   };
 
-  const generatePDF = async () => {
+  async function generatePDF() {
     try {
-      const template = businessDetails?.invoice_template || 'modern';
+      const template = businessDetails?.invoice_template || 'classic';
       console.log('Generating PDF with template:', template);
       
-      return await generateInvoicePDF(template, {
+      // Prepare invoice data
+      const invoiceData = {
         customerName,
         companyName,
         phone,
@@ -223,19 +224,39 @@ export function CreateInvoiceDialog() {
           ...profile,
           digital_signature_url: selectedSignature || profile?.digital_signature_url
         }
-      });
+      };
+      
+      console.log('Invoice data prepared:', invoiceData);
+      return await generateInvoicePDF(template, invoiceData);
     } catch (error) {
       console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Could not generate invoice PDF with the template. Using simple version instead.",
+        variant: "destructive",
+      });
       
+      // Return a simple PDF as fallback
       const doc = new jsPDF();
       doc.setFontSize(20);
-      doc.text("Invoice Generation Error", 20, 30);
+      doc.text("INVOICE", 105, 20, { align: "center" });
+      
+      doc.setFontSize(14);
+      doc.text(`Customer: ${customerName}`, 20, 40);
+      doc.text(`Total: Rs.${calculateSubtotal() + calculateTotalTax()}`, 20, 50);
+      
       doc.setFontSize(12);
-      doc.text("There was an error generating your invoice.", 20, 50);
-      doc.text("Please try again or contact support.", 20, 60);
+      doc.text("Products:", 20, 70);
+      
+      let y = 80;
+      products.forEach((product, index) => {
+        doc.text(`${index + 1}. ${product.name} (${product.quantity} x Rs.${product.price})`, 25, y);
+        y += 8;
+      });
+      
       return doc;
     }
-  };
+  }
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
