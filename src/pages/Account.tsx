@@ -11,7 +11,6 @@ import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignatureManager } from "@/components/SignatureManager";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Account() {
   const [loading, setLoading] = useState(true);
@@ -21,6 +20,7 @@ export default function Account() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [digitalSignature, setDigitalSignature] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("classic");
+  const [userId, setUserId] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,6 +32,9 @@ export default function Account() {
       setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
+      
+      // Set the userId state
+      setUserId(userData.user.id);
 
       let { data, error, status } = await supabase
         .from("profiles")
@@ -288,9 +291,9 @@ export default function Account() {
                     <CardDescription>Add or update your digital signature</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {!loading && (
+                    {!loading && userId && (
                       <SignatureManager 
-                        userId={supabase.auth.getUser().then(res => res.data.user?.id || '')} 
+                        userId={userId} 
                         onSignatureSelect={setDigitalSignature} 
                         defaultSignature={digitalSignature}
                       />
