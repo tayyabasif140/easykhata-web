@@ -1,6 +1,5 @@
-
 import jsPDF from 'jspdf';
-import { classicTemplate } from './classicTemplate';
+import { classicTemplate } from './templates/classic';
 import { professionalTemplate } from './professionalTemplate';
 import { diamondTemplate } from './diamondTemplate';
 
