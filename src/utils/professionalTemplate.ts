@@ -42,12 +42,15 @@ export const professionalTemplate = async (props: TemplateProps) => {
   let yPos = 40;
   
   // Add business logo
-  if (businessDetails?.business_logo_url) {
+  if (businessDetails?.logo_base64 || businessDetails?.business_logo_url) {
     try {
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
+      const logoSource = businessDetails.logo_base64 || 
+        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
+      console.log("Adding logo from source:", businessDetails.logo_base64 ? "base64" : businessDetails.business_logo_url);
+      
       const logoWidth = 40;
       const logoHeight = 20;
-      doc.addImage(logoUrl, 'JPEG', 10, yPos, logoWidth, logoHeight, undefined, 'FAST');
+      doc.addImage(logoSource, 'JPEG', 10, yPos, logoWidth, logoHeight, undefined, 'FAST');
       yPos += 25;
     } catch (error) {
       console.error('Error loading logo:', error);
@@ -249,13 +252,16 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.text('Please pay within 14 days of receipt.', 10, yPos);
   
   // Add signature if available
-  if (profile?.digital_signature_url) {
+  if (profile?.signature_base64 || profile?.digital_signature_url) {
     try {
       yPos += 20;
-      const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
+      const signatureSource = profile.signature_base64 || 
+        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
+      console.log("Adding signature from source:", profile.signature_base64 ? "base64" : profile.digital_signature_url);
+      
       const signatureWidth = 40;
       const signatureHeight = 20;
-      doc.addImage(signatureUrl, 'PNG', pageWidth - 60, yPos, signatureWidth, signatureHeight, undefined, 'FAST');
+      doc.addImage(signatureSource, 'PNG', pageWidth - 60, yPos, signatureWidth, signatureHeight, undefined, 'FAST');
       
       yPos += signatureHeight + 5;
       doc.setDrawColor(0);

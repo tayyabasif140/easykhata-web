@@ -227,6 +227,10 @@ export function CreateInvoiceDialog() {
       };
       
       console.log('Invoice data prepared:', invoiceData);
+      console.log('Business logo URL:', businessDetails?.business_logo_url);
+      console.log('Digital signature URL:', selectedSignature || profile?.digital_signature_url);
+      console.log('Privacy policy included:', !!businessDetails?.privacy_policy);
+      
       return await generateInvoicePDF(template, invoiceData);
     } catch (error) {
       console.error("Error generating PDF:", error);

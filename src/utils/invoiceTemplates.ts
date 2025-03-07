@@ -52,10 +52,25 @@ export const loadImageAsBase64 = async (url: string): Promise<string | null> => 
     if (!url) return null;
     
     console.log("Loading image:", url);
-    const fullUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${url}`;
+    
+    // Use a complete URL that includes the Supabase URL
+    let fullUrl = url;
+    if (!url.startsWith('http')) {
+      fullUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${url}`;
+    }
+    
+    console.log("Full URL for image:", fullUrl);
     
     // Use fetch to get the image
-    const response = await fetch(fullUrl);
+    const response = await fetch(fullUrl, {
+      cache: 'no-cache', // Bypass cache to ensure fresh content
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
+    
     if (!response.ok) {
       console.error("Failed to load image:", response.statusText);
       return null;
@@ -128,27 +143,36 @@ export const preloadImagesForPDF = async (data: InvoiceData): Promise<InvoiceDat
   try {
     const enhancedData = { ...data };
     
-    // Preload logo if available
-    if (data.businessDetails?.logo_url) {
-      console.log("Preloading logo:", data.businessDetails.logo_url);
-      const logoBase64 = await loadImageAsBase64(data.businessDetails.logo_url);
+    console.log("Business details for preloading:", data.businessDetails);
+    console.log("Profile for preloading:", data.profile);
+    
+    // Preload business logo if available
+    if (data.businessDetails?.business_logo_url) {
+      console.log("Preloading business logo:", data.businessDetails.business_logo_url);
+      const logoBase64 = await loadImageAsBase64(data.businessDetails.business_logo_url);
       if (logoBase64) {
+        console.log("Successfully loaded business logo as base64");
         enhancedData.businessDetails = {
           ...data.businessDetails,
           logo_base64: logoBase64
         };
+      } else {
+        console.error("Failed to load business logo");
       }
     }
     
-    // Preload signature if available
+    // Preload digital signature if available
     if (data.profile?.digital_signature_url) {
-      console.log("Preloading signature:", data.profile.digital_signature_url);
+      console.log("Preloading digital signature:", data.profile.digital_signature_url);
       const signatureBase64 = await loadImageAsBase64(data.profile.digital_signature_url);
       if (signatureBase64) {
+        console.log("Successfully loaded signature as base64");
         enhancedData.profile = {
           ...data.profile,
           signature_base64: signatureBase64
         };
+      } else {
+        console.error("Failed to load signature");
       }
     }
     
@@ -201,6 +225,8 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       if (enhancedData.businessDetails?.privacy_policy) {
         try {
           const policy = enhancedData.businessDetails.privacy_policy;
+          console.log("Adding privacy policy to PDF, length:", policy.length);
+          
           pdf.setFontSize(8);
           pdf.setTextColor(100, 100, 100);
           
@@ -221,10 +247,14 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
             // Position at the bottom of the page
             pdf.text(splitText, 20, 270);
           }
+          
+          console.log("Privacy policy added successfully");
         } catch (policyError) {
           console.error("Error adding privacy policy to PDF:", policyError);
           // Continue without the policy rather than failing
         }
+      } else {
+        console.log("No privacy policy found to add to PDF");
       }
       
       return pdf;
