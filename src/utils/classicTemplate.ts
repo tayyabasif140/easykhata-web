@@ -207,11 +207,61 @@ export const classicTemplate = async (props: TemplateProps) => {
     yPos += 7;
     doc.text('Please pay within 14 days of receipt.', 10, yPos);
     
+    // Add signature at the bottom of the page if available
+    const signatureText = "Authorized Signature:";
+    const signaturePosition = pageHeight - 40;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(signatureText, 10, signaturePosition);
+    
+    // Add signature line
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+    
+    // Add business name under signature line
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(businessDetails?.business_name || '', 10, signaturePosition + 20);
+
+    // Add signature text placeholder
+    if (profile?.name) {
+      doc.text(profile.name, 40, signaturePosition + 10);
+    }
+    
     // Footer with page number
     const footerYPos = pageHeight - 10;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.text(`Page ${currentPage}`, pageWidth / 2, footerYPos, { align: 'center' });
+    
+    // Add privacy policy if available
+    if (businessDetails?.privacy_policy) {
+      try {
+        // Check if we need a new page for privacy policy (if it's long)
+        if (businessDetails.privacy_policy.length > 500) {
+          doc.addPage();
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Privacy Policy', 10, 20);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          
+          // Split policy text into paragraphs for readable formatting
+          const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
+          doc.text(policyText, 10, 30);
+        } else {
+          // For shorter policies, add at bottom of last page
+          doc.setFontSize(8);
+          doc.text('Privacy Policy:', 10, pageHeight - 30);
+          const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
+          doc.text(policyText, 10, pageHeight - 25);
+        }
+      } catch (policyError) {
+        console.error("Error adding privacy policy:", policyError);
+        // Continue without adding policy
+      }
+    }
   } catch (error) {
     console.error('Error generating PDF:', error);
     

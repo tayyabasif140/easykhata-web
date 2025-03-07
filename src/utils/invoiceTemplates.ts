@@ -126,43 +126,6 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       }
       
       console.log("PDF successfully generated");
-      
-      // Add privacy policy if available
-      if (cleanData.businessDetails?.privacy_policy) {
-        try {
-          const policy = cleanData.businessDetails.privacy_policy;
-          console.log("Adding privacy policy to PDF, length:", policy.length);
-          
-          pdf.setFontSize(8);
-          pdf.setTextColor(100, 100, 100);
-          
-          // Add a new page for privacy policy if it's lengthy
-          if (policy.length > 500) {
-            pdf.addPage();
-            pdf.text("Privacy Policy", 20, 20);
-            
-            // Split long text into paragraphs that fit on the page
-            const splitText = pdf.splitTextToSize(policy, 170);
-            pdf.text(splitText, 20, 30);
-          } else {
-            // For shorter policies, add at the bottom of the last page
-            const lastPage = pdf.getNumberOfPages();
-            pdf.setPage(lastPage);
-            
-            const splitText = pdf.splitTextToSize(policy, 170);
-            // Position at the bottom of the page
-            pdf.text(splitText, 20, 270);
-          }
-          
-          console.log("Privacy policy added successfully");
-        } catch (policyError) {
-          console.error("Error adding privacy policy to PDF:", policyError);
-          // Continue without the policy rather than failing
-        }
-      } else {
-        console.log("No privacy policy found to add to PDF");
-      }
-      
       return pdf;
     } catch (templateError) {
       console.error(`Error with ${templateKey} template:`, templateError);
@@ -249,6 +212,27 @@ const createSimplifiedPDF = (data: InvoiceData): jsPDF => {
     pdf.setFontSize(14);
     pdf.text("Total:", 140, y);
     pdf.text(`Rs.${data.total || 0}`, 170, y);
+    
+    // Add signature at bottom
+    const signatureText = "Authorized Signature:";
+    const signaturePosition = 240;
+    
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(signatureText, 20, signaturePosition);
+    
+    // Add signature line
+    pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
+    
+    // Add business name under signature line
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(data.businessDetails?.business_name || '', 20, signaturePosition + 15);
+    
+    // Add profile name if available
+    if (data.profile?.name) {
+      pdf.text(data.profile.name, 50, signaturePosition + 7);
+    }
     
     // Add privacy policy if available
     if (data.businessDetails?.privacy_policy) {
