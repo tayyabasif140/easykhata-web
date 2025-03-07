@@ -4,7 +4,7 @@ import { TemplateProps } from '../../../invoiceTemplates';
 import { addPrivacyPolicy } from '../utils/privacyPolicy';
 
 export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
-  const { businessDetails, profile } = props;
+  const { businessDetails, profile, signatureBase64 } = props;
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
   
@@ -15,12 +15,22 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
   doc.setFont('helvetica', 'bold');
   doc.text(signatureText, 10, signaturePosition);
   
-  // Add signature line
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
-  doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+  // Add signature image if available
+  if (signatureBase64) {
+    try {
+      // Adjust position for better placement (higher up)
+      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition - 30, 60, 30);
+    } catch (e) {
+      console.error("Error adding signature image:", e);
+    }
+  } else {
+    // Add signature line only if no image
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+  }
   
-  // Add business name under signature line
+  // Add business name under signature line or image
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.text(businessDetails?.business_name || '', 10, signaturePosition + 20);
@@ -30,18 +40,7 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
     doc.text(profile.name, 40, signaturePosition + 10);
   }
   
-  // Add signature image if available
-  if (profile?.signature) {
-    try {
-      const signatureImg = profile.signature;
-      // Adjust the position and size as needed
-      doc.addImage(signatureImg, 'PNG', 30, signaturePosition - 5, 40, 20);
-    } catch (e) {
-      console.error("Error adding signature image:", e);
-    }
-  }
-  
-  // Footer with page number
+  // Footer with page number only - remove "Generated with invoice manager"
   const footerYPos = pageHeight - 10;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);

@@ -220,8 +220,20 @@ const createSimplifiedPDF = (data: InvoiceData): jsPDF => {
     pdf.setFont('helvetica', 'bold');
     pdf.text(signatureText, 20, signaturePosition);
     
-    // Add signature line
-    pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
+    // Try to add signature image if available
+    if (data.profile?.digital_signature_url) {
+      try {
+        // We can't fetch the image in a synchronous function, so we'll just add a placeholder line
+        pdf.setDrawColor(0);
+        pdf.setLineWidth(0.5);
+        pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
+      } catch (e) {
+        console.error("Error adding signature to simplified PDF:", e);
+      }
+    } else {
+      // Add signature line
+      pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
+    }
     
     // Add business name under signature line
     pdf.setFontSize(8);
