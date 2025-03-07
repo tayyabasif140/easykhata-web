@@ -41,25 +41,6 @@ export const professionalTemplate = async (props: TemplateProps) => {
   
   let yPos = 40;
   
-  // Add business logo
-  if (businessDetails?.logo_base64 || businessDetails?.business_logo_url) {
-    try {
-      const logoSource = businessDetails.logo_base64 || 
-        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
-      console.log("Adding logo from source:", businessDetails.logo_base64 ? "base64" : businessDetails.business_logo_url);
-      
-      const logoWidth = 40;
-      const logoHeight = 20;
-      doc.addImage(logoSource, 'JPEG', 10, yPos, logoWidth, logoHeight, undefined, 'FAST');
-      yPos += 25;
-    } catch (error) {
-      console.error('Error loading logo:', error);
-      yPos += 5;
-    }
-  } else {
-    yPos += 5;
-  }
-  
   // Business details
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
@@ -250,30 +231,6 @@ export const professionalTemplate = async (props: TemplateProps) => {
   yPos += 7;
   doc.setFont('helvetica', 'normal');
   doc.text('Please pay within 14 days of receipt.', 10, yPos);
-  
-  // Add signature if available
-  if (profile?.signature_base64 || profile?.digital_signature_url) {
-    try {
-      yPos += 20;
-      const signatureSource = profile.signature_base64 || 
-        `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-      console.log("Adding signature from source:", profile.signature_base64 ? "base64" : profile.digital_signature_url);
-      
-      const signatureWidth = 40;
-      const signatureHeight = 20;
-      doc.addImage(signatureSource, 'PNG', pageWidth - 60, yPos, signatureWidth, signatureHeight, undefined, 'FAST');
-      
-      yPos += signatureHeight + 5;
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.2);
-      doc.line(pageWidth - 60, yPos, pageWidth - 20, yPos);
-      
-      yPos += 5;
-      doc.text('Authorized Signature', pageWidth - 60, yPos);
-    } catch (error) {
-      console.error('Error loading signature:', error);
-    }
-  }
   
   // Footer with page number
   const footerYPos = pageHeight - 10;

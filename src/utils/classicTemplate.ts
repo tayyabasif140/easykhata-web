@@ -26,35 +26,11 @@ export const classicTemplate = async (props: TemplateProps) => {
     // Header with business details
     let yPos = 20;
     
-    // Add business logo if available
-    if (businessDetails?.business_logo_url) {
-      try {
-        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
-        // Just draw a placeholder rectangle in case image loading fails
-        doc.setDrawColor(200, 200, 200);
-        doc.setFillColor(240, 240, 240);
-        doc.roundedRect(10, yPos, 40, 20, 2, 2, 'FD');
-        
-        try {
-          doc.addImage(logoUrl, 'JPEG', 10, yPos, 40, 20, undefined, 'FAST');
-        } catch (logoError) {
-          console.error('Error adding logo to PDF:', logoError);
-          // Logo failed but we already have placeholder
-        }
-        yPos += 25;
-      } catch (error) {
-        console.error('Error with logo processing:', error);
-        doc.setFontSize(20);
-        doc.setFont('helvetica', 'bold');
-        doc.text(businessDetails?.business_name || 'Company Name', 10, yPos);
-        yPos += 10;
-      }
-    } else {
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text(businessDetails?.business_name || 'Company Name', 10, yPos);
-      yPos += 10;
-    }
+    // Company name
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(businessDetails?.business_name || 'Company Name', 10, yPos);
+    yPos += 10;
     
     // Business details
     doc.setFontSize(10);
@@ -230,30 +206,6 @@ export const classicTemplate = async (props: TemplateProps) => {
     doc.text('Payment Terms:', 10, yPos);
     yPos += 7;
     doc.text('Please pay within 14 days of receipt.', 10, yPos);
-    
-    // Add signature if available
-    if (profile?.digital_signature_url) {
-      try {
-        yPos += 20;
-        const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-        
-        // Draw a placeholder in case of signature loading issues
-        doc.setDrawColor(200, 200, 200);
-        doc.line(pageWidth - 60, yPos + 20, pageWidth - 20, yPos + 20);
-        
-        try {
-          doc.addImage(signatureUrl, 'PNG', pageWidth - 60, yPos, 40, 20, undefined, 'FAST');
-        } catch (signatureError) {
-          console.error('Error adding signature:', signatureError);
-          // Placeholder already drawn above
-        }
-        
-        yPos += 25;
-        doc.text('Authorized Signature', pageWidth - 60, yPos);
-      } catch (error) {
-        console.error('Error with signature processing:', error);
-      }
-    }
     
     // Footer with page number
     const footerYPos = pageHeight - 10;

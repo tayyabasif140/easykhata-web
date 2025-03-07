@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
 
@@ -30,29 +31,11 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, pageWidth, 40, 'F');
     
-    // Add business logo if available
-    let logoHeight = 0;
-    if (businessDetails?.business_logo_url) {
-      try {
-        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`;
-        const logoWidth = 50;
-        logoHeight = 20;
-        doc.addImage(logoUrl, 'JPEG', 10, 10, logoWidth, logoHeight, undefined, 'FAST');
-      } catch (error) {
-        console.error('Error loading logo:', error);
-        // Fall back to text-based header
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.setFont('helvetica', 'bold');
-        doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
-      }
-    } else {
-      // Text-based header if no logo
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont('helvetica', 'bold');
-      doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
-    }
+    // Text-based header
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
 
     // Document title
     doc.setTextColor(255, 255, 255);
@@ -261,40 +244,6 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFontSize(10);
     doc.text('Thank you for your business!', 15, yPos + 20);
     doc.text('Please make payment by the due date.', 15, yPos + 30);
-
-    // Add signature if available
-    if (profile?.digital_signature_url) {
-      try {
-        const signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${profile.digital_signature_url}`;
-        // Check if the signature URL exists or not before attempting to add it
-        console.log("Trying to add signature from URL:", signatureUrl);
-        
-        const signatureWidth = 40;
-        const signatureHeight = 20;
-        let yPos = pageHeight - 50; // Position near bottom of page
-        
-        try {
-          doc.addImage(signatureUrl, 'PNG', pageWidth - 60, yPos, signatureWidth, signatureHeight, undefined, 'FAST');
-          
-          doc.setDrawColor(0);
-          doc.setLineWidth(0.5);
-          doc.line(pageWidth - 60, yPos + 25, pageWidth - 20, yPos + 25);
-          
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8);
-          doc.text('Authorized Signature', pageWidth - 60, yPos + 30);
-        } catch (signatureError) {
-          console.error('Error rendering signature:', signatureError);
-          // Add a placeholder for signature
-          doc.setDrawColor(0);
-          doc.setLineWidth(0.5);
-          doc.line(pageWidth - 60, yPos + 20, pageWidth - 20, yPos + 20);
-          doc.text('Signature', pageWidth - 60, yPos + 25);
-        }
-      } catch (error) {
-        console.error('Error processing signature:', error);
-      }
-    }
 
     // Footer
     const footerYPos = doc.internal.pageSize.height - 10;

@@ -46,52 +46,6 @@ export const templates = {
   diamond: diamondTemplate
 };
 
-// Helper function to load an image and convert it to base64
-export const loadImageAsBase64 = async (url: string): Promise<string | null> => {
-  try {
-    if (!url) return null;
-    
-    console.log("Loading image:", url);
-    
-    // Use a complete URL that includes the Supabase URL
-    let fullUrl = url;
-    if (!url.startsWith('http')) {
-      fullUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${url}`;
-    }
-    
-    console.log("Full URL for image:", fullUrl);
-    
-    // Use fetch to get the image
-    const response = await fetch(fullUrl, {
-      cache: 'no-cache', // Bypass cache to ensure fresh content
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
-    
-    if (!response.ok) {
-      console.error("Failed to load image:", response.statusText);
-      return null;
-    }
-    
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => {
-        console.error("Error reading file");
-        resolve(null);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error("Error loading image:", error);
-    return null;
-  }
-};
-
 // Clean and normalize data to prevent null values
 const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
   console.log("Sanitizing invoice data:", data);
@@ -138,51 +92,6 @@ const createFallbackPDF = (error: any): jsPDF => {
   return pdf;
 };
 
-// Preload any images needed for the PDF to avoid async issues
-export const preloadImagesForPDF = async (data: InvoiceData): Promise<InvoiceData> => {
-  try {
-    const enhancedData = { ...data };
-    
-    console.log("Business details for preloading:", data.businessDetails);
-    console.log("Profile for preloading:", data.profile);
-    
-    // Preload business logo if available
-    if (data.businessDetails?.business_logo_url) {
-      console.log("Preloading business logo:", data.businessDetails.business_logo_url);
-      const logoBase64 = await loadImageAsBase64(data.businessDetails.business_logo_url);
-      if (logoBase64) {
-        console.log("Successfully loaded business logo as base64");
-        enhancedData.businessDetails = {
-          ...data.businessDetails,
-          logo_base64: logoBase64
-        };
-      } else {
-        console.error("Failed to load business logo");
-      }
-    }
-    
-    // Preload digital signature if available
-    if (data.profile?.digital_signature_url) {
-      console.log("Preloading digital signature:", data.profile.digital_signature_url);
-      const signatureBase64 = await loadImageAsBase64(data.profile.digital_signature_url);
-      if (signatureBase64) {
-        console.log("Successfully loaded signature as base64");
-        enhancedData.profile = {
-          ...data.profile,
-          signature_base64: signatureBase64
-        };
-      } else {
-        console.error("Failed to load signature");
-      }
-    }
-    
-    return enhancedData;
-  } catch (error) {
-    console.error("Error preloading images:", error);
-    return data;
-  }
-};
-
 // Try to create a PDF with error handling
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
@@ -204,14 +113,11 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       cleanData.companyName = cleanData.businessDetails.business_name;
     }
     
-    // Preload any images needed for the PDF to avoid async issues
-    const enhancedData = await preloadImagesForPDF(cleanData);
-    
     // Attempt to generate PDF with the selected template
     let pdf: jsPDF;
     try {
-      console.log(`Calling ${templateKey} template function with data:`, enhancedData);
-      pdf = await templateFn(enhancedData);
+      console.log(`Calling ${templateKey} template function with data:`, cleanData);
+      pdf = await templateFn(cleanData);
       
       // Verify the PDF was actually created
       if (!pdf || !(pdf instanceof jsPDF)) {
@@ -222,9 +128,9 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       console.log("PDF successfully generated");
       
       // Add privacy policy if available
-      if (enhancedData.businessDetails?.privacy_policy) {
+      if (cleanData.businessDetails?.privacy_policy) {
         try {
-          const policy = enhancedData.businessDetails.privacy_policy;
+          const policy = cleanData.businessDetails.privacy_policy;
           console.log("Adding privacy policy to PDF, length:", policy.length);
           
           pdf.setFontSize(8);
@@ -265,15 +171,15 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
       if (templateKey !== 'classic') {
         console.log("Falling back to classic template");
         try {
-          pdf = await templates.classic(enhancedData);
+          pdf = await templates.classic(cleanData);
           console.log("Fallback template (classic) succeeded");
           return pdf;
         } catch (fallbackError) {
           console.error("Fallback template also failed:", fallbackError);
-          return createSimplifiedPDF(enhancedData);
+          return createSimplifiedPDF(cleanData);
         }
       } else {
-        return createSimplifiedPDF(enhancedData);
+        return createSimplifiedPDF(cleanData);
       }
     }
   } catch (error) {
@@ -343,24 +249,6 @@ const createSimplifiedPDF = (data: InvoiceData): jsPDF => {
     pdf.setFontSize(14);
     pdf.text("Total:", 140, y);
     pdf.text(`Rs.${data.total || 0}`, 170, y);
-    
-    // Add signature
-    if (data.profile?.signature_base64) {
-      try {
-        pdf.addImage(
-          data.profile.signature_base64,
-          'PNG', 
-          20, 
-          y + 20, 
-          60, 
-          30
-        );
-        pdf.setFontSize(10);
-        pdf.text("Signature", 40, y + 55);
-      } catch (e) {
-        console.error("Error adding signature to simplified PDF:", e);
-      }
-    }
     
     // Add privacy policy if available
     if (data.businessDetails?.privacy_policy) {
