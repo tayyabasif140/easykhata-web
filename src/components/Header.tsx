@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -164,14 +164,14 @@ export const Header = () => {
                 <img
                   src={businessDetails.business_logo_url.startsWith('http') 
                     ? businessDetails.business_logo_url 
-                    : `${SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                    : getPublicImageUrl(businessDetails.business_logo_url)}
                   alt="Business Logo"
                   className="h-10 w-auto object-contain"
                   onError={(e) => {
                     console.log("Logo failed to load, using placeholder. URL was:", 
                       businessDetails.business_logo_url.startsWith('http') 
                         ? businessDetails.business_logo_url 
-                        : `${SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`);
+                        : getPublicImageUrl(businessDetails.business_logo_url));
                     (e.target as HTMLImageElement).src = "/placeholder.svg";
                   }}
                 />
