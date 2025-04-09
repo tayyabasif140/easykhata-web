@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
@@ -89,11 +88,21 @@ supabase.auth.onAuthStateChange((event, session) => {
 export const getPublicImageUrl = (path: string) => {
   if (!path) return null;
   
-  const { data } = supabase.storage
-    .from('business_files')
-    .getPublicUrl(path);
-    
-  return data.publicUrl;
+  // Check if the path is already a full URL
+  if (path.startsWith('http')) return path;
+  
+  try {
+    // Get the public URL for the image
+    const { data } = supabase.storage
+      .from('business_files')
+      .getPublicUrl(path);
+      
+    console.log("Generated public URL:", data.publicUrl);
+    return data.publicUrl;
+  } catch (error) {
+    console.error("Error generating public URL:", error);
+    return null;
+  }
 };
 
 // Optimize session checking with caching

@@ -162,12 +162,17 @@ export const Header = () => {
             {businessDetails?.business_logo_url ? (
               <div className="flex items-center space-x-2">
                 <img
-                  src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                  src={businessDetails.business_logo_url.startsWith('http') 
+                    ? businessDetails.business_logo_url 
+                    : `${SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
                   alt="Business Logo"
                   className="h-10 w-auto object-contain"
                   onError={(e) => {
+                    console.log("Logo failed to load, using placeholder. URL was:", 
+                      businessDetails.business_logo_url.startsWith('http') 
+                        ? businessDetails.business_logo_url 
+                        : `${SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`);
                     (e.target as HTMLImageElement).src = "/placeholder.svg";
-                    console.log("Logo failed to load, using placeholder");
                   }}
                 />
                 <h1 className="text-xl font-bold text-primary hidden md:block">

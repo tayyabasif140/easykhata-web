@@ -52,11 +52,23 @@ const SetupWizard = () => {
     if (!userData.user) throw new Error("Not authenticated");
 
     const filePath = `${userData.user.id}/${path}/${file.name}`;
+    console.log(`Uploading ${path} to path: ${filePath}`);
+    
     const { data, error } = await supabase.storage
       .from("business_files")
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true
+      });
 
     if (error) throw error;
+
+    // Get and log the public URL
+    const { data: publicUrlData } = supabase.storage
+      .from("business_files")
+      .getPublicUrl(data.path);
+      
+    console.log(`${path} uploaded, public URL: ${publicUrlData.publicUrl}`);
 
     return data.path;
   };
