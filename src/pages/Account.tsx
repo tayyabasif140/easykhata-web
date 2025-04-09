@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,18 +25,20 @@ export default function Account() {
   const [userId, setUserId] = useState("");
   const [privacyPolicy, setPrivacyPolicy] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [googleProfilePic, setGoogleProfilePic] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     getProfile();
   }, []);
 
-  // Update avatar preview URL when avatarUrl changes
   useEffect(() => {
     if (avatarUrl) {
-      // Create the public URL for preview
-      const previewUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${avatarUrl}`;
-      setAvatarPreviewUrl(previewUrl);
+      if (avatarUrl.startsWith('http')) {
+        setAvatarPreviewUrl(avatarUrl);
+      } else {
+        setAvatarPreviewUrl(getPublicImageUrl(avatarUrl) || "");
+      }
     }
   }, [avatarUrl]);
 
@@ -47,11 +48,12 @@ export default function Account() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
       
-      // Set the userId state
       setUserId(userData.user.id);
-      
-      // Get the email from auth
       setEmail(userData.user.email || "");
+      
+      if (userData.user.app_metadata?.avatar_url) {
+        setGoogleProfilePic(userData.user.app_metadata.avatar_url);
+      }
 
       let { data, error, status } = await supabase
         .from("profiles")
@@ -63,7 +65,6 @@ export default function Account() {
         throw error;
       }
 
-      // Get business details to fetch selected template and privacy policy
       const { data: businessData, error: businessError } = await supabase
         .from("business_details")
         .select("invoice_template, privacy_policy")
@@ -80,7 +81,13 @@ export default function Account() {
       if (data) {
         setFullName(data.full_name || "");
         setUsername(data.username || "");
-        setAvatarUrl(data.avatar_url || "");
+        
+        if (googleProfilePic && !data.avatar_url) {
+          setAvatarUrl(googleProfilePic);
+        } else {
+          setAvatarUrl(data.avatar_url || "");
+        }
+        
         setDigitalSignature(data.digital_signature_url || "");
       }
     } catch (error: any) {
@@ -176,7 +183,6 @@ export default function Account() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      // Check if business details already exist
       const { data, error: checkError } = await supabase
         .from("business_details")
         .select("id")
@@ -187,9 +193,7 @@ export default function Account() {
         throw checkError;
       }
       
-      // Insert or update privacy policy
       if (data) {
-        // Update existing record
         const { error } = await supabase
           .from("business_details")
           .update({ privacy_policy: privacyPolicy })
@@ -197,7 +201,6 @@ export default function Account() {
         
         if (error) throw error;
       } else {
-        // Insert new record
         const { error } = await supabase
           .from("business_details")
           .insert({ 
@@ -239,7 +242,6 @@ export default function Account() {
       
       console.log("Uploading avatar to path:", filePath);
       
-      // Upload the file
       const { error: uploadError } = await supabase.storage
         .from('business_files')
         .upload(filePath, file, { upsert: true });
@@ -248,7 +250,6 @@ export default function Account() {
         throw uploadError;
       }
       
-      // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
@@ -261,15 +262,8 @@ export default function Account() {
         throw updateError;
       }
       
-      // Get the public URL for preview
-      const { data } = supabase.storage
-        .from('business_files')
-        .getPublicUrl(filePath);
-      
-      console.log("Avatar uploaded, public URL:", data.publicUrl);
-      
       setAvatarUrl(filePath);
-      setAvatarPreviewUrl(data.publicUrl);
+      setAvatarPreviewUrl(getPublicImageUrl(filePath) || "");
       
       toast({
         title: "Success",
@@ -284,6 +278,40 @@ export default function Account() {
       });
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function setGoogleProfilePicAsAvatar() {
+    if (!googleProfilePic) return;
+    
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: googleProfilePic,
+          updated_at: new Date()
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      
+      setAvatarUrl(googleProfilePic);
+      setAvatarPreviewUrl(googleProfilePic);
+      
+      toast({
+        title: "Success",
+        description: "Profile picture updated with Google avatar!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -321,6 +349,10 @@ export default function Account() {
                         <AvatarImage 
                           src={avatarPreviewUrl} 
                           alt="Avatar" 
+                          onError={(e) => {
+                            console.log("Avatar failed to load, using fallback");
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
                         />
                       ) : (
                         <AvatarFallback>{fullName?.charAt(0).toUpperCase() || '?'}</AvatarFallback>
@@ -345,6 +377,16 @@ export default function Account() {
                   <div>
                     <h2 className="text-lg font-semibold">Profile Information</h2>
                     <p className="text-gray-500">Update your personal details here.</p>
+                    {googleProfilePic && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2" 
+                        onClick={setGoogleProfilePicAsAvatar}
+                      >
+                        Use Google Profile Picture
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <div className="mt-6">

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -65,6 +66,22 @@ export const Header = () => {
         return { ...data, logoUrl: publicUrl.publicUrl };
       }
       
+      return data;
+    },
+    enabled: !!session?.user?.id
+  });
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      if (!session?.user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (error) throw error;
       return data;
     },
     enabled: !!session?.user?.id
@@ -314,7 +331,21 @@ export const Header = () => {
             <DropdownMenuTrigger asChild>
               {session?.user ? (
                 <button className="w-9 h-9 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
-                  <User className="w-5 h-5 text-primary" />
+                  {profile?.avatar_url ? (
+                    <Avatar className="w-9 h-9">
+                      <AvatarImage 
+                        src={profile.avatar_url.startsWith('http') 
+                          ? profile.avatar_url 
+                          : getPublicImageUrl(profile.avatar_url)}
+                        alt="Profile" 
+                        className="w-full h-full object-cover"
+                        onError={() => console.log("Profile image failed to load")}
+                      />
+                      <AvatarFallback>{profile.full_name?.charAt(0).toUpperCase() || session.user.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <User className="w-5 h-5 text-primary" />
+                  )}
                 </button>
               ) : (
                 <button className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">

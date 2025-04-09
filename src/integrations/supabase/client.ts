@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
@@ -88,7 +89,7 @@ supabase.auth.onAuthStateChange((event, session) => {
 export const getPublicImageUrl = (path: string) => {
   if (!path) return null;
   
-  // Check if the path is already a full URL
+  // Check if the path is already a full URL (including Google profile URLs)
   if (path.startsWith('http')) return path;
   
   try {
