@@ -18,10 +18,15 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
   // Add signature image if available
   if (signatureBase64) {
     try {
+      // Signature is already a full data URL, so we can use it directly
       // Adjust position for better placement (higher up)
       doc.addImage(signatureBase64, 'PNG', 10, signaturePosition - 30, 60, 30);
     } catch (e) {
       console.error("Error adding signature image:", e);
+      // If signature image fails, fall back to signature line
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
     }
   } else {
     // Add signature line only if no image
@@ -40,7 +45,7 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
     doc.text(profile.name, 40, signaturePosition + 10);
   }
   
-  // Footer with page number only - remove "Generated with invoice manager"
+  // Footer with page number only
   const footerYPos = pageHeight - 10;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);

@@ -10,6 +10,7 @@ export const renderHeader = (doc: jsPDF, props: TemplateProps, startY: number): 
   if (logoBase64) {
     try {
       // Position logo at the top left
+      // The logo is already a full data URL, so we can use it directly
       doc.addImage(logoBase64, 'PNG', 10, yPos, 40, 40);
       // Add some space from the left for the company name to avoid overlapping with logo
       yPos += 5;

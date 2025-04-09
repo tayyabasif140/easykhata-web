@@ -14,11 +14,17 @@ export const classicTemplate = async (props: TemplateProps) => {
     // Try to fetch signature if available
     if (profile?.digital_signature_url) {
       signatureBase64 = await fetchImageAsBase64(profile.digital_signature_url);
+      console.log("Signature loaded successfully");
+    } else {
+      console.log("No signature URL available");
     }
     
     // Try to fetch logo if available
     if (businessDetails?.business_logo) {
       logoBase64 = await fetchImageAsBase64(businessDetails.business_logo);
+      console.log("Logo loaded successfully");
+    } else {
+      console.log("No logo URL available");
     }
   } catch (error) {
     console.error("Error pre-loading images:", error);

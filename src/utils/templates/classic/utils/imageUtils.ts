@@ -27,9 +27,7 @@ export const fetchImageAsBase64 = async (imagePath: string): Promise<string | nu
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
-        // Get only the base64 part without the data URL prefix
-        const base64 = base64String.split(',')[1];
-        resolve(base64);
+        resolve(base64String); // Return the full data URL including the MIME type prefix
       };
       reader.readAsDataURL(blob);
     });
