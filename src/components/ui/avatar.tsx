@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
 
@@ -26,6 +27,12 @@ const AvatarImage = React.forwardRef<
     ref={ref}
     className={cn("aspect-square h-full w-full", className)}
     {...props}
+    onError={(e) => {
+      console.error("Avatar image failed to load:", e);
+      // Set fallback to be displayed
+      const imgElement = e.currentTarget as HTMLImageElement;
+      imgElement.style.display = 'none';
+    }}
   />
 ))
 AvatarImage.displayName = AvatarPrimitive.Image.displayName

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignatureManager } from "@/components/SignatureManager";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Upload, ImageIcon } from "lucide-react";
+import { Camera, Upload, ImageIcon, X } from "lucide-react";
 import { validateImageUrl } from "@/utils/templates/classic/utils/imageUtils";
 
 export default function Account() {
@@ -29,6 +29,9 @@ export default function Account() {
   const [googleProfilePic, setGoogleProfilePic] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,13 +46,18 @@ export default function Account() {
         
         try {
           const url = avatarUrl.startsWith('http') ? avatarUrl : getPublicImageUrl(avatarUrl) || "";
+          console.log("Setting avatar preview URL to:", url);
           setAvatarPreviewUrl(url);
           
           if (url) {
             const isValid = await validateImageUrl(url);
             setImageError(!isValid);
+            if (!isValid) {
+              console.error("Avatar URL is invalid:", url);
+            }
           } else {
             setImageError(true);
+            console.error("No valid URL found for avatar");
           }
         } catch (error) {
           console.error("Error validating avatar:", error);
@@ -62,6 +70,51 @@ export default function Account() {
     
     validateAvatar();
   }, [avatarUrl]);
+
+  useEffect(() => {
+    const dropZone = dropZoneRef.current;
+    if (!dropZone) return;
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+    };
+
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        handleFileUploadHelper(e.dataTransfer.files[0]);
+      }
+    };
+
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragenter', handleDragEnter);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleDrop);
+
+    return () => {
+      dropZone.removeEventListener('dragover', handleDragOver);
+      dropZone.removeEventListener('dragenter', handleDragEnter);
+      dropZone.removeEventListener('dragleave', handleDragLeave);
+      dropZone.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   async function getProfile() {
     try {
@@ -88,15 +141,22 @@ export default function Account() {
 
       const { data: businessData, error: businessError } = await supabase
         .from("business_details")
-        .select("invoice_template, privacy_policy")
+        .select("invoice_template, privacy_policy, business_logo_url")
         .eq("user_id", userData.user.id)
         .single();
 
       if (businessError && businessError.code !== 'PGRST116') {
         console.error("Error fetching business details:", businessError);
       } else if (businessData) {
+        console.log("Business data retrieved:", businessData);
         setSelectedTemplate(businessData.invoice_template || "classic");
         setPrivacyPolicy(businessData.privacy_policy || "");
+        
+        if (businessData.business_logo_url) {
+          console.log("Business logo URL found:", businessData.business_logo_url);
+        } else {
+          console.log("No business logo URL found in database");
+        }
       }
 
       if (data) {
@@ -248,31 +308,81 @@ export default function Account() {
     }
   }
 
-  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUploadHelper(file: File) {
     try {
       setUploading(true);
       setImageError(false);
       
-      if (!e.target.files || e.target.files.length === 0) {
+      if (!file) {
         return;
       }
       
-      const file = e.target.files[0];
+      const ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        throw new Error("Invalid file type. Please upload PNG or JPG images only.");
+      }
+      
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error("File size should be less than 5MB.");
+      }
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = `${userId}/avatar/${fileName}`;
       
       console.log("Uploading avatar to path:", filePath);
       
-      const { error: uploadError } = await supabase.storage
-        .from('business_files')
-        .upload(filePath, file, { upsert: true });
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const businessFilesBucket = buckets?.find(bucket => bucket.name === 'business_files');
       
-      if (uploadError) {
-        throw uploadError;
+      if (!businessFilesBucket) {
+        console.log("Creating business_files bucket...");
+        try {
+          await supabase.storage.createBucket('business_files', { public: true });
+          console.log("business_files bucket created successfully");
+        } catch (error) {
+          console.error("Error creating bucket:", error);
+        }
+      } else if (!businessFilesBucket.public) {
+        try {
+          await supabase.storage.updateBucket('business_files', { public: true });
+          console.log("Made business_files bucket public");
+        } catch (error) {
+          console.error("Error updating bucket privacy:", error);
+        }
       }
       
-      const { error: updateError } = await supabase
+      try {
+        await supabase.storage
+          .from("business_files")
+          .remove([filePath]);
+      } catch (error) {
+        console.log("No previous file to remove, proceeding with upload");
+      }
+      
+      const { data, error } = await supabase.storage
+        .from("business_files")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true
+        });
+
+      if (error) {
+        console.error("Error uploading file:", error);
+        throw error;
+      }
+
+      console.log("File uploaded successfully, data:", data);
+      
+      const { data: publicUrlData } = supabase.storage
+        .from("business_files")
+        .getPublicUrl(data.path);
+        
+      console.log(`Avatar uploaded, public URL: ${publicUrlData.publicUrl}`);
+
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
           avatar_url: filePath,
@@ -280,18 +390,33 @@ export default function Account() {
         })
         .eq('id', userId);
       
-      if (updateError) {
-        throw updateError;
+      if (profileError) {
+        throw profileError;
       }
       
-      const publicUrl = getPublicImageUrl(filePath);
+      const { error: businessError } = await supabase
+        .from('business_details')
+        .update({ 
+          business_logo_url: filePath
+        })
+        .eq('user_id', userId);
+      
+      if (businessError) {
+        console.error("Error updating business logo:", businessError);
+      }
+      
       setAvatarUrl(filePath);
-      setAvatarPreviewUrl(publicUrl || "");
+      setAvatarPreviewUrl(publicUrlData.publicUrl || "");
       
       toast({
         title: "Success",
-        description: "Profile picture updated successfully!",
+        description: "Profile picture and business logo updated successfully!",
       });
+      
+      setTimeout(() => {
+        getProfile();
+      }, 1000);
+      
     } catch (error: any) {
       console.error("Upload error:", error);
       setImageError(true);
@@ -303,6 +428,15 @@ export default function Account() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+    
+    const file = e.target.files[0];
+    handleFileUploadHelper(file);
   }
 
   async function setGoogleProfilePicAsAvatar() {
@@ -367,36 +501,52 @@ export default function Account() {
             <TabsContent value="profile">
               <div className="bg-white shadow-md rounded-md p-6">
                 <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Avatar className="w-20 h-20">
-                      {!imageLoading && avatarPreviewUrl && !imageError ? (
-                        <AvatarImage 
-                          src={avatarPreviewUrl} 
-                          alt="Avatar" 
-                          className="object-cover w-full h-full"
-                          onError={() => {
-                            console.log("Avatar failed to load, using fallback");
-                            setImageError(true);
-                          }}
-                        />
-                      ) : (
-                        <AvatarFallback className="bg-primary/10">
-                          {imageLoading ? (
-                            <div className="animate-pulse flex items-center justify-center w-full h-full">
-                              <div className="w-10 h-10 bg-primary/30 rounded-full"></div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center w-full h-full">
-                              {imageError ? (
-                                <ImageIcon className="w-8 h-8 text-primary/70" />
-                              ) : (
-                                <span className="text-xl font-semibold">{fullName?.charAt(0).toUpperCase() || '?'}</span>
-                              )}
-                            </div>
-                          )}
-                        </AvatarFallback>
+                  <div 
+                    className="relative" 
+                    ref={dropZoneRef}
+                  >
+                    <div 
+                      className={`w-20 h-20 rounded-full relative overflow-hidden ${
+                        isDragging ? 'ring-2 ring-primary border-dashed border-2' : ''
+                      }`}
+                    >
+                      <Avatar className="w-20 h-20">
+                        {!imageLoading && avatarPreviewUrl && !imageError ? (
+                          <AvatarImage 
+                            src={avatarPreviewUrl} 
+                            alt="Avatar" 
+                            className="object-cover w-full h-full"
+                            onError={() => {
+                              console.log("Avatar failed to load, using fallback");
+                              setImageError(true);
+                            }}
+                          />
+                        ) : (
+                          <AvatarFallback className="bg-primary/10">
+                            {imageLoading ? (
+                              <div className="animate-pulse flex items-center justify-center w-full h-full">
+                                <div className="w-10 h-10 bg-primary/30 rounded-full"></div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center w-full h-full">
+                                {imageError ? (
+                                  <ImageIcon className="w-8 h-8 text-primary/70" />
+                                ) : (
+                                  <span className="text-xl font-semibold">{fullName?.charAt(0).toUpperCase() || '?'}</span>
+                                )}
+                              </div>
+                            )}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      
+                      {isDragging && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <Upload className="w-8 h-8 text-primary" />
+                        </div>
                       )}
-                    </Avatar>
+                    </div>
+
                     <label 
                       htmlFor="avatar-upload" 
                       className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer shadow-md hover:bg-primary/90 transition-colors"
@@ -410,12 +560,16 @@ export default function Account() {
                         className="hidden" 
                         onChange={uploadAvatar}
                         disabled={uploading}
+                        ref={fileInputRef}
                       />
                     </label>
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Profile Information</h2>
                     <p className="text-gray-500">Update your personal details here.</p>
+                    <p className="text-sm text-primary mt-1">
+                      <strong>Drag & drop</strong> an image or click the camera icon
+                    </p>
                     {googleProfilePic && (
                       <Button 
                         variant="outline" 
@@ -428,6 +582,7 @@ export default function Account() {
                     )}
                   </div>
                 </div>
+                
                 <div className="mt-6">
                   <form
                     onSubmit={(e) => {

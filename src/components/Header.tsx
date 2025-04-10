@@ -57,18 +57,24 @@ export const Header = () => {
         .eq('user_id', session.user.id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching business details:", error);
+        throw error;
+      }
+      
+      console.log("Business details retrieved in Header:", data);
       
       if (data?.business_logo_url) {
-        const { data: publicUrl } = supabase.storage
-          .from('business_files')
-          .getPublicUrl(data.business_logo_url);
-        return { ...data, logoUrl: publicUrl.publicUrl };
+        const publicUrl = getPublicImageUrl(data.business_logo_url);
+        console.log("Logo public URL in Header:", publicUrl);
+        return { ...data, logoUrl: publicUrl };
       }
       
       return data;
     },
-    enabled: !!session?.user?.id
+    enabled: !!session?.user?.id,
+    retry: 2,
+    refetchOnWindowFocus: false
   });
 
   const { data: profile } = useQuery({
@@ -182,6 +188,8 @@ export const Header = () => {
         : getPublicImageUrl(businessDetails.business_logo_url);
       
       console.log("Logo URL in Header:", logoUrl);
+      setLogoError(false);
+      setLogoLoaded(false);
       
       fetch(logoUrl || '', { method: 'HEAD' })
         .then(response => {
@@ -202,6 +210,17 @@ export const Header = () => {
       console.log("Avatar URL in Header:", avatarUrl);
     }
   }, [businessDetails, profile]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (session?.user?.id) {
+        console.log("Forcing refresh of business details in Header");
+        await refetchBusinessDetails();
+      }
+    };
+    
+    fetchData();
+  }, [session]);
 
   return (
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">

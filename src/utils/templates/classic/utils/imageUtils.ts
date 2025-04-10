@@ -1,79 +1,70 @@
 
-import { getPublicImageUrl } from "@/integrations/supabase/client";
-
 /**
- * Fetches an image from a URL and converts it to a base64 string
- * @param imagePath The path to the image in Supabase storage or a full URL
- * @returns Promise with base64 string or null if failed
+ * Validates if a URL can be loaded as an image
  */
-export const fetchImageAsBase64 = async (imagePath: string): Promise<string | null> => {
+export const validateImageUrl = async (url: string): Promise<boolean> => {
+  console.log("Validating image URL:", url);
+  
+  if (!url) {
+    console.error("Empty URL provided for validation");
+    return false;
+  }
+  
   try {
-    if (!imagePath) {
-      console.log("No image path provided");
-      return null;
-    }
-    
-    // Use the path directly if it's already a full URL, otherwise get the public URL
-    const publicUrl = imagePath.startsWith('http') ? imagePath : getPublicImageUrl(imagePath);
-    
-    if (!publicUrl) {
-      console.log("Could not generate public URL for path:", imagePath);
-      return null;
-    }
-    
-    console.log("Attempting to fetch image from:", publicUrl);
-    
-    // Fetch the image with no cache to ensure fresh content
-    const response = await fetch(publicUrl, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
-    
+    // Try to fetch the image headers first
+    const response = await fetch(url, { method: 'HEAD' });
     if (!response.ok) {
-      console.error(`Failed to fetch image from ${publicUrl}. Status: ${response.status}`);
-      return null;
+      console.error(`Image URL HEAD request failed with status: ${response.status}`);
+      return false;
     }
     
-    // Convert to blob and then to base64
-    const blob = await response.blob();
-    console.log("Image fetched successfully, size:", blob.size, "bytes");
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.error(`Invalid content type: ${contentType}`);
+      return false;
+    }
     
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        console.log("Image converted to base64, length:", base64String.length);
-        resolve(base64String); // Return the full data URL including the MIME type prefix
-      };
-      reader.readAsDataURL(blob);
-    });
+    return true;
   } catch (error) {
-    console.error("Error converting image to base64:", error);
-    return null;
+    console.error("Error validating image URL:", error);
+    
+    // As a fallback, try to load the image directly
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log("Image loaded successfully via Image object");
+        resolve(true);
+      };
+      img.onerror = () => {
+        console.error("Image failed to load via Image object");
+        resolve(false);
+      };
+      img.src = url;
+    });
   }
 };
 
 /**
- * Validates if an image URL is accessible and can be loaded
- * @param imageUrl The URL of the image to validate
- * @returns Promise with boolean indicating if the image is valid
+ * Creates a placeholder image data URL
  */
-export const validateImageUrl = async (imageUrl: string): Promise<boolean> => {
-  if (!imageUrl) return false;
+export const createPlaceholderImage = (text: string, size = 100): string => {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
   
-  try {
-    const response = await fetch(imageUrl, { 
-      method: 'HEAD',
-      cache: 'no-store'
-    });
-    
-    return response.ok && response.headers.get('content-type')?.startsWith('image/');
-  } catch (error) {
-    console.error("Error validating image URL:", error);
-    return false;
-  }
+  if (!ctx) return '';
+  
+  // Draw background
+  ctx.fillStyle = '#e2e8f0';
+  ctx.fillRect(0, 0, size, size);
+  
+  // Draw text
+  ctx.fillStyle = '#64748b';
+  ctx.font = `${size * 0.4}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text.charAt(0).toUpperCase(), size / 2, size / 2);
+  
+  return canvas.toDataURL('image/png');
 };
