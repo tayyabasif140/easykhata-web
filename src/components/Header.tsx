@@ -1,4 +1,4 @@
-import { Bell, Settings, User } from "lucide-react";
+import { Bell, Settings, User, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
@@ -19,7 +19,6 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Loader2 } from "./ui/loader";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -172,12 +171,10 @@ export const Header = () => {
     refetchBusinessDetails();
   };
 
-  // Add a state to track if logo/images have loaded
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   
-  // Debug image URLs
   useEffect(() => {
     if (businessDetails?.business_logo_url) {
       const logoUrl = businessDetails.business_logo_url.startsWith('http') 
@@ -186,7 +183,6 @@ export const Header = () => {
       
       console.log("Logo URL in Header:", logoUrl);
       
-      // Validate the URL by trying to fetch it
       fetch(logoUrl || '', { method: 'HEAD' })
         .then(response => {
           console.log("Logo URL status:", response.status, response.ok);
