@@ -471,14 +471,16 @@ const Index = () => {
       }
     });
 
-    months.forEach((month, index) => {
+    const monthsArray = Object.values(monthlyData);
+    
+    monthsArray.forEach((month, index) => {
       if (index > 0) {
-        const prevRevenue = months[index - 1].revenue;
+        const prevRevenue = monthsArray[index - 1].revenue;
         month.growth = prevRevenue ? ((month.revenue - prevRevenue) / prevRevenue) * 100 : 0;
       }
     });
 
-    return months;
+    return monthsArray;
   };
 
   const fetchInvoiceItems = async (invoiceId: string) => {
