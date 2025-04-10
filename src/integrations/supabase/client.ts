@@ -152,6 +152,26 @@ const ensureBusinessFilesBucket = async () => {
   }
 };
 
+// Add event listener for image updates
+window.addEventListener('profile-image-updated', () => {
+  console.log('Profile image updated, refreshing...');
+  
+  // Force a reload of image caches by adding a timestamp
+  const timestamp = new Date().getTime();
+  const images = document.querySelectorAll('img');
+  
+  images.forEach(img => {
+    const src = img.getAttribute('src');
+    if (src && src.includes('business_files') && !src.includes('?')) {
+      img.setAttribute('src', `${src}?t=${timestamp}`);
+    }
+  });
+  
+  // Clear any cached image data
+  invalidateCache('avatar');
+  invalidateCache('logo');
+});
+
 // Run the check and setup when the client is initialized
 ensureBusinessFilesBucket();
 

@@ -117,3 +117,132 @@ export const fetchImageAsBase64 = async (url: string): Promise<string | null> =>
     return null;
   }
 };
+
+/**
+ * Convert a File to a public URL by uploading to Supabase
+ */
+export const uploadImageAndGetPublicUrl = async (file: File, userId: string, type: 'avatar' | 'logo' = 'avatar'): Promise<string | null> => {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Supabase credentials not found");
+      return null;
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Validate file type
+    const ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      console.error("Invalid file type. Please upload PNG or JPG images only.");
+      return null;
+    }
+    
+    // Validate file size (5MB max)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      console.error("File size should be less than 5MB.");
+      return null;
+    }
+    
+    // Create path and filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${type}-${Date.now()}.${fileExt}`;
+    const filePath = `${userId}/${type}/${fileName}`;
+    
+    console.log(`Uploading ${type} to path:`, filePath);
+    
+    // Ensure bucket exists and is public
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const businessFilesBucket = buckets?.find(bucket => bucket.name === 'business_files');
+      
+      if (!businessFilesBucket) {
+        await supabase.storage.createBucket('business_files', { public: true });
+        console.log("business_files bucket created successfully");
+      } else if (!businessFilesBucket.public) {
+        await supabase.storage.updateBucket('business_files', { public: true });
+        console.log("Made business_files bucket public");
+      }
+    } catch (error) {
+      console.error("Error handling bucket:", error);
+    }
+    
+    // Upload the file
+    const { data, error } = await supabase.storage
+      .from("business_files")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true
+      });
+      
+    if (error) {
+      console.error("Error uploading file:", error);
+      return null;
+    }
+    
+    // Get the public URL
+    const { data: publicUrlData } = supabase.storage
+      .from("business_files")
+      .getPublicUrl(data.path);
+      
+    console.log(`File uploaded, public URL: ${publicUrlData.publicUrl}`);
+    
+    return filePath; // Return the path, not the full URL
+  } catch (error) {
+    console.error("Upload error:", error);
+    return null;
+  }
+};
+
+/**
+ * Directly handle image file upload from input or drop events
+ */
+export const handleImageFileUpload = async (file: File, userId: string, type: 'avatar' | 'logo' = 'avatar'): Promise<{ path: string, publicUrl: string } | null> => {
+  try {
+    const filePath = await uploadImageAndGetPublicUrl(file, userId, type);
+    
+    if (!filePath) {
+      return null;
+    }
+    
+    // Get the public URL using the path
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const { data: publicUrlData } = supabase.storage
+      .from("business_files")
+      .getPublicUrl(filePath);
+    
+    // Update the appropriate table based on the image type
+    if (type === 'avatar') {
+      await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: filePath,
+          updated_at: new Date()
+        })
+        .eq('id', userId);
+    } else if (type === 'logo') {
+      await supabase
+        .from('business_details')
+        .update({ 
+          business_logo_url: filePath
+        })
+        .eq('user_id', userId);
+    }
+    
+    return {
+      path: filePath,
+      publicUrl: publicUrlData.publicUrl
+    };
+  } catch (error) {
+    console.error("Error in handleImageFileUpload:", error);
+    return null;
+  }
+};

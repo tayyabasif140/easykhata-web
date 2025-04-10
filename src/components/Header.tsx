@@ -1,5 +1,5 @@
 import { Bell, Settings, User, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -19,6 +19,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { validateImageUrl } from "@/utils/templates/classic/utils/imageUtils";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -67,7 +68,20 @@ export const Header = () => {
       if (data?.business_logo_url) {
         const publicUrl = getPublicImageUrl(data.business_logo_url);
         console.log("Logo public URL in Header:", publicUrl);
-        return { ...data, logoUrl: publicUrl };
+        
+        if (publicUrl) {
+          try {
+            const isValid = await validateImageUrl(publicUrl);
+            if (!isValid) {
+              console.warn("Logo URL validation failed, using fallback");
+              return { ...data, logoUrl: null, logoError: true };
+            }
+            return { ...data, logoUrl: publicUrl, logoError: false };
+          } catch (error) {
+            console.error("Error validating logo URL:", error);
+            return { ...data, logoUrl: null, logoError: true };
+          }
+        }
       }
       
       return data;
@@ -182,6 +196,19 @@ export const Header = () => {
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   
   useEffect(() => {
+    const handleProfileImageUpdate = () => {
+      console.log("Profile image update detected in Header, refetching data");
+      refetchBusinessDetails();
+    };
+    
+    window.addEventListener('profile-image-updated', handleProfileImageUpdate);
+    
+    return () => {
+      window.removeEventListener('profile-image-updated', handleProfileImageUpdate);
+    };
+  }, [refetchBusinessDetails]);
+  
+  useEffect(() => {
     if (businessDetails?.business_logo_url) {
       const logoUrl = businessDetails.business_logo_url.startsWith('http') 
         ? businessDetails.business_logo_url 
@@ -191,15 +218,21 @@ export const Header = () => {
       setLogoError(false);
       setLogoLoaded(false);
       
-      fetch(logoUrl || '', { method: 'HEAD' })
-        .then(response => {
-          console.log("Logo URL status:", response.status, response.ok);
-          setLogoError(!response.ok);
-        })
-        .catch(err => {
-          console.error("Error checking logo URL:", err);
-          setLogoError(true);
-        });
+      if (logoUrl) {
+        validateImageUrl(logoUrl)
+          .then(isValid => {
+            setLogoError(!isValid);
+            if (!isValid) {
+              console.error("Logo URL validation failed in Header component");
+            }
+          })
+          .catch(err => {
+            console.error("Error validating logo URL in Header:", err);
+            setLogoError(true);
+          });
+      } else {
+        setLogoError(true);
+      }
     }
     
     if (profile?.avatar_url) {
@@ -211,16 +244,10 @@ export const Header = () => {
     }
   }, [businessDetails, profile]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (session?.user?.id) {
-        console.log("Forcing refresh of business details in Header");
-        await refetchBusinessDetails();
-      }
-    };
-    
-    fetchData();
-  }, [session]);
+  const forceRefresh = useCallback(() => {
+    console.log("Forcing refresh of business details and profile");
+    refetchBusinessDetails();
+  }, [refetchBusinessDetails]);
 
   return (
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">
@@ -417,13 +444,6 @@ export const Header = () => {
                           console.log("Avatar loaded successfully");
                           setAvatarLoaded(true);
                         }}
-                        onError={(e) => {
-                          console.error("Profile image failed to load. URL was:", 
-                            profile.avatar_url.startsWith('http') 
-                              ? profile.avatar_url 
-                              : getPublicImageUrl(profile.avatar_url));
-                          // Don't set a fallback here - AvatarFallback will handle it
-                        }}
                       />
                       <AvatarFallback>
                         {profile.full_name?.charAt(0).toUpperCase() || 
@@ -451,6 +471,9 @@ export const Header = () => {
                   </div>
                 </DropdownMenuItem>
               </Link>
+              <DropdownMenuItem className="cursor-pointer" onClick={forceRefresh}>
+                Refresh Images
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600 cursor-pointer" 
                 onClick={async () => {

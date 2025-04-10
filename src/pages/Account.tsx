@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SignatureManager } from "@/components/SignatureManager";
 import { Textarea } from "@/components/ui/textarea";
 import { Camera, Upload, ImageIcon, X } from "lucide-react";
-import { validateImageUrl } from "@/utils/templates/classic/utils/imageUtils";
+import { validateImageUrl, handleImageFileUpload } from "@/utils/templates/classic/utils/imageUtils";
 
 export default function Account() {
   const [loading, setLoading] = useState(true);
@@ -71,49 +71,31 @@ export default function Account() {
     validateAvatar();
   }, [avatarUrl]);
 
-  useEffect(() => {
-    const dropZone = dropZoneRef.current;
-    if (!dropZone) return;
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
+  const handleDragIn = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
 
-    const handleDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
+  const handleDragOut = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
 
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-    };
-
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      
-      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        handleFileUploadHelper(e.dataTransfer.files[0]);
-      }
-    };
-
-    dropZone.addEventListener('dragover', handleDragOver);
-    dropZone.addEventListener('dragenter', handleDragEnter);
-    dropZone.addEventListener('dragleave', handleDragLeave);
-    dropZone.addEventListener('drop', handleDrop);
-
-    return () => {
-      dropZone.removeEventListener('dragover', handleDragOver);
-      dropZone.removeEventListener('dragenter', handleDragEnter);
-      dropZone.removeEventListener('dragleave', handleDragLeave);
-      dropZone.removeEventListener('drop', handleDrop);
-    };
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      handleFileUploadHelper(e.dataTransfer.files[0]);
+    }
   }, []);
 
   async function getProfile() {
@@ -317,96 +299,25 @@ export default function Account() {
         return;
       }
       
-      const ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
-      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      console.log("Processing file upload:", file.name, file.type, file.size);
       
-      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        throw new Error("Invalid file type. Please upload PNG or JPG images only.");
+      const result = await handleImageFileUpload(file, userId, 'avatar');
+      
+      if (!result) {
+        throw new Error("Failed to upload image");
       }
       
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error("File size should be less than 5MB.");
-      }
+      console.log("Image uploaded successfully:", result);
       
-      const fileExt = file.name.split('.').pop();
-      const fileName = `avatar-${Date.now()}.${fileExt}`;
-      const filePath = `${userId}/avatar/${fileName}`;
+      setAvatarUrl(result.path);
+      setAvatarPreviewUrl(result.publicUrl);
       
-      console.log("Uploading avatar to path:", filePath);
-      
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const businessFilesBucket = buckets?.find(bucket => bucket.name === 'business_files');
-      
-      if (!businessFilesBucket) {
-        console.log("Creating business_files bucket...");
-        try {
-          await supabase.storage.createBucket('business_files', { public: true });
-          console.log("business_files bucket created successfully");
-        } catch (error) {
-          console.error("Error creating bucket:", error);
-        }
-      } else if (!businessFilesBucket.public) {
-        try {
-          await supabase.storage.updateBucket('business_files', { public: true });
-          console.log("Made business_files bucket public");
-        } catch (error) {
-          console.error("Error updating bucket privacy:", error);
-        }
-      }
-      
-      try {
-        await supabase.storage
-          .from("business_files")
-          .remove([filePath]);
-      } catch (error) {
-        console.log("No previous file to remove, proceeding with upload");
-      }
-      
-      const { data, error } = await supabase.storage
-        .from("business_files")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true
-        });
-
-      if (error) {
-        console.error("Error uploading file:", error);
-        throw error;
-      }
-
-      console.log("File uploaded successfully, data:", data);
-      
-      const { data: publicUrlData } = supabase.storage
-        .from("business_files")
-        .getPublicUrl(data.path);
-        
-      console.log(`Avatar uploaded, public URL: ${publicUrlData.publicUrl}`);
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          avatar_url: filePath,
-          updated_at: new Date()
-        })
-        .eq('id', userId);
-      
-      if (profileError) {
-        throw profileError;
-      }
-      
-      const { error: businessError } = await supabase
+      await supabase
         .from('business_details')
         .update({ 
-          business_logo_url: filePath
+          business_logo_url: result.path
         })
         .eq('user_id', userId);
-      
-      if (businessError) {
-        console.error("Error updating business logo:", businessError);
-      }
-      
-      setAvatarUrl(filePath);
-      setAvatarPreviewUrl(publicUrlData.publicUrl || "");
       
       toast({
         title: "Success",
@@ -415,6 +326,7 @@ export default function Account() {
       
       setTimeout(() => {
         getProfile();
+        window.dispatchEvent(new CustomEvent('profile-image-updated'));
       }, 1000);
       
     } catch (error: any) {
@@ -462,6 +374,8 @@ export default function Account() {
         title: "Success",
         description: "Profile picture updated with Google avatar!",
       });
+      
+      window.dispatchEvent(new CustomEvent('profile-image-updated'));
     } catch (error: any) {
       toast({
         title: "Error",
@@ -504,10 +418,14 @@ export default function Account() {
                   <div 
                     className="relative" 
                     ref={dropZoneRef}
+                    onDragEnter={handleDragIn}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDragOut}
+                    onDrop={handleDrop}
                   >
                     <div 
-                      className={`w-20 h-20 rounded-full relative overflow-hidden ${
-                        isDragging ? 'ring-2 ring-primary border-dashed border-2' : ''
+                      className={`w-20 h-20 rounded-full relative overflow-hidden transition-all duration-200 ${
+                        isDragging ? 'ring-4 ring-primary border-dashed border-2 scale-110' : ''
                       }`}
                     >
                       <Avatar className="w-20 h-20">
@@ -516,10 +434,6 @@ export default function Account() {
                             src={avatarPreviewUrl} 
                             alt="Avatar" 
                             className="object-cover w-full h-full"
-                            onError={() => {
-                              console.log("Avatar failed to load, using fallback");
-                              setImageError(true);
-                            }}
                           />
                         ) : (
                           <AvatarFallback className="bg-primary/10">
@@ -556,7 +470,7 @@ export default function Account() {
                       <input 
                         id="avatar-upload" 
                         type="file" 
-                        accept="image/*" 
+                        accept="image/png,image/jpeg,image/jpg" 
                         className="hidden" 
                         onChange={uploadAvatar}
                         disabled={uploading}
@@ -568,7 +482,7 @@ export default function Account() {
                     <h2 className="text-lg font-semibold">Profile Information</h2>
                     <p className="text-gray-500">Update your personal details here.</p>
                     <p className="text-sm text-primary mt-1">
-                      <strong>Drag & drop</strong> an image or click the camera icon
+                      <strong>Drag & drop</strong> a PNG or JPG image or click the camera icon
                     </p>
                     {googleProfilePic && (
                       <Button 
