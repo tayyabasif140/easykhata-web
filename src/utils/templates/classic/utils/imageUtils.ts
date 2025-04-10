@@ -56,3 +56,24 @@ export const fetchImageAsBase64 = async (imagePath: string): Promise<string | nu
     return null;
   }
 };
+
+/**
+ * Validates if an image URL is accessible and can be loaded
+ * @param imageUrl The URL of the image to validate
+ * @returns Promise with boolean indicating if the image is valid
+ */
+export const validateImageUrl = async (imageUrl: string): Promise<boolean> => {
+  if (!imageUrl) return false;
+  
+  try {
+    const response = await fetch(imageUrl, { 
+      method: 'HEAD',
+      cache: 'no-store'
+    });
+    
+    return response.ok && response.headers.get('content-type')?.startsWith('image/');
+  } catch (error) {
+    console.error("Error validating image URL:", error);
+    return false;
+  }
+};

@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignatureManager } from "@/components/SignatureManager";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Upload } from "lucide-react";
+import { Camera, Upload, ImageIcon } from "lucide-react";
+import { validateImageUrl } from "@/utils/templates/classic/utils/imageUtils";
 
 export default function Account() {
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,8 @@ export default function Account() {
   const [privacyPolicy, setPrivacyPolicy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [googleProfilePic, setGoogleProfilePic] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,13 +36,31 @@ export default function Account() {
   }, []);
 
   useEffect(() => {
-    if (avatarUrl) {
-      if (avatarUrl.startsWith('http')) {
-        setAvatarPreviewUrl(avatarUrl);
-      } else {
-        setAvatarPreviewUrl(getPublicImageUrl(avatarUrl) || "");
+    async function validateAvatar() {
+      if (avatarUrl) {
+        setImageLoading(true);
+        setImageError(false);
+        
+        try {
+          const url = avatarUrl.startsWith('http') ? avatarUrl : getPublicImageUrl(avatarUrl) || "";
+          setAvatarPreviewUrl(url);
+          
+          if (url) {
+            const isValid = await validateImageUrl(url);
+            setImageError(!isValid);
+          } else {
+            setImageError(true);
+          }
+        } catch (error) {
+          console.error("Error validating avatar:", error);
+          setImageError(true);
+        } finally {
+          setImageLoading(false);
+        }
       }
     }
+    
+    validateAvatar();
   }, [avatarUrl]);
 
   async function getProfile() {
@@ -230,6 +251,7 @@ export default function Account() {
   async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true);
+      setImageError(false);
       
       if (!e.target.files || e.target.files.length === 0) {
         return;
@@ -262,8 +284,9 @@ export default function Account() {
         throw updateError;
       }
       
+      const publicUrl = getPublicImageUrl(filePath);
       setAvatarUrl(filePath);
-      setAvatarPreviewUrl(getPublicImageUrl(filePath) || "");
+      setAvatarPreviewUrl(publicUrl || "");
       
       toast({
         title: "Success",
@@ -271,6 +294,7 @@ export default function Account() {
       });
     } catch (error: any) {
       console.error("Upload error:", error);
+      setImageError(true);
       toast({
         title: "Error",
         description: error.message,
@@ -345,22 +369,37 @@ export default function Account() {
                 <div className="flex items-center space-x-4">
                   <div className="relative">
                     <Avatar className="w-20 h-20">
-                      {avatarPreviewUrl ? (
+                      {!imageLoading && avatarPreviewUrl && !imageError ? (
                         <AvatarImage 
                           src={avatarPreviewUrl} 
                           alt="Avatar" 
-                          onError={(e) => {
+                          className="object-cover w-full h-full"
+                          onError={() => {
                             console.log("Avatar failed to load, using fallback");
-                            (e.target as HTMLImageElement).style.display = 'none';
+                            setImageError(true);
                           }}
                         />
                       ) : (
-                        <AvatarFallback>{fullName?.charAt(0).toUpperCase() || '?'}</AvatarFallback>
+                        <AvatarFallback className="bg-primary/10">
+                          {imageLoading ? (
+                            <div className="animate-pulse flex items-center justify-center w-full h-full">
+                              <div className="w-10 h-10 bg-primary/30 rounded-full"></div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full">
+                              {imageError ? (
+                                <ImageIcon className="w-8 h-8 text-primary/70" />
+                              ) : (
+                                <span className="text-xl font-semibold">{fullName?.charAt(0).toUpperCase() || '?'}</span>
+                              )}
+                            </div>
+                          )}
+                        </AvatarFallback>
                       )}
                     </Avatar>
                     <label 
                       htmlFor="avatar-upload" 
-                      className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
+                      className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer shadow-md hover:bg-primary/90 transition-colors"
                       title="Upload profile picture"
                     >
                       <Camera className="w-4 h-4" />
