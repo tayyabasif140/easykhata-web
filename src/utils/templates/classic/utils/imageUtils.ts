@@ -3,7 +3,7 @@ import { getPublicImageUrl } from "@/integrations/supabase/client";
 
 /**
  * Fetches an image from a URL and converts it to a base64 string
- * @param imagePath The path to the image in Supabase storage
+ * @param imagePath The path to the image in Supabase storage or a full URL
  * @returns Promise with base64 string or null if failed
  */
 export const fetchImageAsBase64 = async (imagePath: string): Promise<string | null> => {
@@ -13,8 +13,9 @@ export const fetchImageAsBase64 = async (imagePath: string): Promise<string | nu
       return null;
     }
     
-    // Get the public URL for the image
-    const publicUrl = getPublicImageUrl(imagePath);
+    // Use the path directly if it's already a full URL, otherwise get the public URL
+    const publicUrl = imagePath.startsWith('http') ? imagePath : getPublicImageUrl(imagePath);
+    
     if (!publicUrl) {
       console.log("Could not generate public URL for path:", imagePath);
       return null;
@@ -22,12 +23,13 @@ export const fetchImageAsBase64 = async (imagePath: string): Promise<string | nu
     
     console.log("Attempting to fetch image from:", publicUrl);
     
-    // Fetch the image
+    // Fetch the image with no cache to ensure fresh content
     const response = await fetch(publicUrl, {
-      cache: 'no-store',  // Prevent caching issues
+      cache: 'no-store',
       headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
     

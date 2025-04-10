@@ -1,5 +1,5 @@
 import { Bell, Settings, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -171,6 +171,38 @@ export const Header = () => {
     refetchBusinessDetails();
   };
 
+  // Add a state to track if logo/images have loaded
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
+  
+  // Debug image URLs
+  useEffect(() => {
+    if (businessDetails?.business_logo_url) {
+      const logoUrl = businessDetails.business_logo_url.startsWith('http') 
+        ? businessDetails.business_logo_url 
+        : getPublicImageUrl(businessDetails.business_logo_url);
+      
+      console.log("Logo URL in Header:", logoUrl);
+      
+      // Validate the URL by trying to fetch it
+      fetch(logoUrl || '', { method: 'HEAD' })
+        .then(response => {
+          console.log("Logo URL status:", response.status, response.ok);
+        })
+        .catch(err => {
+          console.error("Error checking logo URL:", err);
+        });
+    }
+    
+    if (profile?.avatar_url) {
+      const avatarUrl = profile.avatar_url.startsWith('http') 
+        ? profile.avatar_url 
+        : getPublicImageUrl(profile.avatar_url);
+      
+      console.log("Avatar URL in Header:", avatarUrl);
+    }
+  }, [businessDetails, profile]);
+
   return (
     <header className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-white/80 backdrop-blur-sm border-b border-gray-200 fixed top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -181,17 +213,27 @@ export const Header = () => {
                 <img
                   src={businessDetails.business_logo_url.startsWith('http') 
                     ? businessDetails.business_logo_url 
-                    : getPublicImageUrl(businessDetails.business_logo_url)}
+                    : getPublicImageUrl(businessDetails.business_logo_url) || '/placeholder.svg'}
                   alt="Business Logo"
                   className="h-10 w-auto object-contain"
+                  onLoad={() => {
+                    console.log("Logo loaded successfully");
+                    setLogoLoaded(true);
+                  }}
                   onError={(e) => {
-                    console.log("Logo failed to load, using placeholder. URL was:", 
+                    console.error("Logo failed to load. URL was:", 
                       businessDetails.business_logo_url.startsWith('http') 
                         ? businessDetails.business_logo_url 
                         : getPublicImageUrl(businessDetails.business_logo_url));
                     (e.target as HTMLImageElement).src = "/placeholder.svg";
                   }}
                 />
+                {/* Show loading state if image is not yet loaded */}
+                {!logoLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full animate-pulse">
+                    <span className="sr-only">Loading...</span>
+                  </div>
+                )}
                 <h1 className="text-xl font-bold text-primary hidden md:block">
                   {businessDetails?.business_name || "EasyKhata"}
                 </h1>
@@ -336,12 +378,25 @@ export const Header = () => {
                       <AvatarImage 
                         src={profile.avatar_url.startsWith('http') 
                           ? profile.avatar_url 
-                          : getPublicImageUrl(profile.avatar_url)}
+                          : getPublicImageUrl(profile.avatar_url) || ''}
                         alt="Profile" 
                         className="w-full h-full object-cover"
-                        onError={() => console.log("Profile image failed to load")}
+                        onLoad={() => {
+                          console.log("Avatar loaded successfully");
+                          setAvatarLoaded(true);
+                        }}
+                        onError={(e) => {
+                          console.error("Profile image failed to load. URL was:", 
+                            profile.avatar_url.startsWith('http') 
+                              ? profile.avatar_url 
+                              : getPublicImageUrl(profile.avatar_url));
+                          // Don't set a fallback here - AvatarFallback will handle it
+                        }}
                       />
-                      <AvatarFallback>{profile.full_name?.charAt(0).toUpperCase() || session.user.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                      <AvatarFallback>
+                        {profile.full_name?.charAt(0).toUpperCase() || 
+                         session.user.email?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
                     </Avatar>
                   ) : (
                     <User className="w-5 h-5 text-primary" />

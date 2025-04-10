@@ -8,7 +8,7 @@ import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 import { CreateCustomerDialog } from "@/components/CreateCustomerDialog";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -266,7 +266,6 @@ const Index = () => {
 
   const handlePreviewInvoice = async (invoice: any) => {
     try {
-      // Get invoice items
       const { data: invoiceItems, error: itemsError } = await supabase
         .from('invoice_items')
         .select('*')
@@ -274,7 +273,6 @@ const Index = () => {
 
       if (itemsError) throw itemsError;
 
-      // Get customer details
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('*')
@@ -283,7 +281,6 @@ const Index = () => {
 
       if (customerError) throw customerError;
 
-      // Get business details
       const { data: businessDetails, error: businessError } = await supabase
         .from('business_details')
         .select('*')
@@ -292,7 +289,6 @@ const Index = () => {
 
       if (businessError) throw businessError;
 
-      // Get user profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -301,7 +297,6 @@ const Index = () => {
 
       if (profileError) throw profileError;
 
-      // Generate PDF
       const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
 
@@ -325,10 +320,8 @@ const Index = () => {
         profile
       });
 
-      // Convert to data URL for preview
       const pdfDataUrl = doc.output('dataurlstring');
       
-      // Open preview in new window
       const previewWindow = window.open();
       if (previewWindow) {
         previewWindow.document.write(`
@@ -358,7 +351,6 @@ const Index = () => {
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
-      // Get invoice items
       const { data: invoiceItems, error: itemsError } = await supabase
         .from('invoice_items')
         .select('*')
@@ -366,7 +358,6 @@ const Index = () => {
 
       if (itemsError) throw itemsError;
 
-      // Get customer details
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('*')
@@ -375,7 +366,6 @@ const Index = () => {
 
       if (customerError) throw customerError;
 
-      // Get business details
       const { data: businessDetails, error: businessError } = await supabase
         .from('business_details')
         .select('*')
@@ -384,7 +374,6 @@ const Index = () => {
 
       if (businessError) throw businessError;
 
-      // Get user profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -393,7 +382,6 @@ const Index = () => {
 
       if (profileError) throw profileError;
 
-      // Generate PDF
       const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
 
@@ -417,7 +405,6 @@ const Index = () => {
         profile
       });
 
-      // Download PDF
       doc.save(`invoice_${invoice.id}.pdf`);
 
       toast({
@@ -484,8 +471,6 @@ const Index = () => {
       }
     });
 
-    // Calculate growth percentage
-    const months = Object.values(monthlyData);
     months.forEach((month, index) => {
       if (index > 0) {
         const prevRevenue = months[index - 1].revenue;
@@ -495,6 +480,38 @@ const Index = () => {
 
     return months;
   };
+
+  const fetchInvoiceItems = async (invoiceId: string) => {
+    try {
+      console.log("Fetching invoice items for:", invoiceId);
+      const { data, error } = await supabase
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoiceId);
+
+      if (error) {
+        console.error("Error fetching invoice items:", error);
+        throw error;
+      }
+      
+      console.log("Fetched invoice items:", data);
+      return data;
+    } catch (err) {
+      console.error("Failed to fetch invoice items:", err);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    if (selectedInvoice && !selectedInvoice.items) {
+      fetchInvoiceItems(selectedInvoice.id).then(items => {
+        setSelectedInvoice(prev => ({
+          ...prev,
+          items: items || []
+        }));
+      });
+    }
+  }, [selectedInvoice]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -834,7 +851,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Tax Dialog */}
         <Dialog open={showTaxDialog} onOpenChange={setShowTaxDialog}>
           <DialogContent>
             <DialogHeader>
@@ -902,7 +918,6 @@ const Index = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Invoice Details Dialog */}
         <Dialog open={!!selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
@@ -913,13 +928,13 @@ const Index = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h3 className="font-medium">Customer</h3>
-                    <p>{selectedInvoice.customers.name}</p>
-                    <p>{selectedInvoice.customers.company || 'No company'}</p>
+                    <p>{selectedInvoice.customers?.name || 'N/A'}</p>
+                    <p>{selectedInvoice.customers?.company || 'No company'}</p>
                   </div>
                   <div>
                     <h3 className="font-medium">Invoice</h3>
-                    <p>Status: {selectedInvoice.status}</p>
-                    <p>Created: {format(new Date(selectedInvoice.created_at), 'MMM d, yyyy')}</p>
+                    <p>Status: {selectedInvoice.status || 'N/A'}</p>
+                    <p>Created: {selectedInvoice.created_at ? format(new Date(selectedInvoice.created_at), 'MMM d, yyyy') : 'N/A'}</p>
                     {selectedInvoice.due_date && (
                       <p>Due: {format(new Date(selectedInvoice.due_date), 'MMM d, yyyy')}</p>
                     )}
@@ -939,14 +954,22 @@ const Index = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.map((item: any) => (
-                          <tr key={item.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">{item.product_name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">Rs.{item.price}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">Rs.{item.total}</td>
+                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.length > 0 ? (
+                          selectedInvoice.items.map((item: any, index: number) => (
+                            <tr key={item.id || index}>
+                              <td className="px-6 py-4 whitespace-nowrap">{item.product_name || 'N/A'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">{item.quantity || 0}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">Rs.{item.price || 0}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">Rs.{item.total || (item.quantity * item.price) || 0}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                              {selectedInvoice.items === undefined ? 'Loading items...' : 'No items found for this invoice'}
+                            </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -954,9 +977,9 @@ const Index = () => {
                 
                 <div className="flex justify-between border-t pt-4">
                   <div>
-                    <p>Subtotal: Rs.{selectedInvoice.total_amount}</p>
-                    <p>Tax: Rs.{selectedInvoice.tax_amount}</p>
-                    <p className="font-bold">Total: Rs.{selectedInvoice.total_amount + selectedInvoice.tax_amount}</p>
+                    <p>Subtotal: Rs.{selectedInvoice.total_amount || 0}</p>
+                    <p>Tax: Rs.{selectedInvoice.tax_amount || 0}</p>
+                    <p className="font-bold">Total: Rs.{(selectedInvoice.total_amount || 0) + (selectedInvoice.tax_amount || 0)}</p>
                   </div>
                   <div className="flex space-x-2">
                     {selectedInvoice.status === 'unpaid' && (
