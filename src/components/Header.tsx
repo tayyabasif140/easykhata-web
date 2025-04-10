@@ -19,6 +19,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Loader2 } from "./ui/loader";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -173,6 +174,7 @@ export const Header = () => {
 
   // Add a state to track if logo/images have loaded
   const [logoLoaded, setLogoLoaded] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   
   // Debug image URLs
@@ -188,9 +190,11 @@ export const Header = () => {
       fetch(logoUrl || '', { method: 'HEAD' })
         .then(response => {
           console.log("Logo URL status:", response.status, response.ok);
+          setLogoError(!response.ok);
         })
         .catch(err => {
           console.error("Error checking logo URL:", err);
+          setLogoError(true);
         });
     }
     
@@ -209,31 +213,44 @@ export const Header = () => {
         <div className="flex items-center space-x-4">
           <Link to="/" className="flex items-center">
             {businessDetails?.business_logo_url ? (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 relative">
+                {logoLoaded && !logoError ? (
+                  <img
+                    src={businessDetails.business_logo_url.startsWith('http') 
+                      ? businessDetails.business_logo_url 
+                      : getPublicImageUrl(businessDetails.business_logo_url) || '/placeholder.svg'}
+                    alt="Business Logo"
+                    className="h-10 w-10 object-contain"
+                    style={{ display: logoLoaded ? 'block' : 'none' }}
+                  />
+                ) : (
+                  <div className="h-10 w-10 bg-primary/10 flex items-center justify-center rounded-md">
+                    {!logoError ? (
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                    ) : (
+                      <span className="text-xs text-primary">Logo</span>
+                    )}
+                  </div>
+                )}
                 <img
                   src={businessDetails.business_logo_url.startsWith('http') 
                     ? businessDetails.business_logo_url 
                     : getPublicImageUrl(businessDetails.business_logo_url) || '/placeholder.svg'}
-                  alt="Business Logo"
-                  className="h-10 w-auto object-contain"
+                  alt=""
+                  className="hidden"
                   onLoad={() => {
                     console.log("Logo loaded successfully");
                     setLogoLoaded(true);
+                    setLogoError(false);
                   }}
                   onError={(e) => {
                     console.error("Logo failed to load. URL was:", 
                       businessDetails.business_logo_url.startsWith('http') 
                         ? businessDetails.business_logo_url 
                         : getPublicImageUrl(businessDetails.business_logo_url));
-                    (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    setLogoError(true);
                   }}
                 />
-                {/* Show loading state if image is not yet loaded */}
-                {!logoLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-full animate-pulse">
-                    <span className="sr-only">Loading...</span>
-                  </div>
-                )}
                 <h1 className="text-xl font-bold text-primary hidden md:block">
                   {businessDetails?.business_name || "EasyKhata"}
                 </h1>

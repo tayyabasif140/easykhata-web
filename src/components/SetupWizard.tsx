@@ -51,9 +51,35 @@ const SetupWizard = () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error("Not authenticated");
 
+    // Create business_files bucket if it doesn't exist
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const businessFilesBucket = buckets?.find(bucket => bucket.name === 'business_files');
+    
+    if (!businessFilesBucket) {
+      console.log("Creating business_files bucket...");
+      try {
+        await supabase.storage.createBucket('business_files', { public: true });
+        console.log("business_files bucket created successfully");
+      } catch (error) {
+        console.error("Error creating bucket:", error);
+        // If we can't create the bucket, we can still try to upload (it might already exist)
+      }
+    }
+
     const filePath = `${userData.user.id}/${path}/${file.name}`;
     console.log(`Uploading ${path} to path: ${filePath}`);
     
+    // First try to delete the file if it already exists to prevent duplicates
+    try {
+      await supabase.storage
+        .from("business_files")
+        .remove([filePath]);
+    } catch (error) {
+      // It's okay if the file doesn't exist yet
+      console.log("No previous file to remove, proceeding with upload");
+    }
+    
+    // Now upload the new file
     const { data, error } = await supabase.storage
       .from("business_files")
       .upload(filePath, file, {
@@ -61,7 +87,10 @@ const SetupWizard = () => {
         upsert: true
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error uploading file:", error);
+      throw error;
+    }
 
     // Get and log the public URL
     const { data: publicUrlData } = supabase.storage
@@ -84,13 +113,19 @@ const SetupWizard = () => {
       let digitalSignatureUrl = null;
 
       if (formData.businessLogo) {
+        console.log("Uploading business logo...");
         businessLogoUrl = await handleFileUpload(formData.businessLogo, "logos");
+        console.log("Business logo uploaded, path:", businessLogoUrl);
       }
+      
       if (formData.digitalSignature) {
+        console.log("Uploading digital signature...");
         digitalSignatureUrl = await handleFileUpload(formData.digitalSignature, "signatures");
+        console.log("Digital signature uploaded, path:", digitalSignatureUrl);
       }
 
       // Create profile
+      console.log("Creating profile...");
       const { error: profileError } = await supabase
         .from("profiles")
         .insert({
@@ -102,9 +137,14 @@ const SetupWizard = () => {
           digital_signature_url: digitalSignatureUrl,
         });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
+        throw profileError;
+      }
 
       // Create business details
+      console.log("Creating business details...");
+      console.log("Logo URL being saved:", businessLogoUrl);
       const { error: businessError } = await supabase
         .from("business_details")
         .insert({
@@ -118,7 +158,10 @@ const SetupWizard = () => {
           social_media_links: formData.socialMediaLinks,
         });
 
-      if (businessError) throw businessError;
+      if (businessError) {
+        console.error("Error creating business details:", businessError);
+        throw businessError;
+      }
 
       toast({
         title: "Welcome to EasyKhata!",
@@ -127,6 +170,7 @@ const SetupWizard = () => {
 
       navigate("/");
     } catch (error: any) {
+      console.error("Setup wizard error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -143,6 +187,7 @@ const SetupWizard = () => {
   ) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log(`Selected ${field} file:`, file.name);
       setFormData((prev) => ({ ...prev, [field]: file }));
     }
   };

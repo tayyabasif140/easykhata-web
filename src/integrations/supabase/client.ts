@@ -105,6 +105,56 @@ export const getPublicImageUrl = (path: string) => {
   }
 };
 
+// Check if business_files bucket exists and make it public if not
+const ensureBusinessFilesBucket = async () => {
+  try {
+    console.log("Checking if business_files bucket exists and is public");
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    
+    if (error) {
+      console.error("Error checking buckets:", error);
+      return;
+    }
+    
+    const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
+    
+    if (!businessFilesBucket) {
+      console.log("business_files bucket doesn't exist, creating it");
+      
+      // Create the bucket
+      const { data, error: createError } = await supabase.storage.createBucket('business_files', {
+        public: true
+      });
+      
+      if (createError) {
+        console.error("Error creating business_files bucket:", createError);
+      } else {
+        console.log("business_files bucket created successfully and set to public");
+      }
+    } else if (!businessFilesBucket.public) {
+      console.error("business_files bucket exists but is not public - images won't be accessible");
+      console.log("Attempting to update bucket to be public");
+      
+      const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+        public: true
+      });
+      
+      if (updateError) {
+        console.error("Error updating business_files bucket to public:", updateError);
+      } else {
+        console.log("business_files bucket updated to be public");
+      }
+    } else {
+      console.log("business_files bucket is correctly configured as public");
+    }
+  } catch (err) {
+    console.error("Error in bucket check:", err);
+  }
+};
+
+// Run the check and setup when the client is initialized
+ensureBusinessFilesBucket();
+
 // Optimize session checking with caching
 let cachedSessionPromise = null;
 let lastSessionCheck = 0;
@@ -242,56 +292,6 @@ export const invalidateCache = (pattern) => {
     console.error('Cache invalidation error:', e);
   }
 };
-
-// Check if business_files bucket exists and make it public if not
-const ensureBusinessFilesBucket = async () => {
-  try {
-    console.log("Checking if business_files bucket exists and is public");
-    const { data: buckets, error } = await supabase.storage.listBuckets();
-    
-    if (error) {
-      console.error("Error checking buckets:", error);
-      return;
-    }
-    
-    const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
-    
-    if (!businessFilesBucket) {
-      console.log("business_files bucket doesn't exist, creating it");
-      
-      // Create the bucket
-      const { data, error: createError } = await supabase.storage.createBucket('business_files', {
-        public: true
-      });
-      
-      if (createError) {
-        console.error("Error creating business_files bucket:", createError);
-      } else {
-        console.log("business_files bucket created successfully and set to public");
-      }
-    } else if (!businessFilesBucket.public) {
-      console.error("business_files bucket exists but is not public - images won't be accessible");
-      console.log("Attempting to update bucket to be public");
-      
-      const { error: updateError } = await supabase.storage.updateBucket('business_files', {
-        public: true
-      });
-      
-      if (updateError) {
-        console.error("Error updating business_files bucket to public:", updateError);
-      } else {
-        console.log("business_files bucket updated to be public");
-      }
-    } else {
-      console.log("business_files bucket is correctly configured as public");
-    }
-  } catch (err) {
-    console.error("Error in bucket check:", err);
-  }
-};
-
-// Run the check and setup when the client is initialized
-ensureBusinessFilesBucket();
 
 // Force a session check on page load to ensure we have a valid token
 window.addEventListener('load', () => {
