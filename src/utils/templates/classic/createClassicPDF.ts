@@ -8,7 +8,7 @@ import { renderTotals } from './sections/totals';
 import { renderFooter } from './sections/footer';
 import { handleError } from './utils/errorHandler';
 
-export const createClassicPDF = (props: TemplateProps): jsPDF => {
+export const createClassicPDF = async (props: TemplateProps): Promise<jsPDF> => {
   // Create a new PDF document
   const doc = new jsPDF();
   
@@ -17,7 +17,8 @@ export const createClassicPDF = (props: TemplateProps): jsPDF => {
     let yPos = 20;
     
     // Render header section (company details)
-    yPos = renderHeader(doc, props, yPos);
+    // Use await since renderHeader is now an async function
+    yPos = await renderHeader(doc, props, yPos);
     
     // Render customer information
     yPos = renderCustomerInfo(doc, props, yPos);

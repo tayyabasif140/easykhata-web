@@ -70,5 +70,6 @@ export const classicTemplate = async (props: TemplateProps) => {
     logoBase64
   };
   
-  return createClassicPDF(enhancedProps);
+  // Now call the async createClassicPDF function with await
+  return await createClassicPDF(enhancedProps);
 };
