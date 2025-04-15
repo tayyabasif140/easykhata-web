@@ -301,6 +301,11 @@ export default function Account() {
       
       console.log("Processing file upload:", file.name, file.type, file.size);
       
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        throw new Error("You need to be logged in to upload images");
+      }
+      
       const result = await handleImageFileUpload(file, userId, 'avatar');
       
       if (!result) {
@@ -311,13 +316,6 @@ export default function Account() {
       
       setAvatarUrl(result.path);
       setAvatarPreviewUrl(result.publicUrl);
-      
-      await supabase
-        .from('business_details')
-        .update({ 
-          business_logo_url: result.path
-        })
-        .eq('user_id', userId);
       
       toast({
         title: "Success",

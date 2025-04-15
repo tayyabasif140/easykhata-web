@@ -1,4 +1,3 @@
-
 /**
  * Validates if a URL can be loaded as an image
  */
@@ -164,23 +163,18 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
   console.log(`Starting upload of ${type} image:`, file.name, file.type, file.size);
   
   try {
-    // Use direct Supabase URL and key to avoid environment variable issues
-    const supabaseUrl = "https://ykjtvqztcatrkinzfpov.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
+    // Import supabase from the client file to use the existing session
+    const { supabase } = await import('@/integrations/supabase/client');
     
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("Supabase credentials not found");
+    if (!userId) {
+      console.error("User ID is required for image upload");
       return null;
     }
-    
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Get user session to ensure we're authenticated
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       console.error("No active session found. User must be logged in to upload files.");
-      // Redirect to login or show error message
       return null;
     }
     
@@ -250,26 +244,7 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
     
     console.log("File uploaded successfully, path:", data.path);
     
-    // Get the public URL
-    const { data: publicUrlData } = supabase.storage
-      .from("business_files")
-      .getPublicUrl(data.path);
-      
-    console.log(`File uploaded, public URL: ${publicUrlData.publicUrl}`);
-    
-    // Verify the image can be accessed
-    const isValidImage = await validateImageUrl(publicUrlData.publicUrl);
-    if (!isValidImage) {
-      console.log("Uploaded image validation failed, trying to make the bucket public...");
-      
-      try {
-        await supabase.storage.updateBucket('business_files', { public: true });
-        console.log("Updated business_files bucket to be public");
-      } catch (updateError) {
-        console.error("Error updating bucket visibility:", updateError);
-      }
-    }
-    
+    // Return the file path
     return data.path;
   } catch (error) {
     console.error("Upload error:", error);
@@ -387,6 +362,16 @@ export const handleImageFileUpload = async (file: File, userId: string, type: 'a
       return null;
     }
     
+    // Import supabase from the client file to use the existing session
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    // First check if we have an active session
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      console.error("No active session, cannot upload image");
+      return null;
+    }
+    
     const filePath = await uploadImageAndGetPublicUrl(file, userId, type);
     
     if (!filePath) {
@@ -395,11 +380,6 @@ export const handleImageFileUpload = async (file: File, userId: string, type: 'a
     }
     
     // Get the public URL using the path
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = "https://ykjtvqztcatrkinzfpov.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
     const { data: publicUrlData } = supabase.storage
       .from("business_files")
       .getPublicUrl(filePath);

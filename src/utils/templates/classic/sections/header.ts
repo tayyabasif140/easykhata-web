@@ -15,6 +15,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       doc.addImage(logoBase64, 'PNG', 10, yPos, 40, 40);
       // Add some space from the left for the company name to avoid overlapping with logo
       yPos += 5;
+      console.log("Successfully added pre-loaded logo to PDF");
     } catch (e) {
       console.error("Error adding logo to PDF:", e);
     }
@@ -39,7 +40,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       if (base64Logo) {
         doc.addImage(base64Logo, 'PNG', 10, yPos, 40, 40);
         yPos += 5;
-        console.log("Successfully added logo to PDF");
+        console.log("Successfully added logo to PDF from URL");
       } else {
         console.error("Failed to fetch logo for PDF");
       }

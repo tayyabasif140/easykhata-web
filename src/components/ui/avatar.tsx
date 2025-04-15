@@ -40,6 +40,7 @@ const AvatarImage = React.forwardRef<
       setImgSrc(newSrc);
       setIsLoading(true);
       setHasError(false);
+      setRetryCount(0); // Reset retry count when src changes
       console.log("Setting image source with cache busting:", newSrc);
     }
   }, [src]);
@@ -85,10 +86,6 @@ const AvatarImage = React.forwardRef<
             console.error("Avatar image failed to load:", imgSrc, e);
             setHasError(true);
             setIsLoading(false);
-            
-            // Set fallback to be displayed
-            const imgElement = e.currentTarget as HTMLImageElement;
-            imgElement.style.display = 'none';
           }}
           {...props}
         />
