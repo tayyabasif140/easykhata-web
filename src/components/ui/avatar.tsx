@@ -28,14 +28,37 @@ const AvatarImage = React.forwardRef<
   );
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
+  const [retryCount, setRetryCount] = React.useState(0);
+  const maxRetries = 2;
 
   React.useEffect(() => {
     if (typeof src === 'string') {
       setImgSrc(src);
       setIsLoading(true);
       setHasError(false);
+      
+      // Add timestamp to URL to prevent caching if it's a retry
+      if (retryCount > 0 && src.indexOf('?') === -1) {
+        const timestamp = new Date().getTime();
+        setImgSrc(`${src}?t=${timestamp}`);
+        console.log("Retrying image load with timestamp:", `${src}?t=${timestamp}`);
+      }
     }
-  }, [src]);
+  }, [src, retryCount]);
+
+  // Add auto-retry logic
+  React.useEffect(() => {
+    if (hasError && retryCount < maxRetries) {
+      const timer = setTimeout(() => {
+        console.log(`Automatically retrying image load (${retryCount + 1}/${maxRetries})`);
+        setRetryCount(prev => prev + 1);
+        setHasError(false);
+        setIsLoading(true);
+      }, 1000); // Wait 1 second before retry
+      
+      return () => clearTimeout(timer);
+    }
+  }, [hasError, retryCount]);
 
   return (
     <>
@@ -55,6 +78,7 @@ const AvatarImage = React.forwardRef<
             console.error("Avatar image failed to load:", imgSrc, e);
             setHasError(true);
             setIsLoading(false);
+            
             // Set fallback to be displayed
             const imgElement = e.currentTarget as HTMLImageElement;
             imgElement.style.display = 'none';

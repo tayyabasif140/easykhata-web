@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
@@ -13,7 +14,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   },
   global: {
     headers: {
-      'Cache-Control': 'max-age=300', // Cache responses for 5 minutes when possible
+      'Cache-Control': 'max-age=0, no-cache', // Prevent caching for better image upload/view
     },
     fetch: async (url, options) => {
       // Use custom fetch implementation with timeout
@@ -79,6 +80,9 @@ supabase.auth.onAuthStateChange((event, session) => {
         window.location.href = '/';
       }
     }, 100);
+    
+    // Force a bucket check when signing in
+    ensureBusinessFilesBucket();
   } else if (event === 'USER_UPDATED') {
     console.log('User details updated');
   }
@@ -98,7 +102,12 @@ export const getPublicImageUrl = (path: string) => {
       .getPublicUrl(path);
       
     console.log("Generated public URL:", data?.publicUrl);
-    return data?.publicUrl;
+    
+    // Add a cache-busting parameter to prevent stale images
+    const timestamp = Date.now();
+    const url = data?.publicUrl ? `${data.publicUrl}?t=${timestamp}` : null;
+    
+    return url;
   } catch (error) {
     console.error("Error generating public URL:", error);
     return null;
@@ -106,49 +115,91 @@ export const getPublicImageUrl = (path: string) => {
 };
 
 // Check if business_files bucket exists and make it public if not
-const ensureBusinessFilesBucket = async () => {
+export const ensureBusinessFilesBucket = async () => {
   try {
     console.log("Checking if business_files bucket exists and is public");
-    const { data: buckets, error } = await supabase.storage.listBuckets();
+    let bucketCreated = false;
     
-    if (error) {
-      console.error("Error checking buckets:", error);
-      return;
+    // Try first to list buckets
+    try {
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error("Error checking buckets:", error);
+      } else {
+        const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
+        
+        if (!businessFilesBucket) {
+          console.log("business_files bucket doesn't exist, attempting to create it");
+        } else if (!businessFilesBucket.public) {
+          console.error("business_files bucket exists but is not public - images won't be accessible");
+          console.log("Attempting to update bucket to be public");
+          
+          const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+            public: true
+          });
+          
+          if (updateError) {
+            console.error("Error updating business_files bucket to public:", updateError);
+          } else {
+            console.log("business_files bucket updated to be public");
+            return true;
+          }
+        } else {
+          console.log("business_files bucket is correctly configured as public");
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error("Error listing buckets:", err);
     }
     
-    const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
-    
-    if (!businessFilesBucket) {
-      console.log("business_files bucket doesn't exist, creating it");
-      
-      // Create the bucket
-      const { data, error: createError } = await supabase.storage.createBucket('business_files', {
-        public: true
-      });
-      
-      if (createError) {
-        console.error("Error creating business_files bucket:", createError);
-      } else {
-        console.log("business_files bucket created successfully and set to public");
+    // If bucket doesn't exist or we couldn't list buckets due to permissions, try to create it
+    if (!bucketCreated) {
+      try {
+        console.log("Creating business_files bucket...");
+        const { data, error: createError } = await supabase.storage.createBucket('business_files', {
+          public: true,
+          fileSizeLimit: 5242880 // 5MB
+        });
+        
+        if (createError) {
+          console.error("Error creating business_files bucket:", createError);
+          
+          // Try a direct upload to see if the bucket exists but is restricted
+          console.log("Trying direct upload to check if bucket exists...");
+          const { error: uploadError } = await supabase.storage
+            .from("business_files")
+            .upload("test.txt", new Blob(["test"]), {
+              upsert: true
+            });
+            
+          if (uploadError) {
+            if (uploadError.message.includes("does not exist")) {
+              console.error("business_files bucket doesn't exist!");
+              return false;
+            } else {
+              console.log("Bucket likely exists but permissions prevent listing it");
+              return true;
+            }
+          } else {
+            console.log("Test upload successful, bucket exists and is working");
+            return true;
+          }
+        } else {
+          console.log("business_files bucket created successfully and set to public");
+          return true;
+        }
+      } catch (err) {
+        console.error("Error in bucket creation:", err);
+        return false;
       }
-    } else if (!businessFilesBucket.public) {
-      console.error("business_files bucket exists but is not public - images won't be accessible");
-      console.log("Attempting to update bucket to be public");
-      
-      const { error: updateError } = await supabase.storage.updateBucket('business_files', {
-        public: true
-      });
-      
-      if (updateError) {
-        console.error("Error updating business_files bucket to public:", updateError);
-      } else {
-        console.log("business_files bucket updated to be public");
-      }
-    } else {
-      console.log("business_files bucket is correctly configured as public");
     }
+    
+    return false;
   } catch (err) {
     console.error("Error in bucket check:", err);
+    return false;
   }
 };
 
@@ -162,8 +213,14 @@ window.addEventListener('profile-image-updated', () => {
   
   images.forEach(img => {
     const src = img.getAttribute('src');
-    if (src && src.includes('business_files') && !src.includes('?')) {
-      img.setAttribute('src', `${src}?t=${timestamp}`);
+    if (src && src.includes('business_files')) {
+      // Check if the URL already has a timestamp parameter
+      const newSrc = src.includes('?') 
+        ? `${src.split('?')[0]}?t=${timestamp}`
+        : `${src}?t=${timestamp}`;
+      
+      img.setAttribute('src', newSrc);
+      console.log(`Refreshed image src: ${newSrc}`);
     }
   });
   
@@ -317,4 +374,12 @@ export const invalidateCache = (pattern) => {
 window.addEventListener('load', () => {
   console.log('Page loaded, checking session validity');
   checkAndRefreshSession();
+  
+  // Also check the bucket exists on page load
+  ensureBusinessFilesBucket();
 });
+
+// Try to create the bucket again after a delay if it failed initially
+setTimeout(() => {
+  ensureBusinessFilesBucket();
+}, 5000);

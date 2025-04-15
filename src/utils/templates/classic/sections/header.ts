@@ -1,8 +1,9 @@
 
 import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
+import { fetchImageAsBase64 } from '../utils/imageUtils';
 
-export const renderHeader = (doc: jsPDF, props: TemplateProps, startY: number): number => {
+export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: number): Promise<number> => {
   const { businessDetails, profile, logoBase64 } = props;
   let yPos = startY;
   
@@ -17,13 +18,36 @@ export const renderHeader = (doc: jsPDF, props: TemplateProps, startY: number): 
     } catch (e) {
       console.error("Error adding logo to PDF:", e);
     }
+  } else if (businessDetails?.business_logo_url) {
+    try {
+      // Try to fetch the logo from the URL
+      let logoUrl = businessDetails.business_logo_url;
+      
+      // If it's not a full URL, get the full URL
+      if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ykjtvqztcatrkinzfpov.supabase.co";
+        logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
+      }
+      
+      // Fetch the image and convert to base64
+      const base64Logo = await fetchImageAsBase64(logoUrl);
+      
+      if (base64Logo) {
+        doc.addImage(base64Logo, 'PNG', 10, yPos, 40, 40);
+        yPos += 5;
+      } else {
+        console.error("Failed to fetch logo for PDF");
+      }
+    } catch (logoError) {
+      console.error("Error adding logo to PDF:", logoError);
+    }
   }
   
   // Company name
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   // Position company name to the right of the logo if logo exists
-  const companyNameX = logoBase64 ? 60 : 10;
+  const companyNameX = logoBase64 || businessDetails?.business_logo_url ? 60 : 10;
   doc.text(businessDetails?.business_name || 'Company Name', companyNameX, yPos);
   yPos += 10;
   
@@ -55,7 +79,7 @@ export const renderHeader = (doc: jsPDF, props: TemplateProps, startY: number): 
   }
   
   // Ensure we always have enough vertical space after the header (logo or text)
-  yPos = Math.max(yPos, logoBase64 ? startY + 50 : yPos);
+  yPos = Math.max(yPos, (logoBase64 || businessDetails?.business_logo_url) ? startY + 50 : yPos);
   
   // Document title
   yPos += 5;
