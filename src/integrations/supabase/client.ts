@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = "https://ykjtvqztcatrkinzfpov.supabase.co";
@@ -17,17 +16,31 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       'Cache-Control': 'max-age=0, no-cache', // Prevent caching for better image upload/view
     },
     fetch: async (url, options) => {
-      // Use custom fetch implementation with timeout
+      // Use custom fetch implementation with timeout and retry
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20-second timeout (increased)
       
-      try {
-        options.signal = controller.signal;
-        const response = await fetch(url, options);
-        return response;
-      } finally {
-        clearTimeout(timeoutId);
+      const maxRetries = 2;
+      let retryCount = 0;
+      let lastError = null;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          options.signal = controller.signal;
+          const response = await fetch(url, options);
+          return response;
+        } catch (error) {
+          lastError = error;
+          retryCount++;
+          
+          if (retryCount <= maxRetries) {
+            console.log(`Fetch attempt ${retryCount} failed, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          }
+        }
       }
+      
+      throw lastError;
     }
   },
   // Set default fetch caching behavior
@@ -120,6 +133,15 @@ export const ensureBusinessFilesBucket = async () => {
     console.log("Checking if business_files bucket exists and is public");
     let bucketCreated = false;
     
+    // First check if we have an active session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const hasSession = !!sessionData?.session;
+    
+    if (!hasSession) {
+      console.log("No active session, skipping bucket check");
+      return false;
+    }
+    
     // Try first to list buckets
     try {
       const { data: buckets, error } = await supabase.storage.listBuckets();
@@ -164,23 +186,46 @@ export const ensureBusinessFilesBucket = async () => {
         });
         
         if (createError) {
-          console.error("Error creating business_files bucket:", createError);
+          // Check if the error is because the bucket already exists
+          if (createError.message.includes("already exists")) {
+            console.log("Bucket exists, trying to update it to be public");
+            try {
+              const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+                public: true
+              });
+              
+              if (updateError) {
+                console.error("Error updating business_files bucket:", updateError);
+              } else {
+                console.log("business_files bucket updated to be public");
+                return true;
+              }
+            } catch (updateErr) {
+              console.error("Error updating bucket:", updateErr);
+            }
+          } else {
+            console.error("Error creating business_files bucket:", createError);
+          }
           
           // Try a direct upload to see if the bucket exists but is restricted
           console.log("Trying direct upload to check if bucket exists...");
+          const testBlob = new Blob(["test"]);
           const { error: uploadError } = await supabase.storage
             .from("business_files")
-            .upload("test.txt", new Blob(["test"]), {
+            .upload("test.txt", testBlob, {
               upsert: true
             });
             
           if (uploadError) {
             if (uploadError.message.includes("does not exist")) {
-              console.error("business_files bucket doesn't exist!");
+              console.error("business_files bucket doesn't exist and cannot be created!");
+              return false;
+            } else if (uploadError.message.includes("row-level security")) {
+              console.log("Bucket exists but RLS is preventing changes. Needs admin intervention.");
               return false;
             } else {
-              console.log("Bucket likely exists but permissions prevent listing it");
-              return true;
+              console.log("Unknown error when testing bucket:", uploadError);
+              return false;
             }
           } else {
             console.log("Test upload successful, bucket exists and is working");
@@ -230,7 +275,13 @@ window.addEventListener('profile-image-updated', () => {
 });
 
 // Run the check and setup when the client is initialized
-ensureBusinessFilesBucket();
+ensureBusinessFilesBucket().then(success => {
+  if (success) {
+    console.log("Storage bucket setup completed successfully");
+  } else {
+    console.warn("Storage bucket setup could not be completed automatically");
+  }
+});
 
 // Optimize session checking with caching
 let cachedSessionPromise = null;

@@ -120,7 +120,7 @@ export const fetchImageAsBase64 = async (url: string): Promise<string | null> =>
     // Handle URLs from Supabase storage by adding the complete URL if needed
     let fullUrl = url;
     if (!url.startsWith('http') && !url.startsWith('data:')) {
-      fullUrl = `${import.meta.env.VITE_SUPABASE_URL || "https://ykjtvqztcatrkinzfpov.supabase.co"}/storage/v1/object/public/business_files/${url}`;
+      fullUrl = `https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${url}`;
       console.log("Using full URL:", fullUrl);
     }
     
@@ -164,16 +164,25 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
   console.log(`Starting upload of ${type} image:`, file.name, file.type, file.size);
   
   try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ykjtvqztcatrkinzfpov.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
+    // Use direct Supabase URL and key to avoid environment variable issues
+    const supabaseUrl = "https://ykjtvqztcatrkinzfpov.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
     
     if (!supabaseUrl || !supabaseKey) {
       console.error("Supabase credentials not found");
       return null;
     }
     
+    const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Get user session to ensure we're authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No active session found. User must be logged in to upload files.");
+      // Redirect to login or show error message
+      return null;
+    }
     
     // Validate file type
     const ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
@@ -197,54 +206,45 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
     
     console.log(`Uploading ${type} to path:`, filePath);
     
-    // Ensure storage bucket exists
-    let bucketExists = false;
-    try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      bucketExists = buckets?.some(bucket => bucket.name === 'business_files') || false;
-      console.log("Does business_files bucket exist?", bucketExists);
-    } catch (error) {
-      console.error("Error checking if bucket exists:", error);
-    }
+    // Ensure business_files bucket exists and is public
+    await ensureBusinessFilesBucket(supabase);
     
-    if (!bucketExists) {
+    // Upload the file with multiple retries
+    let uploadAttempt = 0;
+    const maxAttempts = 3;
+    let uploadError = null;
+    let data = null;
+    
+    while (uploadAttempt < maxAttempts) {
       try {
-        console.log("Creating business_files bucket...");
-        await supabase.storage.createBucket('business_files', { 
-          public: true,
-          fileSizeLimit: 5242880 
-        });
-        console.log("business_files bucket created successfully");
-      } catch (error) {
-        console.error("Error creating business_files bucket:", error);
-        
-        // If we can't create the bucket, we'll check if the bucket already exists
-        // but the listBuckets() failed to find it due to permissions
-        const { error: uploadError } = await supabase.storage
+        console.log(`Upload attempt ${uploadAttempt + 1}/${maxAttempts}`);
+        const result = await supabase.storage
           .from("business_files")
-          .upload("test.txt", new Blob(["test"]), {
-            upsert: true
+          .upload(filePath, file, {
+            cacheControl: "0", // No caching
+            upsert: true // Overwrite if exists
           });
           
-        if (uploadError) {
-          console.error("Unable to upload to business_files bucket:", uploadError);
-          return null;
+        if (result.error) {
+          console.error(`Error on attempt ${uploadAttempt + 1}:`, result.error);
+          uploadError = result.error;
+          uploadAttempt++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
         } else {
-          console.log("Bucket exists but couldn't list it. Proceeding with upload.");
+          data = result.data;
+          uploadError = null;
+          break; // Success, exit loop
         }
+      } catch (err) {
+        console.error(`Error on attempt ${uploadAttempt + 1}:`, err);
+        uploadError = err;
+        uploadAttempt++;
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
       }
     }
     
-    // Upload the file
-    const { data, error } = await supabase.storage
-      .from("business_files")
-      .upload(filePath, file, {
-        cacheControl: "0", // No caching
-        upsert: true // Overwrite if exists
-      });
-      
-    if (error) {
-      console.error("Error uploading file:", error);
+    if (uploadError || !data) {
+      console.error("All upload attempts failed:", uploadError);
       return null;
     }
     
@@ -277,12 +277,115 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
   }
 };
 
+// Ensure business_files bucket exists and is public
+async function ensureBusinessFilesBucket(supabase) {
+  try {
+    console.log("Checking if business_files bucket exists and is public");
+    
+    // Try first to list buckets
+    try {
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error("Error checking buckets:", error);
+      } else {
+        const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
+        
+        if (!businessFilesBucket) {
+          console.log("business_files bucket doesn't exist, creating it");
+          const { error: createError } = await supabase.storage.createBucket('business_files', {
+            public: true,
+            fileSizeLimit: 5242880 // 5MB
+          });
+          
+          if (createError) {
+            console.error("Error creating business_files bucket:", createError);
+            return false;
+          }
+          
+          console.log("business_files bucket created successfully");
+          return true;
+        } else if (!businessFilesBucket.public) {
+          console.error("business_files bucket exists but is not public - trying to update");
+          
+          try {
+            const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+              public: true
+            });
+            
+            if (updateError) {
+              console.error("Error updating business_files bucket to public:", updateError);
+              return false;
+            }
+            
+            console.log("business_files bucket updated to be public");
+            return true;
+          } catch (e) {
+            console.error("Error updating bucket visibility:", e);
+            return false;
+          }
+        } else {
+          console.log("business_files bucket is correctly configured as public");
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error("Error listing buckets:", err);
+    }
+    
+    // If we couldn't determine bucket status, try to create it anyway
+    try {
+      console.log("Attempting to create or update business_files bucket");
+      const { error: createError } = await supabase.storage.createBucket('business_files', {
+        public: true,
+        fileSizeLimit: 5242880 // 5MB
+      });
+      
+      if (createError) {
+        if (createError.message.includes("already exists")) {
+          console.log("Bucket already exists, trying to update it");
+          const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+            public: true
+          });
+          
+          if (updateError) {
+            console.error("Error updating business_files bucket:", updateError);
+            return false;
+          }
+          
+          console.log("business_files bucket updated successfully");
+          return true;
+        } else {
+          console.error("Error creating business_files bucket:", createError);
+          return false;
+        }
+      } else {
+        console.log("business_files bucket created successfully");
+        return true;
+      }
+    } catch (err) {
+      console.error("Error creating/updating bucket:", err);
+      return false;
+    }
+    
+    return false;
+  } catch (err) {
+    console.error("Error in bucket management:", err);
+    return false;
+  }
+}
+
 /**
  * Directly handle image file upload from input or drop events
  */
 export const handleImageFileUpload = async (file: File, userId: string, type: 'avatar' | 'logo' = 'avatar'): Promise<{ path: string, publicUrl: string } | null> => {
   try {
     console.log(`Processing ${type} upload for user ${userId}`);
+    
+    if (!userId) {
+      console.error("No user ID provided for upload");
+      return null;
+    }
     
     const filePath = await uploadImageAndGetPublicUrl(file, userId, type);
     
@@ -293,50 +396,57 @@ export const handleImageFileUpload = async (file: File, userId: string, type: 'a
     
     // Get the public URL using the path
     const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ykjtvqztcatrkinzfpov.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
+    const supabaseUrl = "https://ykjtvqztcatrkinzfpov.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlranR2cXp0Y2F0cmtpbnpmcG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5ODM2NjIsImV4cCI6MjA1NTU1OTY2Mn0.g_AHL0PMZ0IoTucIJpFutzinqX6nYdoN6uXUlIubwgI";
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     const { data: publicUrlData } = supabase.storage
       .from("business_files")
       .getPublicUrl(filePath);
     
-    console.log("Generated public URL:", publicUrlData.publicUrl);
+    // Add a timestamp to prevent caching
+    const timestamp = Date.now();
+    const publicUrl = `${publicUrlData.publicUrl}?t=${timestamp}`;
+    console.log("Generated public URL with cache busting:", publicUrl);
     
     // Update both profile and business details with the new image path
-    // This improves the user experience since one upload updates both
-    if (type === 'avatar') {
-      await supabase
-        .from('profiles')
-        .update({ 
-          avatar_url: filePath,
-          updated_at: new Date()
-        })
-        .eq('id', userId);
-      
-      // Also update business_logo_url to use the same image
-      await supabase
-        .from('business_details')
-        .update({ 
-          business_logo_url: filePath
-        })
-        .eq('user_id', userId);
-      
-      console.log("Updated both profile avatar and business logo");
-    } else if (type === 'logo') {
-      await supabase
-        .from('business_details')
-        .update({ 
-          business_logo_url: filePath
-        })
-        .eq('user_id', userId);
-      
-      console.log("Updated business logo");
+    try {
+      if (type === 'avatar') {
+        await supabase
+          .from('profiles')
+          .update({ 
+            avatar_url: filePath,
+            updated_at: new Date()
+          })
+          .eq('id', userId);
+        
+        // Also update business_logo_url to use the same image
+        await supabase
+          .from('business_details')
+          .update({ 
+            business_logo_url: filePath
+          })
+          .eq('user_id', userId);
+        
+        console.log("Updated both profile avatar and business logo");
+      } else if (type === 'logo') {
+        await supabase
+          .from('business_details')
+          .update({ 
+            business_logo_url: filePath
+          })
+          .eq('user_id', userId);
+        
+        console.log("Updated business logo");
+      }
+    } catch (updateError) {
+      console.error("Error updating database with new image path:", updateError);
+      // Continue anyway since the file was uploaded successfully
     }
     
     return {
       path: filePath,
-      publicUrl: publicUrlData.publicUrl
+      publicUrl
     };
   } catch (error) {
     console.error("Error in handleImageFileUpload:", error);

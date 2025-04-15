@@ -25,9 +25,13 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       
       // If it's not a full URL, get the full URL
       if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ykjtvqztcatrkinzfpov.supabase.co";
-        logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
+        logoUrl = `https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${logoUrl}`;
+        console.log("Constructed full logo URL for PDF:", logoUrl);
       }
+      
+      // Add cache busting parameter to prevent stale images
+      const timestamp = Date.now();
+      logoUrl = logoUrl.includes('?') ? `${logoUrl}&t=${timestamp}` : `${logoUrl}?t=${timestamp}`;
       
       // Fetch the image and convert to base64
       const base64Logo = await fetchImageAsBase64(logoUrl);
@@ -35,6 +39,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       if (base64Logo) {
         doc.addImage(base64Logo, 'PNG', 10, yPos, 40, 40);
         yPos += 5;
+        console.log("Successfully added logo to PDF");
       } else {
         console.error("Failed to fetch logo for PDF");
       }

@@ -29,24 +29,22 @@ const AvatarImage = React.forwardRef<
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
   const [retryCount, setRetryCount] = React.useState(0);
-  const maxRetries = 2;
+  const maxRetries = 3;
 
   React.useEffect(() => {
     if (typeof src === 'string') {
-      setImgSrc(src);
+      // Add timestamp to URL to prevent caching
+      const timestamp = new Date().getTime();
+      const newSrc = src.indexOf('?') === -1 ? `${src}?t=${timestamp}` : `${src}&t=${timestamp}`;
+      
+      setImgSrc(newSrc);
       setIsLoading(true);
       setHasError(false);
-      
-      // Add timestamp to URL to prevent caching if it's a retry
-      if (retryCount > 0 && src.indexOf('?') === -1) {
-        const timestamp = new Date().getTime();
-        setImgSrc(`${src}?t=${timestamp}`);
-        console.log("Retrying image load with timestamp:", `${src}?t=${timestamp}`);
-      }
+      console.log("Setting image source with cache busting:", newSrc);
     }
-  }, [src, retryCount]);
+  }, [src]);
 
-  // Add auto-retry logic
+  // Add auto-retry logic with exponential backoff
   React.useEffect(() => {
     if (hasError && retryCount < maxRetries) {
       const timer = setTimeout(() => {
@@ -54,11 +52,20 @@ const AvatarImage = React.forwardRef<
         setRetryCount(prev => prev + 1);
         setHasError(false);
         setIsLoading(true);
-      }, 1000); // Wait 1 second before retry
+        
+        // Add timestamp to URL to prevent caching on retry
+        if (imgSrc) {
+          const timestamp = new Date().getTime();
+          const newSrc = imgSrc.indexOf('?') === -1 
+            ? `${imgSrc}?t=${timestamp}&retry=${retryCount + 1}` 
+            : `${imgSrc}&t=${timestamp}&retry=${retryCount + 1}`;
+          setImgSrc(newSrc);
+        }
+      }, 1000 * Math.pow(2, retryCount)); // Exponential backoff: 1s, 2s, 4s...
       
       return () => clearTimeout(timer);
     }
-  }, [hasError, retryCount]);
+  }, [hasError, retryCount, imgSrc]);
 
   return (
     <>
@@ -88,8 +95,14 @@ const AvatarImage = React.forwardRef<
       )}
       {(isLoading || hasError) && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          {isLoading && !hasError && (
+          {isLoading && !hasError ? (
             <div className="h-1/3 w-1/3 animate-pulse rounded-full bg-muted-foreground/30" />
+          ) : (
+            hasError && retryCount >= maxRetries && (
+              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                {props.alt?.charAt(0) || '?'}
+              </div>
+            )
           )}
         </div>
       )}
