@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
-import { fetchImageAsBase64 } from '../utils/imageUtils';
+import { fetchImageAsBase64 } from '../utils/images/conversion';
 
 export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: number): Promise<number> => {
   const { businessDetails, profile, logoBase64 } = props;

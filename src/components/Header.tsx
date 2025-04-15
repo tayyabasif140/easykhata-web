@@ -19,7 +19,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { validateImageUrl } from "@/utils/templates/classic/utils/imageUtils";
+import { validateImageUrl } from "@/utils/templates/classic/utils/images/validation";
 
 export const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);

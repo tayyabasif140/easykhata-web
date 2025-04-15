@@ -1,7 +1,7 @@
 
 import { TemplateProps } from '../../invoiceTemplates';
 import { createClassicPDF } from './createClassicPDF';
-import { fetchImageAsBase64 } from './utils/imageUtils';
+import { fetchImageAsBase64 } from './utils/images/conversion';
 import { supabase } from '@/integrations/supabase/client';
 
 // Check if business_files bucket exists and is public

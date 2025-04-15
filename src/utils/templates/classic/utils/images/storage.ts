@@ -1,0 +1,200 @@
+
+/**
+ * Image storage and upload utilities
+ */
+
+/**
+ * Ensure business_files bucket exists and is public
+ */
+async function ensureBusinessFilesBucket(supabase) {
+  try {
+    console.log("Checking if business_files bucket exists and is public");
+    
+    // Try first to list buckets
+    try {
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      
+      if (error) {
+        console.error("Error checking buckets:", error);
+      } else {
+        const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
+        
+        if (!businessFilesBucket) {
+          console.log("business_files bucket doesn't exist, creating it");
+          const { error: createError } = await supabase.storage.createBucket('business_files', {
+            public: true,
+            fileSizeLimit: 5242880 // 5MB
+          });
+          
+          if (createError) {
+            console.error("Error creating business_files bucket:", createError);
+            return false;
+          }
+          
+          console.log("business_files bucket created successfully");
+          return true;
+        } else if (!businessFilesBucket.public) {
+          console.error("business_files bucket exists but is not public - trying to update");
+          
+          try {
+            const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+              public: true
+            });
+            
+            if (updateError) {
+              console.error("Error updating business_files bucket to public:", updateError);
+              return false;
+            }
+            
+            console.log("business_files bucket updated to be public");
+            return true;
+          } catch (e) {
+            console.error("Error updating bucket visibility:", e);
+            return false;
+          }
+        } else {
+          console.log("business_files bucket is correctly configured as public");
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error("Error listing buckets:", err);
+    }
+    
+    // If we couldn't determine bucket status, try to create it anyway
+    try {
+      console.log("Attempting to create or update business_files bucket");
+      const { error: createError } = await supabase.storage.createBucket('business_files', {
+        public: true,
+        fileSizeLimit: 5242880 // 5MB
+      });
+      
+      if (createError) {
+        if (createError.message.includes("already exists")) {
+          console.log("Bucket already exists, trying to update it");
+          const { error: updateError } = await supabase.storage.updateBucket('business_files', {
+            public: true
+          });
+          
+          if (updateError) {
+            console.error("Error updating business_files bucket:", updateError);
+            return false;
+          }
+          
+          console.log("business_files bucket updated successfully");
+          return true;
+        } else {
+          console.error("Error creating business_files bucket:", createError);
+          return false;
+        }
+      } else {
+        console.log("business_files bucket created successfully");
+        return true;
+      }
+    } catch (err) {
+      console.error("Error creating/updating bucket:", err);
+      return false;
+    }
+    
+    return false;
+  } catch (err) {
+    console.error("Error in bucket management:", err);
+    return false;
+  }
+}
+
+/**
+ * Convert a File to a public URL by uploading to Supabase
+ */
+export const uploadImageAndGetPublicUrl = async (file: File, userId: string, type: 'avatar' | 'logo' = 'avatar'): Promise<string | null> => {
+  console.log(`Starting upload of ${type} image:`, file.name, file.type, file.size);
+  
+  try {
+    // Import supabase from the client file to use the existing session
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    if (!userId) {
+      console.error("User ID is required for image upload");
+      return null;
+    }
+    
+    // Get user session to ensure we're authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error("No active session found. User must be logged in to upload files.");
+      return null;
+    }
+    
+    // Validate file type
+    const ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"];
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      console.error("Invalid file type. Please upload PNG or JPG images only.");
+      return null;
+    }
+    
+    // Validate file size (5MB max)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      console.error("File size should be less than 5MB.");
+      return null;
+    }
+    
+    // Create path and filename - use timestamp to prevent caching issues
+    const timestamp = Date.now();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${type}-${timestamp}.${fileExt}`;
+    const filePath = `${userId}/${type}/${fileName}`;
+    
+    console.log(`Uploading ${type} to path:`, filePath);
+    
+    // Ensure business_files bucket exists and is public
+    await ensureBusinessFilesBucket(supabase);
+    
+    // Upload the file with multiple retries
+    let uploadAttempt = 0;
+    const maxAttempts = 3;
+    let uploadError = null;
+    let data = null;
+    
+    while (uploadAttempt < maxAttempts) {
+      try {
+        console.log(`Upload attempt ${uploadAttempt + 1}/${maxAttempts}`);
+        const result = await supabase.storage
+          .from("business_files")
+          .upload(filePath, file, {
+            cacheControl: "0", // No caching
+            upsert: true // Overwrite if exists
+          });
+          
+        if (result.error) {
+          console.error(`Error on attempt ${uploadAttempt + 1}:`, result.error);
+          uploadError = result.error;
+          uploadAttempt++;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        } else {
+          data = result.data;
+          uploadError = null;
+          break; // Success, exit loop
+        }
+      } catch (err) {
+        console.error(`Error on attempt ${uploadAttempt + 1}:`, err);
+        uploadError = err;
+        uploadAttempt++;
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+      }
+    }
+    
+    if (uploadError || !data) {
+      console.error("All upload attempts failed:", uploadError);
+      return null;
+    }
+    
+    console.log("File uploaded successfully, path:", data.path);
+    
+    // Return the file path
+    return data.path;
+  } catch (error) {
+    console.error("Upload error:", error);
+    return null;
+  }
+};
