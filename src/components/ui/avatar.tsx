@@ -29,7 +29,7 @@ const AvatarImage = React.forwardRef<
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
   const [retryCount, setRetryCount] = React.useState(0);
-  const maxRetries = 3;
+  const maxRetries = 1; // Reduced from 3 to 1 for faster fallback
 
   React.useEffect(() => {
     if (typeof src === 'string') {
@@ -45,11 +45,11 @@ const AvatarImage = React.forwardRef<
     }
   }, [src]);
 
-  // Add auto-retry logic with exponential backoff
+  // Add auto-retry logic with shorter timeouts
   React.useEffect(() => {
     if (hasError && retryCount < maxRetries) {
       const timer = setTimeout(() => {
-        console.log(`Automatically retrying image load (${retryCount + 1}/${maxRetries})`);
+        console.log(`Retrying image load (${retryCount + 1}/${maxRetries})`);
         setRetryCount(prev => prev + 1);
         setHasError(false);
         setIsLoading(true);
@@ -62,9 +62,12 @@ const AvatarImage = React.forwardRef<
             : `${imgSrc}&t=${timestamp}&retry=${retryCount + 1}`;
           setImgSrc(newSrc);
         }
-      }, 1000 * Math.pow(2, retryCount)); // Exponential backoff: 1s, 2s, 4s...
+      }, 500); // Reduced from exponential backoff to fixed 500ms
       
       return () => clearTimeout(timer);
+    } else if (hasError) {
+      // Show fallback immediately after max retries
+      setIsLoading(false);
     }
   }, [hasError, retryCount, imgSrc]);
 
@@ -75,15 +78,16 @@ const AvatarImage = React.forwardRef<
           ref={ref}
           src={imgSrc}
           className={cn("aspect-square h-full w-full", 
-            isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300", 
+            isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-200", 
             className
           )}
+          loading="eager" // Add eager loading
           onLoad={() => {
-            console.log("Avatar image loaded successfully:", imgSrc);
+            console.log("Avatar image loaded successfully");
             setIsLoading(false);
           }}
           onError={(e) => {
-            console.error("Avatar image failed to load:", imgSrc, e);
+            console.error("Avatar image failed to load:", imgSrc);
             setHasError(true);
             setIsLoading(false);
           }}
@@ -95,11 +99,9 @@ const AvatarImage = React.forwardRef<
           {isLoading && !hasError ? (
             <div className="h-1/3 w-1/3 animate-pulse rounded-full bg-muted-foreground/30" />
           ) : (
-            hasError && retryCount >= maxRetries && (
-              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                {props.alt?.charAt(0) || '?'}
-              </div>
-            )
+            <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+              {props.alt?.charAt(0) || '?'}
+            </div>
           )}
         </div>
       )}

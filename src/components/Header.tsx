@@ -254,52 +254,7 @@ export const Header = () => {
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <Link to="/" className="flex items-center">
-            {businessDetails?.business_logo_url ? (
-              <div className="flex items-center space-x-2 relative">
-                {logoLoaded && !logoError ? (
-                  <img
-                    src={businessDetails.business_logo_url.startsWith('http') 
-                      ? businessDetails.business_logo_url 
-                      : getPublicImageUrl(businessDetails.business_logo_url) || '/placeholder.svg'}
-                    alt="Business Logo"
-                    className="h-10 w-10 object-contain"
-                    style={{ display: logoLoaded ? 'block' : 'none' }}
-                  />
-                ) : (
-                  <div className="h-10 w-10 bg-primary/10 flex items-center justify-center rounded-md">
-                    {!logoError ? (
-                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                    ) : (
-                      <span className="text-xs text-primary">Logo</span>
-                    )}
-                  </div>
-                )}
-                <img
-                  src={businessDetails.business_logo_url.startsWith('http') 
-                    ? businessDetails.business_logo_url 
-                    : getPublicImageUrl(businessDetails.business_logo_url) || '/placeholder.svg'}
-                  alt=""
-                  className="hidden"
-                  onLoad={() => {
-                    console.log("Logo loaded successfully");
-                    setLogoLoaded(true);
-                    setLogoError(false);
-                  }}
-                  onError={(e) => {
-                    console.error("Logo failed to load. URL was:", 
-                      businessDetails.business_logo_url.startsWith('http') 
-                        ? businessDetails.business_logo_url 
-                        : getPublicImageUrl(businessDetails.business_logo_url));
-                    setLogoError(true);
-                  }}
-                />
-                <h1 className="text-xl font-bold text-primary hidden md:block">
-                  {businessDetails?.business_name || "EasyKhata"}
-                </h1>
-              </div>
-            ) : (
-              <h1 className="text-2xl font-bold text-primary">EasyKhata</h1>
-            )}
+            <h1 className="text-2xl font-bold text-primary">EzKhata</h1>
           </Link>
         </div>
         <div className="flex items-center space-x-6">
@@ -439,11 +394,7 @@ export const Header = () => {
                           ? profile.avatar_url 
                           : getPublicImageUrl(profile.avatar_url) || ''}
                         alt="Profile" 
-                        className="w-full h-full object-cover"
-                        onLoad={() => {
-                          console.log("Avatar loaded successfully");
-                          setAvatarLoaded(true);
-                        }}
+                        onLoad={() => setAvatarLoaded(true)}
                       />
                       <AvatarFallback>
                         {profile.full_name?.charAt(0).toUpperCase() || 
