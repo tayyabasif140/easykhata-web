@@ -177,6 +177,15 @@ export default function Account() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Make sure both email and username are valid
+      if (!email) {
+        throw new Error('Email is required');
+      }
+      
+      if (!username) {
+        throw new Error('Username is required');
+      }
+      
       const updates = {
         id: userData.user.id,
         full_name: fullName,

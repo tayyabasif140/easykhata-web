@@ -248,6 +248,49 @@ export const ensureBusinessFilesBucket = async () => {
   }
 };
 
+// Add helper function to create storage policies
+export const createStoragePolicies = async () => {
+  try {
+    console.log("Setting up storage policies for business_files bucket");
+    
+    // First check if we have an active session
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      console.log("No active session, skipping policy setup");
+      return false;
+    }
+    
+    // Create a universal select policy for the bucket
+    const { error: selectError } = await supabase.rpc('create_storage_policy', {
+      bucket_id: 'business_files',
+      policy_name: 'Allow public read access',
+      definition: 'true', // Anyone can read
+      operation: 'SELECT'
+    });
+    
+    if (selectError && !selectError.message.includes('already exists')) {
+      console.error("Error creating SELECT policy:", selectError);
+    }
+    
+    // Create policy to allow authenticated users to upload to their own folder
+    const { error: insertError } = await supabase.rpc('create_storage_policy', {
+      bucket_id: 'business_files',
+      policy_name: 'Allow authenticated users to upload',
+      definition: '(auth.uid() = CAST(SPLIT_PART(name, \'/\', 1) AS UUID))', // Only allow users to upload to their own folder
+      operation: 'INSERT'
+    });
+    
+    if (insertError && !insertError.message.includes('already exists')) {
+      console.error("Error creating INSERT policy:", insertError);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error creating storage policies:", error);
+    return false;
+  }
+};
+
 // Add event listener for image updates
 window.addEventListener('profile-image-updated', () => {
   console.log('Profile image updated, refreshing...');
@@ -278,6 +321,11 @@ window.addEventListener('profile-image-updated', () => {
 ensureBusinessFilesBucket().then(success => {
   if (success) {
     console.log("Storage bucket setup completed successfully");
+    createStoragePolicies().then(policySuccess => {
+      if (policySuccess) {
+        console.log("Storage policies set up successfully");
+      }
+    });
   } else {
     console.warn("Storage bucket setup could not be completed automatically");
   }
