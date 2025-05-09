@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SignatureManager } from "@/components/SignatureManager";
 import { Textarea } from "@/components/ui/textarea";
 import { Camera, Upload, ImageIcon, X } from "lucide-react";
-import { validateImageUrl, handleImageFileUpload } from "@/utils/templates/classic/utils/imageUtils";
+import { validateImageUrl, handleImageFileUpload } from "@/utils/templates/classic/utils/images";
 
 export default function Account() {
   const [loading, setLoading] = useState(true);
@@ -180,6 +181,7 @@ export default function Account() {
         id: userData.user.id,
         full_name: fullName,
         username,
+        email: email, // Include email to prevent the not-null constraint violation
         updated_at: new Date(),
       };
 
