@@ -1,8 +1,7 @@
-
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
+import Header from "@/components/Header";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Building, Mail, Phone, FileText } from "lucide-react";
 import { BackButton } from "@/components/BackButton";

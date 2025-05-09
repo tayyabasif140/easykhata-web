@@ -1,61 +1,95 @@
-import { UserButton } from "@clerk/nextjs";
-import { MainNav } from "@/components/main-nav";
-import { Search } from "@/components/search";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { MobileSidebar } from "@/components/mobile-sidebar";
-import { siteConfig } from "@/config/site";
-import { ModeToggle } from "./mode-toggle";
+
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 
-export default function Header() {
-  const { user } = useUser();
-  const [businessName, setBusinessName] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+const Header = () => {
+  const [user, setUser] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchBusinessDetails() {
-      if (user && user.id) {
-        const { data, error } = await supabase
-          .from('business_details')
-          .select('business_name, business_logo_url')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching business details:", error);
-        } else if (data) {
-          setBusinessName(data.business_name);
-          setLogoUrl(data.business_logo_url);
-        }
+    async function getSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        setUser(data.session.user);
+        fetchUserAvatar(data.session.user.id);
       }
     }
 
-    fetchBusinessDetails();
-  }, [user]);
+    getSession();
+  }, []);
+
+  async function fetchUserAvatar(userId: string) {
+    try {
+      setAvatarLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching avatar:", error);
+      } else if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    } catch (err) {
+      console.error("Failed to fetch avatar:", err);
+    } finally {
+      setAvatarLoading(false);
+    }
+  }
+
+  async function signOut() {
+    try {
+      await supabase.auth.signOut();
+      window.location.href = '/auth';
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  }
 
   return (
     <div className="w-full py-4 border-b border-border/40 bg-background">
       <div className="container flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          {/* Replace user image and business name with EzKhata */}
           <h2 className="text-xl font-bold tracking-tight">EzKhata</h2>
         </div>
 
-        <nav className="flex items-center space-x-4">
-          <MainNav items={siteConfig.mainNav} />
-          <Search />
-        </nav>
-
         <div className="flex items-center space-x-4">
-          <ThemeToggle />
-          <ModeToggle />
-          <MobileSidebar isPro={false} apiLimitCount={0} />
-          <UserButton afterSignOutUrl="/" />
+          {user ? (
+            <div className="flex items-center space-x-4">
+              <Link to="/account">
+                <Avatar className="cursor-pointer">
+                  {avatarUrl ? (
+                    <AvatarImage 
+                      src={avatarUrl} 
+                      alt="User avatar" 
+                      loading="eager"
+                    />
+                  ) : (
+                    <AvatarFallback>
+                      {avatarLoading ? "..." : user.email?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              </Link>
+              <Button variant="outline" size="sm" onClick={signOut}>
+                Sign out
+              </Button>
+            </div>
+          ) : (
+            <Link to="/auth">
+              <Button>Sign in</Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Header;
