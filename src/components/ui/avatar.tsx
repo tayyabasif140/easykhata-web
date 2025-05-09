@@ -29,7 +29,7 @@ const AvatarImage = React.forwardRef<
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
   const [retryCount, setRetryCount] = React.useState(0);
-  const maxRetries = 1; // Reduced from 3 to 1 for faster fallback
+  const maxRetries = 0; // No retries, immediate fallback for faster loading
 
   React.useEffect(() => {
     if (typeof src === 'string') {
@@ -62,7 +62,7 @@ const AvatarImage = React.forwardRef<
             : `${imgSrc}&t=${timestamp}&retry=${retryCount + 1}`;
           setImgSrc(newSrc);
         }
-      }, 500); // Reduced from exponential backoff to fixed 500ms
+      }, 200); // Even shorter timeout for faster fallback (200ms)
       
       return () => clearTimeout(timer);
     } else if (hasError) {
@@ -82,6 +82,7 @@ const AvatarImage = React.forwardRef<
             className
           )}
           loading="eager" // Add eager loading
+          fetchPriority="high" // Add high priority fetching
           onLoad={() => {
             console.log("Avatar image loaded successfully");
             setIsLoading(false);
@@ -100,7 +101,7 @@ const AvatarImage = React.forwardRef<
             <div className="h-1/3 w-1/3 animate-pulse rounded-full bg-muted-foreground/30" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-              {props.alt?.charAt(0) || '?'}
+              {props.alt?.charAt(0)?.toUpperCase() || '?'}
             </div>
           )}
         </div>

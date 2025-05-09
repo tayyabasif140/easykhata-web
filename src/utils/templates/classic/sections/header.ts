@@ -10,6 +10,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
   // Add logo if available
   if (logoBase64) {
     try {
+      console.log("Adding logo to PDF from base64 data");
       // Position logo at the top left
       // The logo is already a full data URL, so we can use it directly
       doc.addImage(logoBase64, 'PNG', 10, yPos, 40, 40);
@@ -22,11 +23,12 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
   } else if (businessDetails?.business_logo_url) {
     try {
       // Try to fetch the logo from the URL
+      console.log("Fetching logo from URL:", businessDetails.business_logo_url);
       let logoUrl = businessDetails.business_logo_url;
       
       // If it's not a full URL, get the full URL
       if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
-        logoUrl = `https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${logoUrl}`;
+        logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoUrl}`;
         console.log("Constructed full logo URL for PDF:", logoUrl);
       }
       
@@ -34,15 +36,20 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       const timestamp = Date.now();
       logoUrl = logoUrl.includes('?') ? `${logoUrl}&t=${timestamp}` : `${logoUrl}?t=${timestamp}`;
       
-      // Fetch the image and convert to base64
-      const base64Logo = await fetchImageAsBase64(logoUrl);
-      
-      if (base64Logo) {
-        doc.addImage(base64Logo, 'PNG', 10, yPos, 40, 40);
-        yPos += 5;
-        console.log("Successfully added logo to PDF from URL");
-      } else {
-        console.error("Failed to fetch logo for PDF");
+      try {
+        // Fetch the image and convert to base64
+        const base64Logo = await fetchImageAsBase64(logoUrl);
+        
+        if (base64Logo) {
+          console.log("Successfully fetched and converted logo to base64");
+          doc.addImage(base64Logo, 'PNG', 10, yPos, 40, 40);
+          yPos += 5;
+          console.log("Successfully added logo to PDF from URL");
+        } else {
+          console.error("Failed to fetch logo for PDF");
+        }
+      } catch (fetchError) {
+        console.error("Error fetching logo for PDF:", fetchError);
       }
     } catch (logoError) {
       console.error("Error adding logo to PDF:", logoError);

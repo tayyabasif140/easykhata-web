@@ -73,7 +73,7 @@ async function ensureBusinessFilesBucket(supabase) {
       console.log("Attempting to create or update business_files bucket");
       const { error: createError } = await supabase.storage.createBucket('business_files', {
         public: true,
-        fileSizeLimit: 5242880 // 5MB
+        fileSizeLimit: 2097152 // Reduced to 2MB max
       });
       
       if (createError) {
@@ -202,7 +202,7 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
     }
     
     // Validate file size and optimize if needed
-    const MAX_FILE_SIZE = 2 * 1024 * 1024; // Reduced to 2MB max
+    const MAX_FILE_SIZE = 1 * 1024 * 1024; // Reduced to 1MB max
     if (file.size > MAX_FILE_SIZE) {
       console.warn("File is large, optimizing before upload");
       try {
@@ -224,11 +224,11 @@ export const uploadImageAndGetPublicUrl = async (file: File, userId: string, typ
     // Ensure business_files bucket exists and is public
     await ensureBusinessFilesBucket(supabase);
     
-    // Upload the file with a single attempt for speed
+    // Upload the file with better cache control
     const { data, error } = await supabase.storage
       .from("business_files")
       .upload(filePath, file, {
-        cacheControl: "max-age=3600", // Cache for 1 hour
+        cacheControl: "public, max-age=31536000", // Cache for 1 year
         upsert: true // Overwrite if exists
       });
       

@@ -197,16 +197,66 @@ export function CreateInvoiceDialog() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
+  const [showLogoSelector, setShowLogoSelector] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string>('');
 
   const handleSignatureSelect = (signatureUrl: string) => {
     setSelectedSignature(signatureUrl);
     setShowSignatureCanvas(false);
   };
 
+  const handleLogoSelect = async (logoUrl: string) => {
+    setSelectedLogo(logoUrl);
+    setShowLogoSelector(false);
+  };
+
+  // Fetch logos
+  const { data: logos } = useQuery({
+    queryKey: ['logos', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      try {
+        const { data, error } = await supabase.storage
+          .from('business_files')
+          .list(`${profile.id}/logo`, {
+            sortBy: { column: 'name', order: 'desc' }
+          });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching logos:", error);
+        return [];
+      }
+    },
+    enabled: !!profile?.id
+  });
+
   async function generatePDF() {
     try {
       const template = businessDetails?.invoice_template || 'classic';
       console.log('Generating PDF with template:', template);
+      
+      // Convert logo URL to base64 if available
+      let logoBase64 = null;
+      if (selectedLogo || businessDetails?.business_logo_url) {
+        const logoUrl = selectedLogo || businessDetails?.business_logo_url;
+        if (logoUrl) {
+          // This will be handled in createClassicPDF
+          console.log("Logo will be fetched during PDF generation:", logoUrl);
+        }
+      }
+      
+      // Convert signature URL to base64 if available
+      let signatureBase64 = null;
+      if (selectedSignature || profile?.digital_signature_url) {
+        const signatureUrl = selectedSignature || profile?.digital_signature_url;
+        if (signatureUrl) {
+          // This will be handled in createClassicPDF
+          console.log("Signature will be fetched during PDF generation:", signatureUrl);
+        }
+      }
       
       // Prepare invoice data
       const invoiceData = {
@@ -223,13 +273,14 @@ export function CreateInvoiceDialog() {
         profile: {
           ...profile,
           digital_signature_url: selectedSignature || profile?.digital_signature_url
-        }
+        },
+        logoBase64,
+        signatureBase64
       };
       
       console.log('Invoice data prepared:', invoiceData);
-      console.log('Business logo URL:', businessDetails?.business_logo_url);
+      console.log('Business logo URL:', selectedLogo || businessDetails?.business_logo_url);
       console.log('Digital signature URL:', selectedSignature || profile?.digital_signature_url);
-      console.log('Privacy policy included:', !!businessDetails?.privacy_policy);
       
       return await generateInvoicePDF(template, invoiceData);
     } catch (error) {
@@ -450,6 +501,8 @@ export function CreateInvoiceDialog() {
     setTax(0);
     setDueDate(undefined);
     setSelectedTaxes({});
+    setSelectedSignature("");
+    setSelectedLogo("");
   };
 
   return (
@@ -649,6 +702,98 @@ export function CreateInvoiceDialog() {
             </div>
           </div>
 
+          {/* Logo Selection Section */}
+          <div className="space-y-2">
+            <Label>Business Logo</Label>
+            <div>
+              {showLogoSelector ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                    {businessDetails?.business_logo_url && (
+                      <div className={`border rounded-lg p-4 ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}>
+                        <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                          <img
+                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                            alt="Default logo"
+                            className="h-20 w-auto object-contain"
+                          />
+                        </div>
+                        <div className="flex justify-center">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleLogoSelect(businessDetails.business_logo_url)}
+                          >
+                            {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
+                      const logoPath = `${profile?.id}/logo/${logo.name}`;
+                      if (businessDetails?.business_logo_url === logoPath) return null;
+                      
+                      return (
+                        <div 
+                          key={logo.id} 
+                          className={`border rounded-lg p-4 ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                        >
+                          <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                            <img
+                              src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoPath}`}
+                              alt={`Logo ${logo.name}`}
+                              className="h-20 w-auto object-contain"
+                            />
+                          </div>
+                          <div className="flex justify-center">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleLogoSelect(logoPath)}
+                            >
+                              {selectedLogo === logoPath ? 'Selected' : 'Select'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => setShowLogoSelector(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  {(selectedLogo || businessDetails?.business_logo_url) ? (
+                    <div className="flex flex-col space-y-2">
+                      <img 
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
+                        alt="Business logo" 
+                        className="h-20 border border-gray-200 bg-white p-2"
+                      />
+                      <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                        Change Logo
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                      Select Logo
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Signature section */}
           {showSignatureCanvas ? (
             <div className="space-y-4">
               <Label>Signature</Label>

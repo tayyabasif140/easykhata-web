@@ -18,9 +18,10 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
   // Add signature image if available
   if (signatureBase64) {
     try {
+      console.log("Adding signature to PDF from base64");
       // Signature is already a full data URL, so we can use it directly
-      // Adjust position for better placement (higher up)
-      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition - 30, 60, 30);
+      // Adjust position for better placement
+      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition - 25, 60, 25);
     } catch (e) {
       console.error("Error adding signature image:", e);
       // If signature image fails, fall back to signature line

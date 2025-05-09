@@ -1,9 +1,12 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Brush, Image, Trash } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface SignatureManagerProps {
   userId: string;
@@ -19,6 +22,7 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureDataURL, setSignatureDataURL] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [signatureName, setSignatureName] = useState<string>("My Signature");
 
   // Fetch all user signatures
   const { data: signatures, isLoading } = useQuery({
@@ -175,7 +179,9 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       const fetchResponse = await fetch(signatureDataURL);
       const blob = await fetchResponse.blob();
       
-      const filePath = `${userId}/signatures/drawn-signature-${Date.now()}.png`;
+      // Format name to be URL-safe
+      const safeName = signatureName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+      const filePath = `${userId}/signatures/${safeName}-${Date.now()}.png`;
       console.log('Uploading drawn signature:', filePath);
       
       const { data, error: uploadError } = await supabase.storage
@@ -203,9 +209,10 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       // Select the newly saved signature
       onSignatureSelect(filePath);
       
-      // Reset canvas
+      // Reset canvas and name
       clearCanvas();
       setSignatureMode('upload');
+      setSignatureName("My Signature");
       
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['signatures', userId] });
@@ -302,7 +309,9 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       }
       
       const file = e.target.files[0];
-      const filePath = `${userId}/signatures/${Date.now()}_${file.name}`;
+      // Format name to be URL-safe
+      const safeName = signatureName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+      const filePath = `${userId}/signatures/${safeName}-${Date.now()}.png`;
       
       const { data, error: uploadError } = await supabase.storage
         .from('business_files')
@@ -328,6 +337,9 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       // Select the newly uploaded signature
       onSignatureSelect(filePath);
       
+      // Reset name
+      setSignatureName("My Signature");
+      
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['signatures', userId] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -342,6 +354,18 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
       setIsUploading(false);
     }
   };
+
+  function getSignatureNameFromPath(path: string): string {
+    try {
+      const filename = path.split('/').pop() || '';
+      // Remove timestamp and extension
+      let name = filename.split('-')[0];
+      // Convert dashes back to spaces and capitalize words
+      return name.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    } catch (e) {
+      return "Signature";
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -368,6 +392,16 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
 
       {signatureMode === 'upload' ? (
         <div>
+          <div className="mb-4 space-y-2">
+            <Label htmlFor="signatureName">Signature Name</Label>
+            <Input
+              id="signatureName"
+              value={signatureName}
+              onChange={(e) => setSignatureName(e.target.value)}
+              placeholder="Enter a name for your signature"
+              className="w-full"
+            />
+          </div>
           <div className="mb-4">
             <input
               id="digitalSignature"
@@ -393,10 +427,11 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
                       key={signature.id} 
                       className={`border rounded-lg p-4 ${isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
                     >
+                      <div className="font-medium mb-1">{getSignatureNameFromPath(signature.name)}</div>
                       <div className="relative mb-2 bg-white">
                         <img
-                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signaturePath}`}
-                          alt={`Signature ${signature.name}`}
+                          src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signaturePath}?t=${Date.now()}`}
+                          alt={`Signature ${getSignatureNameFromPath(signature.name)}`}
                           className="h-20 w-auto object-contain"
                         />
                       </div>
@@ -429,6 +464,16 @@ export function SignatureManager({ userId, onSignatureSelect, defaultSignature }
         </div>
       ) : (
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="drawSignatureName">Signature Name</Label>
+            <Input
+              id="drawSignatureName"
+              value={signatureName}
+              onChange={(e) => setSignatureName(e.target.value)}
+              placeholder="Enter a name for your signature"
+              className="w-full"
+            />
+          </div>
           <div className="border rounded-lg p-2 bg-white">
             <canvas
               ref={canvasRef}
