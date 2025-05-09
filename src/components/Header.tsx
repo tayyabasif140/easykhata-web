@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
+import { ModeToggle } from "./mode-toggle";
+import { Settings } from "lucide-react";
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -62,6 +64,12 @@ const Header = () => {
         <div className="flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
+              <ModeToggle />
+              <Link to="/account" className="flex items-center space-x-2">
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </Link>
               <Link to="/account">
                 <Avatar className="cursor-pointer">
                   {avatarUrl ? (
@@ -77,9 +85,6 @@ const Header = () => {
                   )}
                 </Avatar>
               </Link>
-              <Button variant="outline" size="sm" onClick={signOut}>
-                Sign out
-              </Button>
             </div>
           ) : (
             <Link to="/auth">
