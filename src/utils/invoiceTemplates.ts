@@ -1,7 +1,9 @@
+
 import jsPDF from 'jspdf';
 import { classicTemplate } from './templates/classic';
 import { professionalTemplate } from './professionalTemplate';
 import { diamondTemplate } from './diamondTemplate';
+import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
 
 export interface TemplateProps {
   customerName: string;
@@ -39,6 +41,8 @@ export interface InvoiceData {
   dueDate?: Date;
   businessDetails: any;
   profile: any;
+  logoBase64?: string | null;
+  signatureBase64?: string | null;
 }
 
 export const templates = {
@@ -67,7 +71,9 @@ const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
     total: isNaN(data.total) ? 0 : data.total || 0,
     dueDate: data.dueDate,
     businessDetails: data.businessDetails || {},
-    profile: data.profile || {}
+    profile: data.profile || {},
+    logoBase64: data.logoBase64 || null,
+    signatureBase64: data.signatureBase64 || null
   };
   
   console.log("Sanitized invoice data:", sanitizedData);
@@ -94,6 +100,34 @@ const createFallbackPDF = (error: any): jsPDF => {
 export const generateInvoicePDF = async (templateName: string, data: InvoiceData): Promise<jsPDF> => {
   try {
     console.log(`Generating invoice PDF with template: ${templateName}`, data);
+    
+    // Process logo if provided as a path
+    if (data.businessDetails?.business_logo_url && !data.logoBase64) {
+      try {
+        let logoUrl = data.businessDetails.business_logo_url;
+        if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+          logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoUrl}`;
+        }
+        console.log("Attempting to fetch logo for PDF:", logoUrl);
+        data.logoBase64 = await fetchImageAsBase64(logoUrl);
+      } catch (error) {
+        console.error("Error fetching logo for PDF:", error);
+      }
+    }
+    
+    // Process signature if provided as a path
+    if (data.profile?.digital_signature_url && !data.signatureBase64) {
+      try {
+        let signatureUrl = data.profile.digital_signature_url;
+        if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
+          signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signatureUrl}`;
+        }
+        console.log("Attempting to fetch signature for PDF:", signatureUrl);
+        data.signatureBase64 = await fetchImageAsBase64(signatureUrl);
+      } catch (error) {
+        console.error("Error fetching signature for PDF:", error);
+      }
+    }
     
     const templateKey = (templateName && templateName in templates) ? 
       templateName as keyof typeof templates : 

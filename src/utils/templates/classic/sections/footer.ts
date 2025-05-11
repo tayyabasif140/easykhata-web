@@ -2,8 +2,9 @@
 import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
 import { addPrivacyPolicy } from '../utils/privacyPolicy';
+import { fetchImageAsBase64 } from '../utils/images/conversion';
 
-export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
+export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<void> => {
   const { businessDetails, profile, signatureBase64 } = props;
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -25,6 +26,50 @@ export const renderFooter = (doc: jsPDF, props: TemplateProps): void => {
     } catch (e) {
       console.error("Error adding signature image:", e);
       // If signature image fails, fall back to signature line
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+    }
+  } else if (profile?.digital_signature_url) {
+    try {
+      // Try to fetch the signature from URL
+      console.log("Fetching signature from URL:", profile.digital_signature_url);
+      let signatureUrl = profile.digital_signature_url;
+      
+      // If it's not a full URL, get the full URL
+      if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
+        signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signatureUrl}`;
+        console.log("Constructed full signature URL for PDF:", signatureUrl);
+      }
+      
+      // Add cache busting parameter to prevent stale images
+      const timestamp = Date.now();
+      signatureUrl = signatureUrl.includes('?') ? `${signatureUrl}&t=${timestamp}` : `${signatureUrl}?t=${timestamp}`;
+      
+      try {
+        const base64Signature = await fetchImageAsBase64(signatureUrl);
+        
+        if (base64Signature) {
+          console.log("Successfully fetched and converted signature to base64");
+          doc.addImage(base64Signature, 'PNG', 10, signaturePosition - 25, 60, 25);
+          console.log("Successfully added signature to PDF from URL");
+        } else {
+          console.error("Failed to fetch signature for PDF");
+          // Fall back to signature line
+          doc.setDrawColor(0);
+          doc.setLineWidth(0.5);
+          doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+        }
+      } catch (fetchError) {
+        console.error("Error fetching signature for PDF:", fetchError);
+        // Fall back to signature line
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+      }
+    } catch (signatureError) {
+      console.error("Error adding signature to PDF:", signatureError);
+      // Fall back to signature line
       doc.setDrawColor(0);
       doc.setLineWidth(0.5);
       doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);

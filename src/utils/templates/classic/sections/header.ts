@@ -28,6 +28,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       
       // If it's not a full URL, get the full URL
       if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+        // Make sure to use the complete URL including the storage bucket
         logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoUrl}`;
         console.log("Constructed full logo URL for PDF:", logoUrl);
       }
@@ -36,8 +37,8 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       const timestamp = Date.now();
       logoUrl = logoUrl.includes('?') ? `${logoUrl}&t=${timestamp}` : `${logoUrl}?t=${timestamp}`;
       
+      // Fetch the image and convert to base64
       try {
-        // Fetch the image and convert to base64
         const base64Logo = await fetchImageAsBase64(logoUrl);
         
         if (base64Logo) {
