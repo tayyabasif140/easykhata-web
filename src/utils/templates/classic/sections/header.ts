@@ -12,7 +12,6 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
     try {
       console.log("Adding logo to PDF from base64 data");
       // Position logo at the top left
-      // The logo is already a full data URL, so we can use it directly
       doc.addImage(logoBase64, 'PNG', 10, yPos, 40, 40);
       // Add some space from the left for the company name to avoid overlapping with logo
       yPos += 5;
@@ -37,8 +36,8 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       const timestamp = Date.now();
       logoUrl = logoUrl.includes('?') ? `${logoUrl}&t=${timestamp}` : `${logoUrl}?t=${timestamp}`;
       
-      // Fetch the image and convert to base64
       try {
+        console.log("Attempting to fetch image as base64:", logoUrl);
         const base64Logo = await fetchImageAsBase64(logoUrl);
         
         if (base64Logo) {
@@ -47,7 +46,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
           yPos += 5;
           console.log("Successfully added logo to PDF from URL");
         } else {
-          console.error("Failed to fetch logo for PDF");
+          console.error("Failed to fetch logo for PDF - base64Logo is null or empty");
         }
       } catch (fetchError) {
         console.error("Error fetching logo for PDF:", fetchError);

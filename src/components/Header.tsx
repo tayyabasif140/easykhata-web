@@ -36,7 +36,19 @@ const Header = () => {
       if (error) {
         console.error("Error fetching avatar:", error);
       } else if (data?.avatar_url) {
-        setAvatarUrl(data.avatar_url);
+        // Add a cache-busting timestamp to the avatar URL
+        const timestamp = new Date().getTime();
+        let url = data.avatar_url;
+        
+        // If it's a relative path, construct the full URL
+        if (!url.startsWith('http') && !url.startsWith('data:')) {
+          url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${url}`;
+        }
+        
+        // Add the timestamp parameter to prevent caching
+        const finalUrl = url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`;
+        setAvatarUrl(finalUrl);
+        console.log("Set avatar URL to:", finalUrl);
       }
     } catch (err) {
       console.error("Failed to fetch avatar:", err);
@@ -55,7 +67,7 @@ const Header = () => {
   }
 
   return (
-    <div className="w-full py-4 border-b border-border/40 bg-background">
+    <header className="w-full py-4 border-b border-border/40 bg-background sticky top-0 z-10">
       <div className="container flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-bold tracking-tight">EzKhata</h2>
@@ -65,7 +77,7 @@ const Header = () => {
           {user ? (
             <div className="flex items-center space-x-4">
               <ModeToggle />
-              <Link to="/account" className="flex items-center space-x-2">
+              <Link to="/account">
                 <Button variant="ghost" size="icon">
                   <Settings className="h-5 w-5" />
                 </Button>
@@ -77,6 +89,7 @@ const Header = () => {
                       src={avatarUrl} 
                       alt="User avatar" 
                       loading="eager"
+                      fetchPriority="high"
                     />
                   ) : (
                     <AvatarFallback>
@@ -93,7 +106,7 @@ const Header = () => {
           )}
         </div>
       </div>
-    </div>
+    </header>
   );
 };
 

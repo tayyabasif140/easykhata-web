@@ -29,7 +29,7 @@ const AvatarImage = React.forwardRef<
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
   const [retryCount, setRetryCount] = React.useState(0);
-  const maxRetries = 0; // No retries, immediate fallback for faster loading
+  const maxRetries = 2;
 
   React.useEffect(() => {
     if (typeof src === 'string') {
@@ -62,12 +62,9 @@ const AvatarImage = React.forwardRef<
             : `${imgSrc}&t=${timestamp}&retry=${retryCount + 1}`;
           setImgSrc(newSrc);
         }
-      }, 200); // Even shorter timeout for faster fallback (200ms)
+      }, 500);
       
       return () => clearTimeout(timer);
-    } else if (hasError) {
-      // Show fallback immediately after max retries
-      setIsLoading(false);
     }
   }, [hasError, retryCount, imgSrc]);
 
@@ -81,8 +78,8 @@ const AvatarImage = React.forwardRef<
             isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-200", 
             className
           )}
-          loading="eager" // Add eager loading
-          fetchPriority="high" // Add high priority fetching
+          loading="eager"
+          fetchPriority="high"
           onLoad={() => {
             console.log("Avatar image loaded successfully");
             setIsLoading(false);
@@ -90,7 +87,6 @@ const AvatarImage = React.forwardRef<
           onError={(e) => {
             console.error("Avatar image failed to load:", imgSrc);
             setHasError(true);
-            setIsLoading(false);
           }}
           {...props}
         />

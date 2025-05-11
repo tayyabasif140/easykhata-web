@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import { classicTemplate } from './templates/classic';
 import { professionalTemplate } from './professionalTemplate';
@@ -109,7 +108,15 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
           logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoUrl}`;
         }
         console.log("Attempting to fetch logo for PDF:", logoUrl);
-        data.logoBase64 = await fetchImageAsBase64(logoUrl);
+        
+        // Add cache busting to logo URL
+        const timestamp = new Date().getTime();
+        const logoUrlWithCache = logoUrl.includes('?') 
+          ? `${logoUrl}&t=${timestamp}` 
+          : `${logoUrl}?t=${timestamp}`;
+        
+        data.logoBase64 = await fetchImageAsBase64(logoUrlWithCache);
+        console.log("Logo base64 data fetched:", data.logoBase64 ? "Successfully" : "Failed");
       } catch (error) {
         console.error("Error fetching logo for PDF:", error);
       }
@@ -123,7 +130,15 @@ export const generateInvoicePDF = async (templateName: string, data: InvoiceData
           signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signatureUrl}`;
         }
         console.log("Attempting to fetch signature for PDF:", signatureUrl);
-        data.signatureBase64 = await fetchImageAsBase64(signatureUrl);
+        
+        // Add cache busting to signature URL
+        const timestamp = new Date().getTime();
+        const signatureUrlWithCache = signatureUrl.includes('?') 
+          ? `${signatureUrl}&t=${timestamp}` 
+          : `${signatureUrl}?t=${timestamp}`;
+        
+        data.signatureBase64 = await fetchImageAsBase64(signatureUrlWithCache);
+        console.log("Signature base64 data fetched:", data.signatureBase64 ? "Successfully" : "Failed");
       } catch (error) {
         console.error("Error fetching signature for PDF:", error);
       }
@@ -238,13 +253,12 @@ const createSimplifiedPDF = (data: InvoiceData): jsPDF => {
     pdf.setFont('helvetica', 'bold');
     pdf.text(signatureText, 20, signaturePosition);
     
-    if (data.profile?.digital_signature_url) {
+    if (data.signatureBase64) {
       try {
-        pdf.setDrawColor(0);
-        pdf.setLineWidth(0.5);
-        pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
+        pdf.addImage(data.signatureBase64, 'PNG', 20, signaturePosition - 20, 50, 20);
       } catch (e) {
         console.error("Error adding signature to simplified PDF:", e);
+        pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
       }
     } else {
       pdf.line(20, signaturePosition + 10, 90, signaturePosition + 10);
