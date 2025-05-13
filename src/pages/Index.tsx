@@ -19,7 +19,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { templates } from "@/utils/invoiceTemplates";
-
 interface TaxPayment {
   id: string;
   amount: number;
@@ -27,17 +26,17 @@ interface TaxPayment {
   payment_date: string;
   user_id: string;
 }
-
 interface MonthlyData {
   month: string;
   revenue: number;
   expenses: number;
   growth: number;
 }
-
 const Index = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const queryClient = useQueryClient();
   const [timeRange, setTimeRange] = useState<'1D' | '30D' | '1Y' | '5Y'>('30D');
   const [showTaxDialog, setShowTaxDialog] = useState(false);
@@ -46,149 +45,143 @@ const Index = () => {
   const [taxDate, setTaxDate] = useState<Date>();
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
-
-  const { data: customers } = useQuery({
+  const {
+    data: customers
+  } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', userData.user.id);
+      const {
+        data,
+        error
+      } = await supabase.from('customers').select('*').eq('user_id', userData.user.id);
       if (error) throw error;
       return data;
     }
   });
-
-  const { data: invoices } = useQuery({
+  const {
+    data: invoices
+  } = useQuery({
     queryKey: ['invoices'],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       if (!userData.user) return [];
-
-      const { data, error } = await supabase
-        .from('invoices')
-        .select(`
+      const {
+        data,
+        error
+      } = await supabase.from('invoices').select(`
           *,
           customers (
             name,
             company
           )
-        `)
-        .eq('user_id', userData.user.id)
-        .order('created_at', { ascending: false });
-
+        `).eq('user_id', userData.user.id).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
       return data;
     }
   });
-
-  const { data: businessTip } = useQuery({
+  const {
+    data: businessTip
+  } = useQuery({
     queryKey: ['businessTip'],
     queryFn: async () => {
-      const { data } = await supabase.functions.invoke('generate-business-tips');
+      const {
+        data
+      } = await supabase.functions.invoke('generate-business-tips');
       return data.tip;
     },
-    refetchInterval: 1000 * 60 * 60, // Refresh every hour
+    refetchInterval: 1000 * 60 * 60 // Refresh every hour
   });
-
   const handleDeleteCustomer = async (customerId: string) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', customerId)
-        .eq('user_id', userData.user.id);
-
+      const {
+        error
+      } = await supabase.from('customers').delete().eq('id', customerId).eq('user_id', userData.user.id);
       if (error) throw error;
-
       toast({
         title: "Success",
-        description: "Customer deleted successfully",
+        description: "Customer deleted successfully"
       });
-
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({
+        queryKey: ['customers']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['invoices']
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
-      const { error } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceId);
-
+      const {
+        error
+      } = await supabase.from('invoices').delete().eq('id', invoiceId);
       if (error) throw error;
-
       toast({
         title: "Success",
-        description: "Invoice deleted successfully",
+        description: "Invoice deleted successfully"
       });
-
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({
+        queryKey: ['invoices']
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleMarkAsPaid = async (invoiceId: string) => {
     try {
-      const { error } = await supabase
-        .from('invoices')
-        .update({ status: 'paid' })
-        .eq('id', invoiceId);
-
+      const {
+        error
+      } = await supabase.from('invoices').update({
+        status: 'paid'
+      }).eq('id', invoiceId);
       if (error) throw error;
-
       toast({
         title: "Success",
-        description: "Invoice marked as paid",
+        description: "Invoice marked as paid"
       });
-
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({
+        queryKey: ['invoices']
+      });
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
-  const totalPaidInvoices = invoices?.reduce((sum, invoice) => 
-    invoice.status === 'paid' ? sum + Number(invoice.total_amount) : sum, 0
-  ) || 0;
-
-  const totalUnpaidInvoices = invoices?.reduce((sum, invoice) => 
-    invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0
-  ) || 0;
-
+  const totalPaidInvoices = invoices?.reduce((sum, invoice) => invoice.status === 'paid' ? sum + Number(invoice.total_amount) : sum, 0) || 0;
+  const totalUnpaidInvoices = invoices?.reduce((sum, invoice) => invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0) || 0;
   const calculateSalesData = () => {
     if (!invoices?.length) return [];
-    
     const now = new Date();
-    const data: { [key: string]: number } = {};
-    
+    const data: {
+      [key: string]: number;
+    } = {};
     let startDate = new Date();
     let format: 'hour' | 'day' | 'month' | 'year';
-    
-    switch(timeRange) {
+    switch (timeRange) {
       case '1D':
         startDate.setDate(now.getDate() - 1);
         format = 'hour';
@@ -206,102 +199,88 @@ const Index = () => {
         format = 'year';
         break;
     }
-
     if (format === 'hour') {
       for (let i = 0; i < 24; i++) {
         data[`${i}:00`] = 0;
       }
     }
-
-    invoices
-      .filter(invoice => {
-        const date = new Date(invoice.created_at);
-        return invoice.status === 'paid' && date >= startDate;
-      })
-      .forEach(invoice => {
-        const date = new Date(invoice.created_at);
-        let key;
-        switch(format) {
-          case 'hour':
-            key = `${date.getHours()}:00`;
-            break;
-          case 'day':
-            key = date.toLocaleDateString('default', { month: 'short', day: 'numeric' });
-            break;
-          case 'month':
-            key = date.toLocaleDateString('default', { month: 'short' });
-            break;
-          case 'year':
-            key = date.getFullYear().toString();
-            break;
-        }
-        data[key] = (data[key] || 0) + Number(invoice.total_amount);
-      });
-
-    return Object.entries(data)
-      .map(([label, amount]) => ({
-        label,
-        amount: parseFloat(amount.toFixed(2))
-      }));
+    invoices.filter(invoice => {
+      const date = new Date(invoice.created_at);
+      return invoice.status === 'paid' && date >= startDate;
+    }).forEach(invoice => {
+      const date = new Date(invoice.created_at);
+      let key;
+      switch (format) {
+        case 'hour':
+          key = `${date.getHours()}:00`;
+          break;
+        case 'day':
+          key = date.toLocaleDateString('default', {
+            month: 'short',
+            day: 'numeric'
+          });
+          break;
+        case 'month':
+          key = date.toLocaleDateString('default', {
+            month: 'short'
+          });
+          break;
+        case 'year':
+          key = date.getFullYear().toString();
+          break;
+      }
+      data[key] = (data[key] || 0) + Number(invoice.total_amount);
+    });
+    return Object.entries(data).map(([label, amount]) => ({
+      label,
+      amount: parseFloat(amount.toFixed(2))
+    }));
   };
-
   const salesData = calculateSalesData();
-
-  const { data: taxPayments } = useQuery({
+  const {
+    data: taxPayments
+  } = useQuery({
     queryKey: ['taxPayments'],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('tax_payments')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .order('payment_date', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('tax_payments').select('*').eq('user_id', userData.user.id).order('payment_date', {
+        ascending: false
+      });
       if (error) throw error;
       return data as TaxPayment[];
     }
   });
-
   const handlePreviewInvoice = async (invoice: any) => {
     try {
-      const { data: invoiceItems, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', invoice.id);
-
+      const {
+        data: invoiceItems,
+        error: itemsError
+      } = await supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id);
       if (itemsError) throw itemsError;
-
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', invoice.customer_id)
-        .single();
-
+      const {
+        data: customer,
+        error: customerError
+      } = await supabase.from('customers').select('*').eq('id', invoice.customer_id).single();
       if (customerError) throw customerError;
-
-      const { data: businessDetails, error: businessError } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', invoice.user_id)
-        .single();
-
+      const {
+        data: businessDetails,
+        error: businessError
+      } = await supabase.from('business_details').select('*').eq('user_id', invoice.user_id).single();
       if (businessError) throw businessError;
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', invoice.user_id)
-        .single();
-
+      const {
+        data: profile,
+        error: profileError
+      } = await supabase.from('profiles').select('*').eq('id', invoice.user_id).single();
       if (profileError) throw profileError;
-
       const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
-
       if (!templateFn) throw new Error('Invalid template');
-
       const doc = await templateFn({
         customerName: customer.name,
         companyName: customer.company || '',
@@ -319,9 +298,7 @@ const Index = () => {
         businessDetails,
         profile
       });
-
       const pdfDataUrl = doc.output('dataurlstring');
-      
       const previewWindow = window.open();
       if (previewWindow) {
         previewWindow.document.write(`
@@ -344,49 +321,35 @@ const Index = () => {
       toast({
         title: "Error",
         description: "Failed to preview invoice. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleDownloadInvoice = async (invoice: any) => {
     try {
-      const { data: invoiceItems, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', invoice.id);
-
+      const {
+        data: invoiceItems,
+        error: itemsError
+      } = await supabase.from('invoice_items').select('*').eq('invoice_id', invoice.id);
       if (itemsError) throw itemsError;
-
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', invoice.customer_id)
-        .single();
-
+      const {
+        data: customer,
+        error: customerError
+      } = await supabase.from('customers').select('*').eq('id', invoice.customer_id).single();
       if (customerError) throw customerError;
-
-      const { data: businessDetails, error: businessError } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', invoice.user_id)
-        .single();
-
+      const {
+        data: businessDetails,
+        error: businessError
+      } = await supabase.from('business_details').select('*').eq('user_id', invoice.user_id).single();
       if (businessError) throw businessError;
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', invoice.user_id)
-        .single();
-
+      const {
+        data: profile,
+        error: profileError
+      } = await supabase.from('profiles').select('*').eq('id', invoice.user_id).single();
       if (profileError) throw profileError;
-
       const template = businessDetails?.invoice_template || 'classic';
       const templateFn = templates[template as keyof typeof templates];
-
       if (!templateFn) throw new Error('Invalid template');
-
       const doc = await templateFn({
         customerName: customer.name,
         companyName: customer.company || '',
@@ -404,59 +367,63 @@ const Index = () => {
         businessDetails,
         profile
       });
-
       doc.save(`invoice_${invoice.id}.pdf`);
-
       toast({
         title: "Success",
-        description: "Invoice downloaded successfully!",
+        description: "Invoice downloaded successfully!"
       });
     } catch (error: any) {
       console.error('Error downloading invoice:', error);
       toast({
         title: "Error",
         description: "Failed to download invoice. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const addTaxPayment = useMutation({
-    mutationFn: async (payment: { amount: number; description: string; payment_date: Date }) => {
-      const { data: userData } = await supabase.auth.getUser();
+    mutationFn: async (payment: {
+      amount: number;
+      description: string;
+      payment_date: Date;
+    }) => {
+      const {
+        data: userData
+      } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('tax_payments')
-        .insert([{
-          ...payment,
-          user_id: userData.user.id
-        }]);
-
+      const {
+        error
+      } = await supabase.from('tax_payments').insert([{
+        ...payment,
+        user_id: userData.user.id
+      }]);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['taxPayments'] });
+      queryClient.invalidateQueries({
+        queryKey: ['taxPayments']
+      });
       setShowTaxDialog(false);
       setTaxAmount('');
       setTaxDescription('');
       setTaxDate(undefined);
       toast({
         title: "Success",
-        description: "Tax payment recorded successfully",
+        description: "Tax payment recorded successfully"
       });
     }
   });
-
   const calculateGrowthData = (): MonthlyData[] => {
     if (!invoices?.length) return [];
-    
-    const monthlyData: { [key: string]: MonthlyData } = {};
-    
+    const monthlyData: {
+      [key: string]: MonthlyData;
+    } = {};
     invoices.forEach(invoice => {
       const date = new Date(invoice.created_at);
-      const monthYear = date.toLocaleDateString('default', { month: 'short', year: 'numeric' });
-      
+      const monthYear = date.toLocaleDateString('default', {
+        month: 'short',
+        year: 'numeric'
+      });
       if (!monthlyData[monthYear]) {
         monthlyData[monthYear] = {
           month: monthYear,
@@ -465,37 +432,30 @@ const Index = () => {
           growth: 0
         };
       }
-      
       if (invoice.status === 'paid') {
         monthlyData[monthYear].revenue += Number(invoice.total_amount);
       }
     });
-
     const monthsArray = Object.values(monthlyData);
-    
     monthsArray.forEach((month, index) => {
       if (index > 0) {
         const prevRevenue = monthsArray[index - 1].revenue;
-        month.growth = prevRevenue ? ((month.revenue - prevRevenue) / prevRevenue) * 100 : 0;
+        month.growth = prevRevenue ? (month.revenue - prevRevenue) / prevRevenue * 100 : 0;
       }
     });
-
     return monthsArray;
   };
-
   const fetchInvoiceItems = async (invoiceId: string) => {
     try {
       console.log("Fetching invoice items for:", invoiceId);
-      const { data, error } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', invoiceId);
-
+      const {
+        data,
+        error
+      } = await supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId);
       if (error) {
         console.error("Error fetching invoice items:", error);
         throw error;
       }
-      
       console.log("Fetched invoice items:", data);
       return data;
     } catch (err) {
@@ -503,7 +463,6 @@ const Index = () => {
       return [];
     }
   };
-
   useEffect(() => {
     if (selectedInvoice && !selectedInvoice.items) {
       fetchInvoiceItems(selectedInvoice.id).then(items => {
@@ -514,9 +473,7 @@ const Index = () => {
       });
     }
   }, [selectedInvoice]);
-
-  return (
-    <div className="min-h-screen bg-gray-50">
+  return <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="mt-8">
@@ -542,19 +499,14 @@ const Index = () => {
           </div>
         </div>
 
-        {businessTip && (
-          <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
+        {businessTip && <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-blue-900 mb-2">Business Tip of the Day</h3>
             <p className="text-blue-800">{businessTip}</p>
-          </div>
-        )}
+          </div>}
 
         <div className="mt-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div 
-              onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} 
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
-            >
+            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <FileText className="w-6 h-6 text-primary" />
               </div>
@@ -562,10 +514,7 @@ const Index = () => {
               <p className="text-gray-600">Create and manage your invoices easily</p>
             </div>
 
-            <div 
-              onClick={() => navigate('/reports')} 
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
-            >
+            <div onClick={() => navigate('/reports')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <ChartBar className="w-6 h-6 text-primary" />
               </div>
@@ -573,10 +522,7 @@ const Index = () => {
               <p className="text-gray-600">View detailed financial reports and analytics</p>
             </div>
 
-            <div 
-              onClick={() => navigate('/inventory')} 
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
-            >
+            <div onClick={() => navigate('/inventory')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <Package className="w-6 h-6 text-primary" />
               </div>
@@ -584,10 +530,7 @@ const Index = () => {
               <p className="text-gray-600">Track and manage your product stock</p>
             </div>
 
-            <div 
-              onClick={() => setShowTaxDialog(true)} 
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer"
-            >
+            <div onClick={() => setShowTaxDialog(true)} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <IndianRupee className="w-6 h-6 text-primary" />
               </div>
@@ -604,13 +547,8 @@ const Index = () => {
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">
-              {customers?.length ? (
-                <div className="divide-y">
-                  {customers.map((customer) => (
-                    <div
-                      key={customer.id}
-                      className="py-4 flex justify-between items-center hover:bg-gray-50 px-4 -mx-4 transition-colors"
-                    >
+              {customers?.length ? <div className="divide-y">
+                  {customers.map(customer => <div key={customer.id} className="py-4 flex justify-between items-center hover:bg-gray-50 px-4 -mx-4 transition-colors">
                       <div className="cursor-pointer" onClick={() => navigate(`/customer/${customer.id}`)}>
                         <h3 className="font-medium">{customer.name}</h3>
                         <p className="text-sm text-gray-600">{customer.email}</p>
@@ -620,19 +558,12 @@ const Index = () => {
                           <p className="text-sm font-medium">Total Outstanding</p>
                           <p className="text-sm text-red-600">Rs.{customer.total_unpaid?.toLocaleString() || '0'}</p>
                         </div>
-                        <Button 
-                          variant="destructive" 
-                          size="icon"
-                          onClick={() => handleDeleteCustomer(customer.id)}
-                        >
+                        <Button variant="destructive" size="icon" onClick={() => handleDeleteCustomer(customer.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
+                    </div>)}
+                </div> : <div className="text-center py-8">
                   <UserPlus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No customers yet</h3>
                   <p className="text-gray-600 mb-4">Start by adding your first customer</p>
@@ -640,8 +571,7 @@ const Index = () => {
                     <UserPlus className="w-4 h-4" />
                     Add Customer
                   </Button>
-                </div>
-              )}
+                </div>}
             </div>
           </div>
         </div>
@@ -650,36 +580,25 @@ const Index = () => {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Recent Invoices</h2>
             <div className="flex gap-2">
-              {selectedInvoices.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    selectedInvoices.forEach(id => {
-                      const invoice = invoices?.find(inv => inv.id === id);
-                      if (invoice) handleDownloadInvoice(invoice);
-                    });
-                  }}
-                >
+              {selectedInvoices.length > 0 && <Button variant="outline" onClick={() => {
+              selectedInvoices.forEach(id => {
+                const invoice = invoices?.find(inv => inv.id === id);
+                if (invoice) handleDownloadInvoice(invoice);
+              });
+            }}>
                   Download Selected
-                </Button>
-              )}
+                </Button>}
               <CreateInvoiceDialog />
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6">
-              {invoices?.length ? (
-                <div className="divide-y">
-                  {invoices.map((invoice) => (
-                    <Card key={invoice.id} className="overflow-hidden">
+              {invoices?.length ? <div className="divide-y">
+                  {invoices.map(invoice => <Card key={invoice.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
                         <CardTitle className="flex justify-between items-center">
                           <span>{invoice.customers.name}</span>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            invoice.status === 'paid' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
                             {invoice.status}
                           </span>
                         </CardTitle>
@@ -692,61 +611,33 @@ const Index = () => {
                         <p className="text-sm text-gray-500">
                           Created: {format(new Date(invoice.created_at), 'MMM d, yyyy')}
                         </p>
-                        {invoice.due_date && (
-                          <p className="text-sm text-gray-500">
+                        {invoice.due_date && <p className="text-sm text-gray-500">
                             Due: {format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                          </p>
-                        )}
+                          </p>}
                       </CardContent>
                       <CardFooter className="flex justify-between border-t pt-4">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setSelectedInvoice(invoice)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)}>
                           <Eye className="w-4 h-4 mr-2" />
                           Details
                         </Button>
                         <div className="flex space-x-2">
-                          {invoice.status === 'unpaid' && (
-                            <Button 
-                              variant="success"
-                              size="sm"
-                              onClick={() => handleMarkAsPaid(invoice.id)}
-                              className="flex items-center gap-1"
-                            >
+                          {invoice.status === 'unpaid' && <Button variant="success" size="sm" onClick={() => handleMarkAsPaid(invoice.id)} className="flex items-center gap-1">
                               <CheckCircle className="w-4 h-4" />
                               Mark Paid
-                            </Button>
-                          )}
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handlePreviewInvoice(invoice)}
-                          >
+                            </Button>}
+                          <Button variant="outline" size="sm" onClick={() => handlePreviewInvoice(invoice)}>
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDownloadInvoice(invoice)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadInvoice(invoice)}>
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
-                          >
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteInvoice(invoice.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
+                    </Card>)}
+                </div> : <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
                   <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
@@ -754,8 +645,7 @@ const Index = () => {
                     <Plus className="w-4 h-4" />
                     Create Invoice
                   </Button>
-                </div>
-              )}
+                </div>}
             </div>
           </div>
         </div>
@@ -764,28 +654,16 @@ const Index = () => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Sales Overview</h3>
             <div className="flex gap-2">
-              <Button
-                variant={timeRange === '1D' ? 'default' : 'outline'}
-                onClick={() => setTimeRange('1D')}
-              >
+              <Button variant={timeRange === '1D' ? 'default' : 'outline'} onClick={() => setTimeRange('1D')}>
                 1 Day
               </Button>
-              <Button
-                variant={timeRange === '30D' ? 'default' : 'outline'}
-                onClick={() => setTimeRange('30D')}
-              >
+              <Button variant={timeRange === '30D' ? 'default' : 'outline'} onClick={() => setTimeRange('30D')}>
                 30 Days
               </Button>
-              <Button
-                variant={timeRange === '1Y' ? 'default' : 'outline'}
-                onClick={() => setTimeRange('1Y')}
-              >
+              <Button variant={timeRange === '1Y' ? 'default' : 'outline'} onClick={() => setTimeRange('1Y')}>
                 1 Year
               </Button>
-              <Button
-                variant={timeRange === '5Y' ? 'default' : 'outline'}
-                onClick={() => setTimeRange('5Y')}
-              >
+              <Button variant={timeRange === '5Y' ? 'default' : 'outline'} onClick={() => setTimeRange('5Y')}>
                 5 Years
               </Button>
             </div>
@@ -830,21 +708,16 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {taxPayments?.map((payment) => (
-                    <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
+                  {taxPayments?.map(payment => <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">Rs.{payment.amount.toLocaleString()}</p>
                         <p className="text-sm text-gray-500">{new Date(payment.payment_date).toLocaleDateString()}</p>
                       </div>
                       <p className="text-sm text-gray-600">{payment.description}</p>
-                    </div>
-                  ))}
-                  <Button
-                    onClick={() => {
-                      setShowTaxDialog(true);
-                    }}
-                    className="w-full"
-                  >
+                    </div>)}
+                  <Button onClick={() => {
+                  setShowTaxDialog(true);
+                }} className="w-full">
                     Record Tax Payment
                   </Button>
                 </div>
@@ -858,57 +731,35 @@ const Index = () => {
             <DialogHeader>
               <DialogTitle>Record Tax Payment</DialogTitle>
             </DialogHeader>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (!taxDate || !taxAmount) return;
-              
-              addTaxPayment.mutate({
-                amount: parseFloat(taxAmount),
-                description: taxDescription,
-                payment_date: taxDate
-              });
-            }}>
+            <form onSubmit={e => {
+            e.preventDefault();
+            if (!taxDate || !taxAmount) return;
+            addTaxPayment.mutate({
+              amount: parseFloat(taxAmount),
+              description: taxDescription,
+              payment_date: taxDate
+            });
+          }}>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Amount</Label>
-                  <Input
-                    type="number"
-                    value={taxAmount}
-                    onChange={(e) => setTaxAmount(e.target.value)}
-                    placeholder="Enter amount"
-                    required
-                  />
+                  <Input type="number" value={taxAmount} onChange={e => setTaxAmount(e.target.value)} placeholder="Enter amount" required />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Input
-                    value={taxDescription}
-                    onChange={(e) => setTaxDescription(e.target.value)}
-                    placeholder="Enter description"
-                  />
+                  <Input value={taxDescription} onChange={e => setTaxDescription(e.target.value)} placeholder="Enter description" />
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !taxDate && "text-muted-foreground"
-                        )}
-                      >
+                      <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !taxDate && "text-muted-foreground")}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {taxDate ? format(taxDate, "PPP") : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={taxDate}
-                        onSelect={setTaxDate}
-                        initialFocus
-                      />
+                      <Calendar mode="single" selected={taxDate} onSelect={setTaxDate} initialFocus />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -920,13 +771,12 @@ const Index = () => {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={!!selectedInvoice} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
+        <Dialog open={!!selectedInvoice} onOpenChange={open => !open && setSelectedInvoice(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>Invoice Details</DialogTitle>
             </DialogHeader>
-            {selectedInvoice && (
-              <div className="space-y-4">
+            {selectedInvoice && <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h3 className="font-medium">Customer</h3>
@@ -937,9 +787,7 @@ const Index = () => {
                     <h3 className="font-medium">Invoice</h3>
                     <p>Status: {selectedInvoice.status || 'N/A'}</p>
                     <p>Created: {selectedInvoice.created_at ? format(new Date(selectedInvoice.created_at), 'MMM d, yyyy') : 'N/A'}</p>
-                    {selectedInvoice.due_date && (
-                      <p>Due: {format(new Date(selectedInvoice.due_date), 'MMM d, yyyy')}</p>
-                    )}
+                    {selectedInvoice.due_date && <p>Due: {format(new Date(selectedInvoice.due_date), 'MMM d, yyyy')}</p>}
                   </div>
                 </div>
                 
@@ -956,22 +804,16 @@ const Index = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.length > 0 ? (
-                          selectedInvoice.items.map((item: any, index: number) => (
-                            <tr key={item.id || index}>
+                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.length > 0 ? selectedInvoice.items.map((item: any, index: number) => <tr key={item.id || index}>
                               <td className="px-6 py-4 whitespace-nowrap">{item.product_name || 'N/A'}</td>
                               <td className="px-6 py-4 whitespace-nowrap">{item.quantity || 0}</td>
                               <td className="px-6 py-4 whitespace-nowrap">Rs.{item.price || 0}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">Rs.{item.total || (item.quantity * item.price) || 0}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
+                              <td className="px-6 py-4 whitespace-nowrap">Rs.{item.total || item.quantity * item.price || 0}</td>
+                            </tr>) : <tr>
                             <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
                               {selectedInvoice.items === undefined ? 'Loading items...' : 'No items found for this invoice'}
                             </td>
-                          </tr>
-                        )}
+                          </tr>}
                       </tbody>
                     </table>
                   </div>
@@ -984,18 +826,13 @@ const Index = () => {
                     <p className="font-bold">Total: Rs.{(selectedInvoice.total_amount || 0) + (selectedInvoice.tax_amount || 0)}</p>
                   </div>
                   <div className="flex space-x-2">
-                    {selectedInvoice.status === 'unpaid' && (
-                      <Button 
-                        variant="success"
-                        onClick={() => {
-                          handleMarkAsPaid(selectedInvoice.id);
-                          setSelectedInvoice(null);
-                        }}
-                      >
+                    {selectedInvoice.status === 'unpaid' && <Button variant="success" onClick={() => {
+                  handleMarkAsPaid(selectedInvoice.id);
+                  setSelectedInvoice(null);
+                }}>
                         <CheckCircle className="w-4 h-4 mr-2" />
                         Mark as Paid
-                      </Button>
-                    )}
+                      </Button>}
                     <Button onClick={() => handlePreviewInvoice(selectedInvoice)}>
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
@@ -1006,13 +843,10 @@ const Index = () => {
                     </Button>
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
           </DialogContent>
         </Dialog>
       </main>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
