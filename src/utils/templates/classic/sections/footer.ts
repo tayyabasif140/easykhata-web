@@ -11,7 +11,7 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
   
   // Add signature at the bottom of the page
   const signatureText = "Authorized Signature:";
-  const signaturePosition = pageHeight - 40;
+  const signaturePosition = pageHeight - 45;
   
   doc.setFont('helvetica', 'bold');
   doc.text(signatureText, 10, signaturePosition);
@@ -21,8 +21,8 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
     try {
       console.log("Adding signature to PDF from base64");
       // Signature is already a full data URL, so we can use it directly
-      // Adjust position for better placement
-      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition - 25, 60, 25);
+      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition + 1, 60, 25);
+      console.log("Successfully added signature to PDF from provided base64");
     } catch (e) {
       console.error("Error adding signature image:", e);
       // If signature image fails, fall back to signature line
@@ -38,21 +38,17 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
       
       // If it's not a full URL, get the full URL
       if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
         signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
         console.log("Constructed full signature URL for PDF:", signatureUrl);
       }
-      
-      // Add cache busting parameter to prevent stale images
-      const timestamp = Date.now();
-      signatureUrl = signatureUrl.includes('?') ? `${signatureUrl}&t=${timestamp}` : `${signatureUrl}?t=${timestamp}`;
       
       try {
         const base64Signature = await fetchImageAsBase64(signatureUrl);
         
         if (base64Signature) {
           console.log("Successfully fetched and converted signature to base64");
-          doc.addImage(base64Signature, 'PNG', 10, signaturePosition - 25, 60, 25);
+          doc.addImage(base64Signature, 'PNG', 10, signaturePosition + 1, 60, 25);
           console.log("Successfully added signature to PDF from URL");
         } else {
           console.error("Failed to fetch signature for PDF");

@@ -28,7 +28,7 @@ export const renderHeader = async (doc: jsPDF, props: TemplateProps, startY: num
       // If it's not a full URL, get the full URL
       if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
         // Make sure to use the complete URL including the storage bucket
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
         logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
         console.log("Constructed full logo URL for PDF:", logoUrl);
       }

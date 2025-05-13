@@ -14,13 +14,19 @@ export const fetchImageAsBase64 = async (url: string): Promise<string | null> =>
     // Handle URLs from Supabase storage by adding the complete URL if needed
     let fullUrl = url;
     if (!url.startsWith('http') && !url.startsWith('data:')) {
-      fullUrl = `https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${url}`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+      fullUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${url}`;
       console.log("Using full URL:", fullUrl);
     }
     
+    // Add cache-busting parameter
+    const timestamp = Date.now();
+    fullUrl = fullUrl.includes('?') ? `${fullUrl}&t=${timestamp}` : `${fullUrl}?t=${timestamp}`;
+    
     // Fetch the image
     const response = await fetch(fullUrl, {
-      headers: { 'Cache-Control': 'no-cache' }
+      headers: { 'Cache-Control': 'no-cache' },
+      mode: 'cors'
     });
     
     if (!response.ok) {
@@ -36,7 +42,7 @@ export const fetchImageAsBase64 = async (url: string): Promise<string | null> =>
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64data = reader.result as string;
-        console.log("Base64 conversion successful, length:", base64data.length);
+        console.log("Base64 conversion successful, length:", base64data?.length || 0);
         resolve(base64data);
       };
       reader.onerror = () => {

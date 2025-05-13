@@ -24,7 +24,8 @@ export const createClassicPDF = async (props: TemplateProps): Promise<jsPDF> => 
         let logoUrl = props.businessDetails.business_logo_url;
         
         if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
-          logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoUrl}`;
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
         }
         
         const timestamp = Date.now();
@@ -47,7 +48,8 @@ export const createClassicPDF = async (props: TemplateProps): Promise<jsPDF> => 
         let signatureUrl = props.profile.digital_signature_url;
         
         if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
-          signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signatureUrl}`;
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
         }
         
         const timestamp = Date.now();
