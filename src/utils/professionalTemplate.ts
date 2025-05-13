@@ -1,6 +1,8 @@
 
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
+import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
+import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
 
 export const professionalTemplate = async (props: TemplateProps) => {
   const {
@@ -15,6 +17,8 @@ export const professionalTemplate = async (props: TemplateProps) => {
     dueDate,
     businessDetails,
     profile,
+    logoBase64,
+    signatureBase64
   } = props;
 
   // Create a new PDF document
@@ -29,11 +33,42 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, pageWidth, 30, 'F');
   
-  // Company name in header
+  // Add logo if available
+  if (logoBase64) {
+    try {
+      console.log("Adding logo to professional PDF template");
+      doc.addImage(logoBase64, 'PNG', 10, 5, 20, 20);
+      console.log("Successfully added logo to professional PDF template");
+    } catch (e) {
+      console.error("Error adding logo image to professional template:", e);
+    }
+  } else if (businessDetails?.business_logo_url) {
+    try {
+      console.log("Fetching logo for professional PDF template");
+      let logoUrl = businessDetails.business_logo_url;
+      
+      if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
+      }
+      
+      const logoBase64Data = await fetchImageAsBase64(logoUrl);
+      
+      if (logoBase64Data) {
+        doc.addImage(logoBase64Data, 'PNG', 10, 5, 20, 20);
+        console.log("Successfully added logo to professional PDF template");
+      }
+    } catch (logoError) {
+      console.error("Error adding logo to professional PDF:", logoError);
+    }
+  }
+  
+  // Company name in header (offset if logo is present)
+  const companyNameXPos = logoBase64 || businessDetails?.business_logo_url ? 35 : 10;
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
+  doc.text(businessDetails?.business_name || 'Company Name', companyNameXPos, 20);
   
   // INVOICE text in header
   doc.setFontSize(16);
@@ -189,7 +224,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
   }
   
   // Check if we need more space for totals
-  if (yPos > pageHeight - 40) {
+  if (yPos > pageHeight - 60) {
     startNewPage();
   }
   
@@ -232,6 +267,69 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Please pay within 14 days of receipt.', 10, yPos);
   
+  // Add signature - position it above privacy policy
+  const signaturePosition = pageHeight - 80;
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text("Authorized Signature:", 10, signaturePosition);
+  
+  // Add signature image if available
+  if (signatureBase64) {
+    try {
+      console.log("Adding signature to professional PDF template");
+      doc.addImage(signatureBase64, 'PNG', 10, signaturePosition + 1, 50, 20);
+      console.log("Successfully added signature to professional PDF template");
+    } catch (e) {
+      console.error("Error adding signature image to professional template:", e);
+      // If signature image fails, fall back to signature line
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+    }
+  } else if (profile?.digital_signature_url) {
+    try {
+      console.log("Fetching signature for professional PDF template");
+      let signatureUrl = profile.digital_signature_url;
+      
+      if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
+      }
+      
+      const signatureBase64Data = await fetchImageAsBase64(signatureUrl);
+      
+      if (signatureBase64Data) {
+        doc.addImage(signatureBase64Data, 'PNG', 10, signaturePosition + 1, 50, 20);
+        console.log("Successfully added signature to professional PDF template");
+      } else {
+        // Fall back to signature line
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+      }
+    } catch (signatureError) {
+      console.error("Error adding signature to professional PDF:", signatureError);
+      // Fall back to signature line
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+    }
+  } else {
+    // Add signature line only if no image
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.5);
+    doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
+  }
+  
+  // Add business name and signer name
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(businessDetails?.business_name || '', 10, signaturePosition + 20);
+  
+  if (profile?.name) {
+    doc.text(profile.name, 40, signaturePosition + 10);
+  }
+  
   // Footer with page number
   const footerYPos = pageHeight - 10;
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -243,6 +341,9 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.text(`Page ${currentPage}`, 10, footerYPos + 2);
   doc.text('Thank you for your business!', pageWidth / 2, footerYPos + 2, { align: 'center' });
   doc.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - 10, footerYPos + 2, { align: 'right' });
+  
+  // Add privacy policy
+  addPrivacyPolicy(doc, businessDetails);
   
   return doc;
 };

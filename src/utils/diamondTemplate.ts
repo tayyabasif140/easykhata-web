@@ -1,6 +1,8 @@
 
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
+import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
+import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
 
 export const diamondTemplate = async (props: TemplateProps) => {
   try {
@@ -16,6 +18,8 @@ export const diamondTemplate = async (props: TemplateProps) => {
       dueDate,
       businessDetails,
       profile,
+      logoBase64,
+      signatureBase64
     } = props;
 
     // Create a new PDF document
@@ -31,11 +35,42 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.rect(0, 0, pageWidth, 40, 'F');
     
+    // Add logo if available
+    if (logoBase64) {
+      try {
+        console.log("Adding logo to diamond PDF template");
+        doc.addImage(logoBase64, 'PNG', 10, 5, 30, 30);
+        console.log("Successfully added logo to diamond PDF template");
+      } catch (e) {
+        console.error("Error adding logo image to diamond template:", e);
+      }
+    } else if (businessDetails?.business_logo_url) {
+      try {
+        console.log("Fetching logo for diamond PDF template");
+        let logoUrl = businessDetails.business_logo_url;
+        
+        if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
+        }
+        
+        const logoBase64Data = await fetchImageAsBase64(logoUrl);
+        
+        if (logoBase64Data) {
+          doc.addImage(logoBase64Data, 'PNG', 10, 5, 30, 30);
+          console.log("Successfully added logo to diamond PDF template");
+        }
+      } catch (logoError) {
+        console.error("Error adding logo to diamond PDF:", logoError);
+      }
+    }
+    
     // Text-based header
+    const companyNameXPos = logoBase64 || businessDetails?.business_logo_url ? 45 : 10;
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text(businessDetails?.business_name || 'Company Name', 10, 20);
+    doc.text(businessDetails?.business_name || 'Company Name', companyNameXPos, 20);
 
     // Document title
     doc.setTextColor(255, 255, 255);
@@ -145,7 +180,6 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFont('helvetica', 'normal');
     
     let altRow = false;
-    let totalRows = products.length;
     let currentPage = 1;
     
     const startNewPage = () => {
@@ -192,7 +226,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
     }
 
     // Totals - check if we need a new page
-    if (yPos > pageHeight - 80) {
+    if (yPos > pageHeight - 100) {
       startNewPage();
     }
     
@@ -226,12 +260,72 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.text('Total:', pageWidth - 80, yPos);
     doc.text(`${total.toFixed(2)}`, pageWidth - 30, yPos);
 
-    // Add payment details and terms - check if we need a new page
-    if (yPos > pageHeight - 60) {
-      startNewPage();
+    // Add signature - position it properly to avoid overlapping with privacy policy
+    const signaturePosition = pageHeight - 90;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Authorized Signature:", 15, signaturePosition);
+    
+    // Add signature image if available
+    if (signatureBase64) {
+      try {
+        console.log("Adding signature to diamond PDF template");
+        doc.addImage(signatureBase64, 'PNG', 15, signaturePosition + 1, 50, 20);
+        console.log("Successfully added signature to diamond PDF template");
+      } catch (e) {
+        console.error("Error adding signature image to diamond template:", e);
+        // If signature image fails, fall back to signature line
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(15, signaturePosition + 15, 85, signaturePosition + 15);
+      }
+    } else if (profile?.digital_signature_url) {
+      try {
+        console.log("Fetching signature for diamond PDF template");
+        let signatureUrl = profile.digital_signature_url;
+        
+        if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
+        }
+        
+        const signatureBase64Data = await fetchImageAsBase64(signatureUrl);
+        
+        if (signatureBase64Data) {
+          doc.addImage(signatureBase64Data, 'PNG', 15, signaturePosition + 1, 50, 20);
+          console.log("Successfully added signature to diamond PDF template");
+        } else {
+          // Fall back to signature line
+          doc.setDrawColor(0);
+          doc.setLineWidth(0.5);
+          doc.line(15, signaturePosition + 15, 85, signaturePosition + 15);
+        }
+      } catch (signatureError) {
+        console.error("Error adding signature to diamond PDF:", signatureError);
+        // Fall back to signature line
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(15, signaturePosition + 15, 85, signaturePosition + 15);
+      }
+    } else {
+      // Add signature line only if no image
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(15, signaturePosition + 15, 85, signaturePosition + 15);
     }
     
-    yPos += 25;
+    // Add business name and signer name
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(businessDetails?.business_name || '', 15, signaturePosition + 20);
+    
+    if (profile?.name) {
+      doc.text(profile.name, 45, signaturePosition + 10);
+    }
+
+    // Add payment details and terms with properly adjusted position
+    yPos = signaturePosition - 30;
     
     doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
     doc.roundedRect(10, yPos, pageWidth - 20, 40, 2, 2, 'F');
@@ -256,6 +350,9 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFontSize(8);
     doc.text(`Page ${currentPage}`, 10, footerYPos);
     doc.text('Generated with Invoice Manager', pageWidth / 2, footerYPos, { align: 'center' });
+
+    // Add privacy policy
+    addPrivacyPolicy(doc, businessDetails);
 
     return doc;
   } catch (error) {

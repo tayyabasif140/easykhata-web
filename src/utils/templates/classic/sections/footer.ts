@@ -9,9 +9,10 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
   
-  // Add signature at the bottom of the page
+  // Add signature at the bottom of the page, but higher up to avoid privacy policy
   const signatureText = "Authorized Signature:";
-  const signaturePosition = pageHeight - 45;
+  // Adjusted position to be higher to avoid overlapping with privacy policy
+  const signaturePosition = pageHeight - 70;
   
   doc.setFont('helvetica', 'bold');
   doc.text(signatureText, 10, signaturePosition);
