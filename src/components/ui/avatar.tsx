@@ -33,9 +33,19 @@ const AvatarImage = React.forwardRef<
 
   React.useEffect(() => {
     if (typeof src === 'string') {
+      // Check if the URL is missing the base URL and add it
+      let newSrc = src;
+      
+      // Check if we need to add the Supabase URL
+      if (src.indexOf('/storage/v1/object/public') > -1 && 
+          src.indexOf('http') === -1 && 
+          import.meta.env.VITE_SUPABASE_URL) {
+        newSrc = `${import.meta.env.VITE_SUPABASE_URL}${src}`;
+      }
+      
       // Add timestamp to URL to prevent caching
       const timestamp = new Date().getTime();
-      const newSrc = src.indexOf('?') === -1 ? `${src}?t=${timestamp}` : `${src}&t=${timestamp}`;
+      newSrc = newSrc.indexOf('?') === -1 ? `${newSrc}?t=${timestamp}` : `${newSrc}&t=${timestamp}`;
       
       setImgSrc(newSrc);
       setIsLoading(true);
