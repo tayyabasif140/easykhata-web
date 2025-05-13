@@ -29,7 +29,7 @@ const AvatarImage = React.forwardRef<
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
   const [retryCount, setRetryCount] = React.useState(0);
-  const maxRetries = 2;
+  const maxRetries = 3;
 
   React.useEffect(() => {
     if (typeof src === 'string') {
@@ -62,7 +62,7 @@ const AvatarImage = React.forwardRef<
             : `${imgSrc}&t=${timestamp}&retry=${retryCount + 1}`;
           setImgSrc(newSrc);
         }
-      }, 500);
+      }, 300); // Faster retry
       
       return () => clearTimeout(timer);
     }
@@ -79,6 +79,7 @@ const AvatarImage = React.forwardRef<
             className
           )}
           loading="eager"
+          crossOrigin="anonymous"
           fetchPriority="high"
           onLoad={() => {
             console.log("Avatar image loaded successfully");

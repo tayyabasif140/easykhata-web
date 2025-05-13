@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 export function ModeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { setTheme, theme, resolvedTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
 
   // Wait until component is mounted to avoid hydration mismatch
@@ -19,27 +19,30 @@ export function ModeToggle() {
     setIsMounted(true);
   }, []);
 
-  // Set the system theme on first load
+  // Detect system preference on first load
   useEffect(() => {
     if (isMounted) {
-      // Set system theme if not already set
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const systemTheme = prefersDark ? 'dark' : 'light';
+      
+      // Set theme on first load if not already set
       if (!theme || theme === "system") {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        console.log("Setting initial theme based on system preference:", prefersDark ? 'dark' : 'light');
-        setTheme(prefersDark ? 'dark' : 'light');
+        console.log("Setting initial theme based on system preference:", systemTheme);
+        setTheme(systemTheme);
       }
     }
   }, [isMounted, theme, setTheme]);
 
-  // Add listener for system theme changes
+  // Listen for system theme changes
   useEffect(() => {
     if (!isMounted) return;
     
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       if (theme === 'system') {
-        console.log("System theme changed to:", e.matches ? 'dark' : 'light');
-        setTheme(e.matches ? 'dark' : 'light');
+        const newTheme = e.matches ? 'dark' : 'light';
+        console.log("System theme changed to:", newTheme);
+        setTheme(newTheme);
       }
     };
     
@@ -51,12 +54,17 @@ export function ModeToggle() {
     return <Button variant="ghost" size="icon" className="h-9 w-9"><Sun className="h-[1.2rem] w-[1.2rem]" /></Button>;
   }
 
+  const currentTheme = resolvedTheme || theme;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          {currentTheme === "dark" ? (
+            <Moon className="h-[1.2rem] w-[1.2rem]" />
+          ) : (
+            <Sun className="h-[1.2rem] w-[1.2rem]" />
+          )}
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
@@ -75,8 +83,9 @@ export function ModeToggle() {
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => {
           const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          console.log("Setting theme to system preference:", prefersDark ? 'dark' : 'light');
-          setTheme(prefersDark ? 'dark' : 'light');
+          const systemTheme = prefersDark ? 'dark' : 'light';
+          console.log("Setting theme to system preference:", systemTheme);
+          setTheme("system");
         }}>
           System
         </DropdownMenuItem>

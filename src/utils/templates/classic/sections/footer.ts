@@ -38,7 +38,8 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
       
       // If it's not a full URL, get the full URL
       if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
-        signatureUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${signatureUrl}`;
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
         console.log("Constructed full signature URL for PDF:", signatureUrl);
       }
       

@@ -6,6 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { ModeToggle } from "./mode-toggle";
 import { Settings } from "lucide-react";
+import { 
+  Drawer,
+  DrawerTrigger,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerClose
+} from "./ui/drawer";
 
 const Header = () => {
   const [user, setUser] = useState(null);
@@ -67,7 +75,7 @@ const Header = () => {
   }
 
   return (
-    <header className="w-full py-4 border-b border-border/40 bg-background sticky top-0 z-10">
+    <header className="w-full py-2 border-b border-border/40 bg-background sticky top-0 z-10">
       <div className="container flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-bold tracking-tight">EzKhata</h2>
@@ -77,27 +85,42 @@ const Header = () => {
           {user ? (
             <div className="flex items-center space-x-4">
               <ModeToggle />
-              <Link to="/account">
-                <Button variant="ghost" size="icon">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </Link>
-              <Link to="/account">
-                <Avatar className="cursor-pointer">
-                  {avatarUrl ? (
-                    <AvatarImage 
-                      src={avatarUrl} 
-                      alt="User avatar" 
-                      loading="eager"
-                      fetchPriority="high"
-                    />
-                  ) : (
-                    <AvatarFallback>
-                      {avatarLoading ? "..." : user.email?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-              </Link>
+              
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent>
+                  <DrawerHeader>
+                    <DrawerTitle>Settings</DrawerTitle>
+                  </DrawerHeader>
+                  <div className="p-4 space-y-4">
+                    <Link to="/account" className="block w-full">
+                      <Button variant="outline" className="w-full justify-start">Profile Settings</Button>
+                    </Link>
+                    <Button variant="outline" className="w-full justify-start" onClick={signOut}>
+                      Sign Out
+                    </Button>
+                  </div>
+                </DrawerContent>
+              </Drawer>
+              
+              <Avatar className="cursor-pointer">
+                {avatarUrl ? (
+                  <AvatarImage 
+                    src={avatarUrl} 
+                    alt="User avatar" 
+                    loading="eager"
+                    fetchPriority="high"
+                  />
+                ) : (
+                  <AvatarFallback>
+                    {avatarLoading ? "..." : user.email?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                )}
+              </Avatar>
             </div>
           ) : (
             <Link to="/auth">
