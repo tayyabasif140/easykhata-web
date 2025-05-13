@@ -9,46 +9,64 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 export function ModeToggle() {
   const { setTheme, theme, resolvedTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
+  const [isChanging, setIsChanging] = useState(false);
 
   // Wait until component is mounted to avoid hydration mismatch
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Detect system preference on first load
-  useEffect(() => {
-    if (isMounted) {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const systemTheme = prefersDark ? 'dark' : 'light';
-      
-      // Set theme on first load if not already set
-      if (!theme || theme === "system") {
-        console.log("Setting initial theme based on system preference:", systemTheme);
-        setTheme(systemTheme);
-      }
-    }
-  }, [isMounted, theme, setTheme]);
-
-  // Listen for system theme changes
-  useEffect(() => {
-    if (!isMounted) return;
+  // Handle theme change with debounce to prevent flickering
+  const handleThemeChange = (newTheme: string) => {
+    if (isChanging) return;
     
+    setIsChanging(true);
+    console.log(`Setting theme to ${newTheme}`);
+    
+    setTheme(newTheme);
+    
+    // Show feedback to user
+    toast({
+      title: `Theme changed to ${newTheme}`,
+      duration: 2000,
+    });
+    
+    // Prevent rapid changes
+    setTimeout(() => {
+      setIsChanging(false);
+    }, 500);
+  };
+
+  // Simplified system preference detection
+  useEffect(() => {
+    if (!isMounted || isChanging) return;
+    
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // Only set on first load if theme is system
+    if (theme === "system") {
+      const systemTheme = prefersDark ? 'dark' : 'light';
+      console.log("Using system theme:", systemTheme);
+      // We don't call setTheme here to avoid unnecessary re-renders
+    }
+    
+    // Listen for system theme changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       if (theme === 'system') {
-        const newTheme = e.matches ? 'dark' : 'light';
-        console.log("System theme changed to:", newTheme);
-        setTheme(newTheme);
+        // The theme provider will handle this automatically
+        console.log("System theme changed:", e.matches ? "dark" : "light");
       }
     };
     
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [isMounted, setTheme, theme]);
+  }, [isMounted, theme, isChanging]);
 
   if (!isMounted) {
     return <Button variant="ghost" size="icon" className="h-9 w-9"><Sun className="h-[1.2rem] w-[1.2rem]" /></Button>;
@@ -58,7 +76,7 @@ export function ModeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild disabled={isChanging}>
         <Button variant="ghost" size="icon" className="h-9 w-9">
           {currentTheme === "dark" ? (
             <Moon className="h-[1.2rem] w-[1.2rem]" />
@@ -68,25 +86,17 @@ export function ModeToggle() {
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => {
-          console.log("Setting theme to light");
-          setTheme("light");
-        }}>
+      <DropdownMenuContent align="end" className="bg-background border-border">
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}
+          className="cursor-pointer">
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => {
-          console.log("Setting theme to dark");
-          setTheme("dark");
-        }}>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}
+          className="cursor-pointer">
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => {
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          const systemTheme = prefersDark ? 'dark' : 'light';
-          console.log("Setting theme to system preference:", systemTheme);
-          setTheme("system");
-        }}>
+        <DropdownMenuItem onClick={() => handleThemeChange("system")}
+          className="cursor-pointer">
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

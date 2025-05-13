@@ -10,7 +10,13 @@ window.React = React;
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider 
+      attribute="class" 
+      defaultTheme="system" 
+      enableSystem 
+      disableTransitionOnChange
+      storageKey="ezkhata-theme-preference"
+    >
       <App />
     </ThemeProvider>
   </React.StrictMode>

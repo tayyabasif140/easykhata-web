@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ModeToggle } from "./mode-toggle";
-import { Settings } from "lucide-react";
+import { Settings, User } from "lucide-react";
 import { 
   Drawer,
   DrawerTrigger,
@@ -19,6 +19,7 @@ const Header = () => {
   const [user, setUser] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function getSession() {
@@ -74,6 +75,10 @@ const Header = () => {
     }
   }
 
+  const handleProfileClick = () => {
+    navigate('/account');
+  };
+
   return (
     <header className="w-full py-2 border-b border-border/40 bg-background sticky top-0 z-10">
       <div className="container flex items-center justify-between">
@@ -92,22 +97,46 @@ const Header = () => {
                     <Settings className="h-5 w-5" />
                   </Button>
                 </DrawerTrigger>
-                <DrawerContent>
-                  <DrawerHeader>
+                <DrawerContent className="p-4">
+                  <DrawerHeader className="p-0">
                     <DrawerTitle>Settings</DrawerTitle>
                   </DrawerHeader>
-                  <div className="p-4 space-y-4">
-                    <Link to="/account" className="block w-full">
-                      <Button variant="outline" className="w-full justify-start">Profile Settings</Button>
-                    </Link>
+                  
+                  <div className="flex items-center space-x-3 my-4 p-2 border rounded-md hover:bg-accent cursor-pointer" onClick={handleProfileClick}>
+                    <Avatar className="h-10 w-10">
+                      {avatarUrl ? (
+                        <AvatarImage 
+                          src={avatarUrl} 
+                          alt="User avatar" 
+                          loading="eager"
+                          fetchPriority="high"
+                        />
+                      ) : (
+                        <AvatarFallback>
+                          {avatarLoading ? "..." : user?.email?.charAt(0).toUpperCase() || "U"}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">Profile Settings</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
                     <Button variant="outline" className="w-full justify-start" onClick={signOut}>
+                      <User className="mr-2 h-4 w-4" />
                       Sign Out
                     </Button>
+                    
+                    <DrawerClose asChild>
+                      <Button variant="secondary" className="w-full">Close</Button>
+                    </DrawerClose>
                   </div>
                 </DrawerContent>
               </Drawer>
               
-              <Avatar className="cursor-pointer">
+              <Avatar className="cursor-pointer" onClick={handleProfileClick}>
                 {avatarUrl ? (
                   <AvatarImage 
                     src={avatarUrl} 
@@ -117,7 +146,7 @@ const Header = () => {
                   />
                 ) : (
                   <AvatarFallback>
-                    {avatarLoading ? "..." : user.email?.charAt(0).toUpperCase() || "U"}
+                    {avatarLoading ? "..." : user?.email?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 )}
               </Avatar>
