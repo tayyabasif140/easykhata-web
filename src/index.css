@@ -55,16 +55,16 @@
     --popover: 222.2 47.4% 11.2%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 152 76% 44%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 152 76% 28%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 152 76% 12%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -93,4 +93,35 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Fix spacing in navbar */
+.navbar-container {
+  margin-bottom: 0; /* Remove any bottom margin */
+  padding-bottom: 0; /* Remove any bottom padding */
+}
+
+/* Make dark theme elements darker */
+.dark .bg-card,
+.dark .bg-popover,
+.dark .bg-background {
+  background-color: #121212; /* Darker background */
+}
+
+.dark .border-border {
+  border-color: #2a2a2a; /* Darker borders */
+}
+
+.dark .text-foreground {
+  color: #f5f5f5; /* Lighter text for better contrast */
+}
+
+/* Adjust navbar spacing */
+nav {
+  margin-bottom: 0 !important;
+}
+
+/* Ensure content flows properly without awkward spacing */
+main {
+  padding-top: 0.5rem;
 }

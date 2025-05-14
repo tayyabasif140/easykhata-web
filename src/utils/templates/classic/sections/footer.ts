@@ -11,8 +11,8 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
   
   // Add signature at the bottom of the page, but higher up to avoid privacy policy
   const signatureText = "Authorized Signature:";
-  // Adjusted position to be higher to avoid overlapping with privacy policy
-  const signaturePosition = pageHeight - 70;
+  // Adjusted position to be significantly higher to avoid overlapping with privacy policy
+  const signaturePosition = pageHeight - 100;
   
   doc.setFont('helvetica', 'bold');
   doc.text(signatureText, 10, signaturePosition);
@@ -77,16 +77,6 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
     doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
-  }
-  
-  // Add business name under signature line or image
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(businessDetails?.business_name || '', 10, signaturePosition + 20);
-
-  // Add signature text placeholder
-  if (profile?.name) {
-    doc.text(profile.name, 40, signaturePosition + 10);
   }
   
   // Footer with page number only
