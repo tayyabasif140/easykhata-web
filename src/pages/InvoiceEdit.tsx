@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +26,16 @@ interface InvoiceItem {
   isNew?: boolean;
 }
 
+interface Invoice {
+  id: string;
+  customer_id: string;
+  total_amount: number;
+  tax_amount: number;
+  status: 'paid' | 'unpaid';
+  due_date?: string | null;
+  // Add any other invoice properties here
+}
+
 const InvoiceEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -34,7 +43,7 @@ const InvoiceEdit = () => {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [invoice, setInvoice] = useState<any>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -341,7 +350,7 @@ const InvoiceEdit = () => {
                 <Label htmlFor="status">Status</Label>
                 <Select 
                   value={invoice.status} 
-                  onValueChange={(value) => setInvoice({...invoice, status: value})}
+                  onValueChange={(value: 'paid' | 'unpaid') => setInvoice({...invoice, status: value})}
                 >
                   <SelectTrigger id="status">
                     <SelectValue placeholder="Select status" />
