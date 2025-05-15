@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,17 +80,16 @@ const InvoiceEdit = () => {
         if (customersError) throw customersError;
         setCustomers(customersData);
         
-        // Fetch products
+        // Fetch products - FIXED: Remove filtering by user_id as it doesn't exist in the products table
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select('*')
-          .eq('user_id', userData.user.id);
+          .select('*');
           
         if (productsError) throw productsError;
         setProducts(productsData);
         
         // If we have an ID, fetch the invoice data for editing
-        if (id && id !== 'new') {
+        if (id && id !== 'new' && id !== 'create') {
           // Fetch invoice
           const { data: invoiceData, error: invoiceError } = await supabase
             .from('invoices')
