@@ -475,20 +475,20 @@ const Index = () => {
   }, [selectedInvoice]);
   return <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 bg-zinc-900">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
         <div className="mt-8">
-          <div className="rounded-xl p-6 shadow-sm border border-gray-200 animate-fade-in bg-zinc-950">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-lg border border-green-100 bg-zinc-900">
-                <h3 className="text-lg font-semibold text-slate-50">
+              <div className="p-6 rounded-lg bg-green-50 border border-green-100">
+                <h3 className="text-lg font-semibold text-gray-900">
                   Paid Invoices
                 </h3>
                 <p className="text-3xl font-bold text-green-600 mt-2">
                   Rs.{totalPaidInvoices.toLocaleString()}
                 </p>
               </div>
-              <div className="p-6 rounded-lg border border-red-100 bg-zinc-900">
-                <h3 className="text-lg font-semibold text-slate-50">
+              <div className="p-6 rounded-lg bg-red-50 border border-red-100">
+                <h3 className="text-lg font-semibold text-gray-900">
                   Unpaid Invoices
                 </h3>
                 <p className="text-3xl font-bold text-red-600 mt-2">
@@ -506,35 +506,35 @@ const Index = () => {
 
         <div className="mt-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer bg-zinc-950">
+            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <FileText className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-slate-50">Invoice</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
               <p className="text-gray-600">Create and manage your invoices easily</p>
             </div>
 
-            <div onClick={() => navigate('/reports')} className="p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer bg-zinc-950">
+            <div onClick={() => navigate('/reports')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <ChartBar className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-slate-50">Report</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Report</h3>
               <p className="text-gray-600">View detailed financial reports and analytics</p>
             </div>
 
-            <div onClick={() => navigate('/inventory')} className="p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer bg-zinc-950">
+            <div onClick={() => navigate('/inventory')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <Package className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-slate-50">Inventory</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Inventory</h3>
               <p className="text-gray-600">Track and manage your product stock</p>
             </div>
 
-            <div onClick={() => setShowTaxDialog(true)} className="p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer bg-zinc-950">
+            <div onClick={() => setShowTaxDialog(true)} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
               <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
                 <IndianRupee className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-slate-50">Tax</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Tax</h3>
               <p className="text-gray-600">Record and track your tax payments</p>
             </div>
           </div>
@@ -546,7 +546,7 @@ const Index = () => {
             <CreateCustomerDialog />
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6 bg-zinc-900">
+            <div className="p-6">
               {customers?.length ? <div className="divide-y">
                   {customers.map(customer => <div key={customer.id} className="py-4 flex justify-between items-center hover:bg-gray-50 px-4 -mx-4 transition-colors">
                       <div className="cursor-pointer" onClick={() => navigate(`/customer/${customer.id}`)}>
@@ -563,9 +563,9 @@ const Index = () => {
                         </Button>
                       </div>
                     </div>)}
-                </div> : <div className="text-center py-8 bg-zinc-900">
+                </div> : <div className="text-center py-8">
                   <UserPlus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2 text-slate-50">No customers yet</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No customers yet</h3>
                   <p className="text-gray-600 mb-4">Start by adding your first customer</p>
                   <Button className="gap-2">
                     <UserPlus className="w-4 h-4" />
@@ -592,7 +592,7 @@ const Index = () => {
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6 bg-zinc-900">
+            <div className="p-6">
               {invoices?.length ? <div className="divide-y">
                   {invoices.map(invoice => <Card key={invoice.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
@@ -639,7 +639,7 @@ const Index = () => {
                     </Card>)}
                 </div> : <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2 text-slate-50">No invoices yet</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
                   <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
                   <Button className="gap-2">
                     <Plus className="w-4 h-4" />
