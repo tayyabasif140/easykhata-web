@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,21 @@ interface Invoice {
   // Add any other invoice properties here
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  company?: string | null;
+  // Add other customer properties as needed
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  // Add other product properties as needed
+}
+
 const InvoiceEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -45,8 +61,8 @@ const InvoiceEdit = () => {
   const [saving, setSaving] = useState(false);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   
   // Fetch invoice, items, customers and products data
@@ -93,7 +109,7 @@ const InvoiceEdit = () => {
         
         // Set data to state
         setInvoice(invoiceData);
-        setItems(itemsData.map((item: any) => ({
+        setItems(itemsData.map((item: InvoiceItem) => ({
           ...item,
           total: item.quantity * item.price
         })));
@@ -168,6 +184,15 @@ const InvoiceEdit = () => {
   const handleSubmit = async () => {
     try {
       setSaving(true);
+      
+      if (!invoice) {
+        toast({
+          title: "Error",
+          description: "Invoice data is missing",
+          variant: "destructive"
+        });
+        return;
+      }
       
       if (!invoice.customer_id) {
         toast({
