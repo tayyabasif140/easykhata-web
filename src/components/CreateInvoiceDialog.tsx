@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -173,16 +174,27 @@ export function CreateInvoiceDialog() {
 
   const updateInventory = useMutation({
     mutationFn: async (updates: { productName: string, quantity: number }) => {
+      // Check if the product exists in inventory
       const { data: inventoryItem } = await supabase
         .from('inventory')
         .select('quantity')
         .eq('product_name', updates.productName)
         .single();
 
-      if (!inventoryItem) throw new Error('Product not found in inventory');
+      if (!inventoryItem) {
+        // Product not in inventory, skip the update
+        return;
+      }
 
       const newQuantity = inventoryItem.quantity - updates.quantity;
-      if (newQuantity < 0) throw new Error('Not enough stock');
+      if (newQuantity < 0) {
+        // Allow negative stock but provide a warning
+        toast({
+          title: "Warning",
+          description: `Insufficient stock for ${updates.productName}. Creating invoice will make stock negative.`,
+          variant: "warning"
+        });
+      }
 
       const { error } = await supabase
         .from('inventory')
@@ -393,11 +405,19 @@ export function CreateInvoiceDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Only update inventory for products that exist in inventory
       for (const product of products) {
-        await updateInventory.mutateAsync({
-          productName: product.name,
-          quantity: product.quantity
-        });
+        try {
+          if (product.name) {
+            await updateInventory.mutateAsync({
+              productName: product.name,
+              quantity: product.quantity
+            });
+          }
+        } catch (error) {
+          // Continue with invoice creation even if inventory update fails
+          console.error(`Couldn't update inventory for ${product.name}:`, error);
+        }
       }
 
       const { data: userData } = await supabase.auth.getUser();
