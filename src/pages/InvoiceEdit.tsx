@@ -233,7 +233,7 @@ const InvoiceEdit = () => {
       // First, delete existing items that were removed
       const existingItemIds = items
         .filter(item => item.id) // Only get items that already exist in DB
-        .map(item => item.id);
+        .map(item => item.id as string); // Type assertion to ensure string
       
       // Delete items that are no longer in the items array
       if (existingItemIds.length > 0) {
@@ -355,8 +355,8 @@ const InvoiceEdit = () => {
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer</Label>
                 <Select 
-                  value={invoice.customer_id} 
-                  onValueChange={(value) => setInvoice({...invoice, customer_id: value})}
+                  value={invoice?.customer_id} 
+                  onValueChange={(value) => invoice && setInvoice({...invoice, customer_id: value})}
                 >
                   <SelectTrigger id="customer">
                     <SelectValue placeholder="Select a customer" />
@@ -374,8 +374,8 @@ const InvoiceEdit = () => {
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select 
-                  value={invoice.status} 
-                  onValueChange={(value: 'paid' | 'unpaid') => setInvoice({...invoice, status: value})}
+                  value={invoice?.status} 
+                  onValueChange={(value: 'paid' | 'unpaid') => invoice && setInvoice({...invoice, status: value})}
                 >
                   <SelectTrigger id="status">
                     <SelectValue placeholder="Select status" />
@@ -417,8 +417,8 @@ const InvoiceEdit = () => {
                 <Input
                   id="tax"
                   type="number"
-                  value={invoice.tax_amount || 0}
-                  onChange={(e) => setInvoice({...invoice, tax_amount: parseFloat(e.target.value) || 0})}
+                  value={invoice?.tax_amount || 0}
+                  onChange={(e) => invoice && setInvoice({...invoice, tax_amount: parseFloat(e.target.value) || 0})}
                 />
               </div>
             </div>
@@ -530,7 +530,7 @@ const InvoiceEdit = () => {
                       Tax:
                     </td>
                     <td className="text-right py-3 px-4">
-                      Rs.{(invoice.tax_amount || 0).toFixed(2)}
+                      Rs.{(invoice?.tax_amount || 0).toFixed(2)}
                     </td>
                     <td></td>
                   </tr>
@@ -539,7 +539,7 @@ const InvoiceEdit = () => {
                       Total:
                     </td>
                     <td className="text-right py-3 px-4">
-                      Rs.{(calculateTotal() + (invoice.tax_amount || 0)).toFixed(2)}
+                      Rs.{(calculateTotal() + (invoice?.tax_amount || 0)).toFixed(2)}
                     </td>
                     <td></td>
                   </tr>
