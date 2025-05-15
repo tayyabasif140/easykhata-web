@@ -169,6 +169,11 @@ const App = () => (
                 <InvoiceEdit />
               </PrivateRoute>
             } />
+            <Route path="/invoice/create" element={
+              <PrivateRoute>
+                <InvoiceEdit />
+              </PrivateRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

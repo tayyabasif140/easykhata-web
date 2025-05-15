@@ -28,20 +28,18 @@ interface InvoiceItem {
 }
 
 interface Invoice {
-  id: string;
+  id?: string;
   customer_id: string;
   total_amount: number;
   tax_amount: number;
   status: 'paid' | 'unpaid';
   due_date?: string | null;
-  // Add any other invoice properties here
 }
 
 interface Customer {
   id: string;
   name: string;
   company?: string | null;
-  // Add other customer properties as needed
 }
 
 interface Product {
@@ -49,7 +47,6 @@ interface Product {
   name: string;
   price: number;
   quantity: number;
-  // Add other product properties as needed
 }
 
 const InvoiceEdit = () => {
@@ -64,31 +61,15 @@ const InvoiceEdit = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [isNewInvoice, setIsNewInvoice] = useState<boolean>(false);
   
-  // Fetch invoice, items, customers and products data
+  // Fetch invoice data if editing, otherwise initialize a new invoice
   useEffect(() => {
-    const fetchInvoiceData = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch invoice
-        const { data: invoiceData, error: invoiceError } = await supabase
-          .from('invoices')
-          .select('*')
-          .eq('id', id)
-          .single();
-          
-        if (invoiceError) throw invoiceError;
-        
-        // Fetch invoice items
-        const { data: itemsData, error: itemsError } = await supabase
-          .from('invoice_items')
-          .select('*')
-          .eq('invoice_id', id);
-          
-        if (itemsError) throw itemsError;
-        
-        // Fetch all customers
+        // Fetch customers
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) throw new Error('Not authenticated');
         
@@ -98,33 +79,69 @@ const InvoiceEdit = () => {
           .eq('user_id', userData.user.id);
           
         if (customersError) throw customersError;
+        setCustomers(customersData);
         
-        // Fetch all products
+        // Fetch products
         const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select('*')
           .eq('user_id', userData.user.id);
           
         if (productsError) throw productsError;
-        
-        // Set data to state
-        setInvoice(invoiceData);
-        setItems(itemsData.map((item: InvoiceItem) => ({
-          ...item,
-          total: item.quantity * item.price
-        })));
-        setCustomers(customersData);
         setProducts(productsData);
         
-        if (invoiceData.due_date) {
-          setDueDate(new Date(invoiceData.due_date));
+        // If we have an ID, fetch the invoice data for editing
+        if (id && id !== 'new') {
+          // Fetch invoice
+          const { data: invoiceData, error: invoiceError } = await supabase
+            .from('invoices')
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+          if (invoiceError) throw invoiceError;
+          
+          // Fetch invoice items
+          const { data: itemsData, error: itemsError } = await supabase
+            .from('invoice_items')
+            .select('*')
+            .eq('invoice_id', id);
+            
+          if (itemsError) throw itemsError;
+          
+          // Set data to state
+          setInvoice(invoiceData);
+          setItems(itemsData.map((item: InvoiceItem) => ({
+            ...item,
+            total: item.quantity * item.price
+          })));
+          
+          if (invoiceData.due_date) {
+            setDueDate(new Date(invoiceData.due_date));
+          }
+        } else {
+          // This is a new invoice
+          setIsNewInvoice(true);
+          setInvoice({
+            customer_id: '',
+            total_amount: 0,
+            tax_amount: 0,
+            status: 'unpaid',
+            due_date: null
+          });
+          setItems([{
+            product_name: '',
+            quantity: 1,
+            price: 0,
+            total: 0,
+            isNew: true
+          }]);
         }
-        
       } catch (error: any) {
         console.error('Error fetching invoice data:', error);
         toast({
           title: "Error",
-          description: `Failed to load invoice: ${error.message}`,
+          description: `Failed to load invoice data: ${error.message}`,
           variant: "destructive"
         });
       } finally {
@@ -132,7 +149,7 @@ const InvoiceEdit = () => {
       }
     };
     
-    fetchInvoiceData();
+    fetchData();
   }, [id, toast]);
   
   const addNewItem = () => {
@@ -215,87 +232,132 @@ const InvoiceEdit = () => {
       // Calculate totals
       const totalAmount = calculateTotal();
       
-      // Update invoice
-      const { error: invoiceUpdateError } = await supabase
-        .from('invoices')
-        .update({
-          customer_id: invoice.customer_id,
-          total_amount: totalAmount,
-          tax_amount: invoice.tax_amount || 0,
-          status: invoice.status,
-          due_date: dueDate ? dueDate.toISOString() : null,
-        })
-        .eq('id', id);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
       
-      if (invoiceUpdateError) throw invoiceUpdateError;
-      
-      // Handle invoice items updates
-      // First, delete existing items that were removed
-      const existingItemIds = items
-        .filter(item => item.id) // Only get items that already exist in DB
-        .map(item => item.id as string); // Type assertion to ensure string
-      
-      // Delete items that are no longer in the items array
-      if (existingItemIds.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('invoice_items')
-          .delete()
-          .eq('invoice_id', id)
-          .not('id', 'in', `(${existingItemIds.join(',')})`);
+      if (isNewInvoice) {
+        // Create new invoice
+        const { data: newInvoice, error: invoiceError } = await supabase
+          .from('invoices')
+          .insert([{
+            customer_id: invoice.customer_id,
+            total_amount: totalAmount,
+            tax_amount: invoice.tax_amount || 0,
+            status: invoice.status,
+            due_date: dueDate ? dueDate.toISOString() : null,
+            user_id: userData.user.id,
+            description: `Invoice for ${customers.find(c => c.id === invoice.customer_id)?.name || 'customer'}`,
+            notification_sent: false
+          }])
+          .select()
+          .single();
         
-        if (deleteError) throw deleteError;
-      } else {
-        // If no existing items left, delete all items for this invoice
-        const { error: deleteAllError } = await supabase
+        if (invoiceError) throw invoiceError;
+        
+        // Insert invoice items
+        const { error: itemsError } = await supabase
           .from('invoice_items')
-          .delete()
-          .eq('invoice_id', id);
+          .insert(
+            items.map(item => ({
+              invoice_id: newInvoice.id,
+              product_id: item.product_id || null,
+              product_name: item.product_name,
+              quantity: item.quantity,
+              price: item.price,
+              total: item.quantity * item.price
+            }))
+          );
+        
+        if (itemsError) throw itemsError;
+        
+        toast({
+          title: "Success",
+          description: "Invoice created successfully"
+        });
+        
+      } else {
+        // Update existing invoice
+        const { error: invoiceUpdateError } = await supabase
+          .from('invoices')
+          .update({
+            customer_id: invoice.customer_id,
+            total_amount: totalAmount,
+            tax_amount: invoice.tax_amount || 0,
+            status: invoice.status,
+            due_date: dueDate ? dueDate.toISOString() : null,
+          })
+          .eq('id', id);
+        
+        if (invoiceUpdateError) throw invoiceUpdateError;
+        
+        // Handle invoice items updates
+        // First, delete existing items that were removed
+        const existingItemIds = items
+          .filter(item => item.id) // Only get items that already exist in DB
+          .map(item => item.id as string); // Type assertion to ensure string
+        
+        // Delete items that are no longer in the items array
+        if (existingItemIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('invoice_items')
+            .delete()
+            .eq('invoice_id', id)
+            .not('id', 'in', `(${existingItemIds.join(',')})`);
           
-        if (deleteAllError) throw deleteAllError;
-      }
-      
-      // Update existing items and insert new ones
-      for (const item of items) {
-        if (item.id) {
-          // Update existing item
-          const { error: updateItemError } = await supabase
-            .from('invoice_items')
-            .update({
-              product_id: item.product_id || null,
-              product_name: item.product_name,
-              quantity: item.quantity,
-              price: item.price
-            })
-            .eq('id', item.id);
-            
-          if (updateItemError) throw updateItemError;
+          if (deleteError) throw deleteError;
         } else {
-          // Insert new item
-          const { error: insertItemError } = await supabase
+          // If no existing items left, delete all items for this invoice
+          const { error: deleteAllError } = await supabase
             .from('invoice_items')
-            .insert({
-              invoice_id: id,
-              product_id: item.product_id || null,
-              product_name: item.product_name,
-              quantity: item.quantity,
-              price: item.price
-            });
+            .delete()
+            .eq('invoice_id', id);
             
-          if (insertItemError) throw insertItemError;
+          if (deleteAllError) throw deleteAllError;
         }
+        
+        // Update existing items and insert new ones
+        for (const item of items) {
+          if (item.id) {
+            // Update existing item
+            const { error: updateItemError } = await supabase
+              .from('invoice_items')
+              .update({
+                product_id: item.product_id || null,
+                product_name: item.product_name,
+                quantity: item.quantity,
+                price: item.price
+              })
+              .eq('id', item.id);
+              
+            if (updateItemError) throw updateItemError;
+          } else {
+            // Insert new item
+            const { error: insertItemError } = await supabase
+              .from('invoice_items')
+              .insert({
+                invoice_id: id,
+                product_id: item.product_id || null,
+                product_name: item.product_name,
+                quantity: item.quantity,
+                price: item.price
+              });
+              
+            if (insertItemError) throw insertItemError;
+          }
+        }
+        
+        toast({
+          title: "Success",
+          description: "Invoice updated successfully"
+        });
       }
-      
-      toast({
-        title: "Success",
-        description: "Invoice updated successfully"
-      });
       
       navigate('/');
     } catch (error: any) {
       console.error('Error updating invoice:', error);
       toast({
         title: "Error",
-        description: `Failed to update invoice: ${error.message}`,
+        description: `Failed to ${isNewInvoice ? 'create' : 'update'} invoice: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -304,7 +366,7 @@ const InvoiceEdit = () => {
   };
   
   if (loading) {
-    return <LoadingSpinner fullScreen message="Loading invoice..." />;
+    return <LoadingSpinner fullScreen message={isNewInvoice ? "Creating new invoice..." : "Loading invoice..."} />;
   }
   
   if (!invoice) {
@@ -343,7 +405,7 @@ const InvoiceEdit = () => {
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Button>
-          <h1 className="text-2xl font-bold">Edit Invoice</h1>
+          <h1 className="text-2xl font-bold">{isNewInvoice ? 'Create New Invoice' : 'Edit Invoice'}</h1>
         </div>
         
         <Card className="mb-8">
@@ -561,12 +623,12 @@ const InvoiceEdit = () => {
             {saving ? (
               <>
                 <LoadingSpinner size="sm" />
-                Saving...
+                {isNewInvoice ? 'Creating...' : 'Saving...'}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Save Invoice
+                {isNewInvoice ? 'Create Invoice' : 'Save Invoice'}
               </>
             )}
           </Button>

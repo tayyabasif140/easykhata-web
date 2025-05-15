@@ -646,7 +646,7 @@ const Index = () => {
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
                   <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
-                  <Button className="gap-2">
+                  <Button className="gap-2" onClick={() => navigate('/invoice/create')}>
                     <Plus className="w-4 h-4" />
                     Create Invoice
                   </Button>
