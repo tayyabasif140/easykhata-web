@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,7 +164,8 @@ const InvoiceEdit = () => {
     ]);
   };
   
-  const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
+  // Fix: Use generic type parameter for value based on field
+  const updateItem = <K extends keyof InvoiceItem>(index: number, field: K, value: InvoiceItem[K]) => {
     const updatedItems = [...items];
     
     updatedItems[index][field] = value;
@@ -174,8 +176,9 @@ const InvoiceEdit = () => {
     }
     
     // If product was selected from inventory
-    if (field === 'product_id' && value) {
-      const selectedProduct = products.find(p => p.id === value);
+    if (field === 'product_id') {
+      const productId = value as string | null;
+      const selectedProduct = products.find(p => p.id === productId);
       if (selectedProduct) {
         updatedItems[index].product_name = selectedProduct.name;
         updatedItems[index].price = selectedProduct.price;
