@@ -511,14 +511,14 @@ const InvoiceEdit = () => {
                         <td className="py-3 px-4">
                           <div className="space-y-2">
                             <Select
-                              value={item.product_id || ''}
-                              onValueChange={(value) => updateItem(index, 'product_id', value)}
+                              value={item.product_id || "custom"}
+                              onValueChange={(value) => updateItem(index, 'product_id', value === "custom" ? null : value)}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select a product or type below" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">Custom Product</SelectItem>
+                                <SelectItem value="custom">Custom Product</SelectItem>
                                 {products.map((product) => (
                                   <SelectItem key={product.id} value={product.id}>
                                     {product.name} (Rs.{product.price})
