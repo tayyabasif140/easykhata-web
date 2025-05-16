@@ -88,12 +88,16 @@ const Header = () => {
 
         <div className="flex items-center space-x-4">
           {user ? (
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
               <ModeToggle />
               
               <Drawer>
                 <DrawerTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full h-9 w-9 flex items-center justify-center"
+                  >
                     <Settings className="h-5 w-5" />
                   </Button>
                 </DrawerTrigger>
@@ -136,7 +140,10 @@ const Header = () => {
                 </DrawerContent>
               </Drawer>
               
-              <Avatar className="cursor-pointer" onClick={handleProfileClick}>
+              <Avatar 
+                className="cursor-pointer h-9 w-9 border-2 border-primary/20 hover:border-primary/40 transition-colors" 
+                onClick={handleProfileClick}
+              >
                 {avatarUrl ? (
                   <AvatarImage 
                     src={avatarUrl} 
@@ -145,7 +152,7 @@ const Header = () => {
                     fetchPriority="high"
                   />
                 ) : (
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary">
                     {avatarLoading ? "..." : user?.email?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 )}
