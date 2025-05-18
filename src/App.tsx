@@ -21,17 +21,16 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Create QueryClient with better performance options
+// Create QueryClient with better performance options - moved outside component
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2, // Reduced retries to prevent excessive network requests
-      staleTime: 2 * 60 * 1000, // 2 minutes - increased to reduce API calls
-      gcTime: 10 * 60 * 1000, // 10 minutes - increased for better caching (was cacheTime)
-      refetchOnWindowFocus: import.meta.env.PROD, // Only in production
+      retry: 2,
+      staleTime: 2 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: import.meta.env.PROD,
       refetchOnReconnect: true,
       refetchOnMount: true,
-      // Remove the suspense property as it's not supported in this context
       meta: {
         errorHandler: (error) => {
           console.error("Query error:", error);
@@ -82,10 +81,10 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
         throw err;
       }
     },
-    retry: 1, // Reduced retries for faster feedback
+    retry: 1,
     enabled: !isInitializing,
-    refetchInterval: 10 * 60 * 1000, // Reduced frequency - 10 minutes
-    refetchOnWindowFocus: false, // Disable to reduce flickering
+    refetchInterval: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -123,52 +122,59 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Optimize main app render
+// Optimize main app render - separate component to avoid React hooks errors
+const AppContent = () => (
+  <BrowserRouter>
+    <Suspense fallback={<LoadingSpinner fullScreen message="Loading application..." />}>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/setup" element={
+          <PrivateRoute>
+            <SetupWizard />
+          </PrivateRoute>
+        } />
+        <Route path="/" element={
+          <PrivateRoute>
+            <Index />
+          </PrivateRoute>
+        } />
+        <Route path="/account" element={
+          <PrivateRoute>
+            <Account />
+          </PrivateRoute>
+        } />
+        <Route path="/customer/:id" element={
+          <PrivateRoute>
+            <CustomerDetails />
+          </PrivateRoute>
+        } />
+        <Route path="/reports" element={
+          <PrivateRoute>
+            <Reports />
+          </PrivateRoute>
+        } />
+        <Route path="/inventory" element={
+          <PrivateRoute>
+            <Inventory />
+          </PrivateRoute>
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  </BrowserRouter>
+);
+
+// Main App component 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Suspense fallback={<LoadingSpinner fullScreen message="Loading application..." />}>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/setup" element={
-              <PrivateRoute>
-                <SetupWizard />
-              </PrivateRoute>
-            } />
-            <Route path="/" element={
-              <PrivateRoute>
-                <Index />
-              </PrivateRoute>
-            } />
-            <Route path="/account" element={
-              <PrivateRoute>
-                <Account />
-              </PrivateRoute>
-            } />
-            <Route path="/customer/:id" element={
-              <PrivateRoute>
-                <CustomerDetails />
-              </PrivateRoute>
-            } />
-            <Route path="/reports" element={
-              <PrivateRoute>
-                <Reports />
-              </PrivateRoute>
-            } />
-            <Route path="/inventory" element={
-              <PrivateRoute>
-                <Inventory />
-              </PrivateRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </React.StrictMode>
 );
 
 export default App;
