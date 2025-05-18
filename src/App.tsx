@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -165,11 +164,6 @@ const App = () => (
               </PrivateRoute>
             } />
             <Route path="/invoice/edit/:id" element={
-              <PrivateRoute>
-                <InvoiceEdit />
-              </PrivateRoute>
-            } />
-            <Route path="/invoice/create" element={
               <PrivateRoute>
                 <InvoiceEdit />
               </PrivateRoute>
