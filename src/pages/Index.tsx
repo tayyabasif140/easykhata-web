@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2, CheckCircle, Receipt, Edit } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2, CheckCircle, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -19,7 +19,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { templates } from "@/utils/invoiceTemplates";
-
 interface TaxPayment {
   id: string;
   amount: number;
@@ -33,7 +32,6 @@ interface MonthlyData {
   expenses: number;
   growth: number;
 }
-
 const Index = () => {
   const navigate = useNavigate();
   const {
@@ -633,9 +631,6 @@ const Index = () => {
                           <Button variant="outline" size="sm" onClick={() => handleDownloadInvoice(invoice)}>
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/invoice/edit/${invoice.id}`)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
                           <Button variant="destructive" size="sm" onClick={() => handleDeleteInvoice(invoice.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -646,7 +641,7 @@ const Index = () => {
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
                   <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
-                  <Button className="gap-2" onClick={() => navigate('/invoice/create')}>
+                  <Button className="gap-2">
                     <Plus className="w-4 h-4" />
                     Create Invoice
                   </Button>
@@ -854,5 +849,4 @@ const Index = () => {
       </main>
     </div>;
 };
-
 export default Index;

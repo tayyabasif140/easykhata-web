@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -19,7 +20,6 @@ const CustomerDetails = lazy(() => import("./pages/CustomerDetails"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const InvoiceEdit = lazy(() => import("./pages/InvoiceEdit"));
 
 // Create QueryClient with better performance options
 const queryClient = new QueryClient({
@@ -161,11 +161,6 @@ const App = () => (
             <Route path="/inventory" element={
               <PrivateRoute>
                 <Inventory />
-              </PrivateRoute>
-            } />
-            <Route path="/invoice/edit/:id" element={
-              <PrivateRoute>
-                <InvoiceEdit />
               </PrivateRoute>
             } />
             <Route path="*" element={<NotFound />} />
