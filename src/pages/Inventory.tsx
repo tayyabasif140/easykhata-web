@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Package, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Package, AlertTriangle, Plus, Trash2, Edit } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ const Inventory = () => {
   const queryClient = useQueryClient();
   const LOW_STOCK_THRESHOLD = 5;
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<{id: string, quantity: number} | null>(null);
   const [newProduct, setNewProduct] = useState({
     product_name: "",
     description: "",
@@ -95,6 +96,7 @@ const Inventory = () => {
         title: "Success",
         description: "Stock updated successfully",
       });
+      setEditingProduct(null);
     }
   });
 
@@ -118,6 +120,16 @@ const Inventory = () => {
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
     addProduct.mutate(newProduct);
+  };
+
+  const handleUpdateQuantity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProduct) {
+      updateStock.mutate({ 
+        id: editingProduct.id, 
+        quantity: editingProduct.quantity 
+      });
+    }
   };
 
   if (isLoading) {
@@ -219,6 +231,36 @@ const Inventory = () => {
           </Dialog>
         </div>
 
+        {/* Edit Stock Dialog */}
+        <Dialog 
+          open={editingProduct !== null} 
+          onOpenChange={(open) => !open && setEditingProduct(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Stock Quantity</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateQuantity} className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="edit-quantity">Quantity</Label>
+                <Input
+                  id="edit-quantity"
+                  type="number"
+                  min="0"
+                  value={editingProduct?.quantity || 0}
+                  onChange={(e) => setEditingProduct(prev => 
+                    prev ? { ...prev, quantity: parseInt(e.target.value) } : null
+                  )}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                Update Stock
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {inventory?.map((item) => (
             <Card key={item.id} className="bg-white">
@@ -275,6 +317,16 @@ const Inventory = () => {
                       }}
                     >
                       +
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingProduct({
+                        id: item.id,
+                        quantity: item.quantity
+                      })}
+                    >
+                      <Edit className="w-4 h-4" />
                     </Button>
                   </div>
                   <div className="flex gap-2">
