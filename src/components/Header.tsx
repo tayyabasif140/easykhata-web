@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
-import { ModeToggle } from "./mode-toggle";
 import { Settings, User } from "lucide-react";
 import { 
   Drawer,
@@ -89,8 +88,6 @@ const Header = () => {
         <div className="flex items-center space-x-4">
           {user ? (
             <div className="flex items-center space-x-4">
-              <ModeToggle />
-              
               <Drawer>
                 <DrawerTrigger asChild>
                   <Button variant="ghost" size="icon">
