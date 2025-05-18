@@ -320,12 +320,10 @@ export const professionalTemplate = async (props: TemplateProps) => {
     doc.line(10, signaturePosition + 15, 80, signaturePosition + 15);
   }
   
-  // Add business name and signer name
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text(businessDetails?.business_name || '', 10, signaturePosition + 20);
-  
+  // Add only signer name if available
   if (profile?.name) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
     doc.text(profile.name, 40, signaturePosition + 10);
   }
   

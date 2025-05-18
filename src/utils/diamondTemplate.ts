@@ -314,15 +314,13 @@ export const diamondTemplate = async (props: TemplateProps) => {
       doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
     }
     
-    // Add business name and signer name
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(businessDetails?.business_name || '', 15, signaturePosition + 20);
-    
+    // Add only signer name if available
     if (profile?.name) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
       doc.text(profile.name, 45, signaturePosition + 10);
     }
-
+    
     // Add payment details and terms with properly adjusted position
     yPos = signaturePosition - 30;
     
