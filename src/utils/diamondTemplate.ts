@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
 import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
@@ -259,18 +260,34 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.text('Total:', pageWidth - 80, yPos);
     doc.text(`${total.toFixed(2)}`, pageWidth - 30, yPos);
 
-    // Add signature - positioned on the right side with proper spacing
-    const signaturePosition = pageHeight - 90;
+    // Add payment details and terms first (so it's in the background)
+    const paymentDetailsYPos = pageHeight - 110;
+    
+    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.roundedRect(10, paymentDetailsYPos, pageWidth - 20, 40, 2, 2, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Payment Details', 15, paymentDetailsYPos + 10);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Thank you for your business!', 15, paymentDetailsYPos + 20);
+    doc.text('Please make payment by the due date.', 15, paymentDetailsYPos + 30);
+
+    // Add signature on top of payment details (positioned on the right side with proper spacing)
+    const signaturePosition = pageHeight - 100;
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text("Authorized Signature:", pageWidth - 90, signaturePosition);
     
-    // Add signature image if available - now on right side
+    // Add signature image if available - positioned to be visible above the payment details
     if (signatureBase64) {
       try {
         console.log("Adding signature to diamond PDF template");
-        doc.addImage(signatureBase64, 'PNG', pageWidth - 90, signaturePosition + 1, 50, 20);
+        doc.addImage(signatureBase64, 'PNG', pageWidth - 90, signaturePosition + 2, 50, 20);
         console.log("Successfully added signature to diamond PDF template");
       } catch (e) {
         console.error("Error adding signature image to diamond template:", e);
@@ -292,7 +309,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
         const signatureBase64Data = await fetchImageAsBase64(signatureUrl);
         
         if (signatureBase64Data) {
-          doc.addImage(signatureBase64Data, 'PNG', pageWidth - 90, signaturePosition + 1, 50, 20);
+          doc.addImage(signatureBase64Data, 'PNG', pageWidth - 90, signaturePosition + 2, 50, 20);
           console.log("Successfully added signature to diamond PDF template");
         } else {
           // Fall back to signature line
@@ -314,27 +331,12 @@ export const diamondTemplate = async (props: TemplateProps) => {
       doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
     }
     
-    // Add only signer name if available
+    // Add only signer name if available - positioned properly under the signature
     if (profile?.name) {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(profile.name, 45, signaturePosition + 10);
+      doc.text(profile.name, pageWidth - 65, signaturePosition + 25);
     }
-    
-    // Add payment details and terms with properly adjusted position
-    yPos = signaturePosition - 30;
-    
-    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.roundedRect(10, yPos, pageWidth - 20, 40, 2, 2, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Payment Details', 15, yPos + 10);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('Thank you for your business!', 15, yPos + 20);
-    doc.text('Please make payment by the due date.', 15, yPos + 30);
 
     // Footer
     const footerYPos = doc.internal.pageSize.height - 10;
