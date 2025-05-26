@@ -1,6 +1,6 @@
+
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
-import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
 import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
 
 export const professionalTemplate = async (props: TemplateProps) => {
@@ -257,18 +257,29 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.text('TOTAL:', pageWidth - 90, yPos);
   doc.text(`${total.toFixed(2)}`, pageWidth - 15, yPos, { align: 'right' });
   
-  // Payment terms and notes
+  // Privacy Policy instead of payment terms
   yPos += 20;
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.text('Payment Terms:', 10, yPos);
+  doc.text('Privacy Policy:', 10, yPos);
   yPos += 7;
   doc.setFont('helvetica', 'normal');
-  doc.text('Please pay within 14 days of receipt.', 10, yPos);
+  doc.setFontSize(9);
   
-  // Add signature - position it above privacy policy
+  if (businessDetails?.privacy_policy) {
+    const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
+    for (let i = 0; i < Math.min(policyText.length, 3); i++) {
+      doc.text(policyText[i], 10, yPos);
+      yPos += 5;
+    }
+  } else {
+    doc.text('Your privacy is important to us. We protect your personal information.', 10, yPos);
+  }
+
+  // Add signature - position it above the footer
   const signaturePosition = pageHeight - 80;
   doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text("Authorized Signature:", 10, signaturePosition);
   
@@ -324,7 +335,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
   if (profile?.name) {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(profile.name, 40, signaturePosition + 10);
+    doc.text(profile.name, 40, signaturePosition + 25);
   }
   
   // Footer with page number
@@ -339,8 +350,6 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.text('Thank you for your business!', pageWidth / 2, footerYPos + 2, { align: 'center' });
   doc.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - 10, footerYPos + 2, { align: 'right' });
   
-  // Add privacy policy
-  addPrivacyPolicy(doc, businessDetails);
-  
   return doc;
 };
+

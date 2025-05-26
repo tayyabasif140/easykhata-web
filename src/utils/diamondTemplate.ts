@@ -2,7 +2,6 @@
 
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
-import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
 import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
 
 export const diamondTemplate = async (props: TemplateProps) => {
@@ -261,30 +260,39 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.text('Total:', pageWidth - 80, yPos);
     doc.text(`${total.toFixed(2)}`, pageWidth - 30, yPos);
 
-    // Add payment details and terms first (so it's in the background)
-    const paymentDetailsYPos = pageHeight - 110;
+    // Add privacy policy instead of payment details
+    const privacyPolicyYPos = pageHeight - 110;
     
     doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.roundedRect(10, paymentDetailsYPos, pageWidth - 20, 40, 2, 2, 'F');
+    doc.roundedRect(10, privacyPolicyYPos, pageWidth - 20, 40, 2, 2, 'F');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text('Payment Details', 15, paymentDetailsYPos + 10);
+    doc.text('Privacy Policy', 15, privacyPolicyYPos + 10);
     
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text('Thank you for your business!', 15, paymentDetailsYPos + 20);
-    doc.text('Please make payment by the due date.', 15, paymentDetailsYPos + 30);
+    doc.setFontSize(9);
+    
+    if (businessDetails?.privacy_policy) {
+      const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 30);
+      let policyYPos = privacyPolicyYPos + 18;
+      for (let i = 0; i < Math.min(policyText.length, 3); i++) {
+        doc.text(policyText[i], 15, policyYPos);
+        policyYPos += 5;
+      }
+    } else {
+      doc.text('Your privacy is important to us. We protect your personal information.', 15, privacyPolicyYPos + 20);
+    }
 
-    // Add signature on top of payment details (positioned on the far right side)
+    // Add signature on top of privacy policy (positioned on the far right side)
     const signaturePosition = pageHeight - 100;
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text("Authorized Signature:", pageWidth - 70, signaturePosition);
     
-    // Add signature image if available - positioned to be visible above the payment details
+    // Add signature image if available - positioned to be visible above the privacy policy
     if (signatureBase64) {
       try {
         console.log("Adding signature to diamond PDF template");
@@ -350,9 +358,6 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFontSize(8);
     doc.text(`Page ${currentPage}`, 10, footerYPos);
     doc.text('Generated with Invoice Manager', pageWidth / 2, footerYPos, { align: 'center' });
-
-    // Add privacy policy
-    addPrivacyPolicy(doc, businessDetails);
 
     return doc;
   } catch (error) {

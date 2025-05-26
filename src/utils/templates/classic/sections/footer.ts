@@ -1,7 +1,7 @@
 
+
 import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
-import { addPrivacyPolicy } from '../utils/privacyPolicy';
 import { fetchImageAsBase64 } from '../utils/images/conversion';
 
 export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<void> => {
@@ -9,12 +9,33 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
   
-  // Add signature at the bottom of the page, but higher up to avoid privacy policy
+  // Add privacy policy instead of payment terms
+  const privacyPolicyPosition = pageHeight - 120;
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Privacy Policy:', 10, privacyPolicyPosition);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  
+  if (businessDetails?.privacy_policy) {
+    const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
+    let yPos = privacyPolicyPosition + 7;
+    for (let i = 0; i < Math.min(policyText.length, 3); i++) {
+      doc.text(policyText[i], 10, yPos);
+      yPos += 5;
+    }
+  } else {
+    doc.text('Your privacy is important to us. We protect your personal information.', 10, privacyPolicyPosition + 7);
+  }
+  
+  // Add signature above privacy policy
   const signatureText = "Authorized Signature:";
-  // Adjusted position to be significantly higher to avoid overlapping with privacy policy
   const signaturePosition = pageHeight - 100;
   
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
   doc.text(signatureText, 10, signaturePosition);
   
   // Add signature image if available
@@ -84,7 +105,5 @@ export const renderFooter = async (doc: jsPDF, props: TemplateProps): Promise<vo
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
   doc.text(`Page 1`, pageWidth / 2, footerYPos, { align: 'center' });
-  
-  // Add privacy policy if available
-  addPrivacyPolicy(doc, businessDetails);
 };
+
