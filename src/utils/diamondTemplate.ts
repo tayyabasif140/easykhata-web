@@ -1,4 +1,5 @@
 
+
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
 import { addPrivacyPolicy } from './templates/classic/utils/privacyPolicy';
@@ -276,25 +277,25 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.text('Thank you for your business!', 15, paymentDetailsYPos + 20);
     doc.text('Please make payment by the due date.', 15, paymentDetailsYPos + 30);
 
-    // Add signature on top of payment details (positioned on the right side with proper spacing)
+    // Add signature on top of payment details (positioned on the far right side)
     const signaturePosition = pageHeight - 100;
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text("Authorized Signature:", pageWidth - 90, signaturePosition);
+    doc.text("Authorized Signature:", pageWidth - 70, signaturePosition);
     
     // Add signature image if available - positioned to be visible above the payment details
     if (signatureBase64) {
       try {
         console.log("Adding signature to diamond PDF template");
-        doc.addImage(signatureBase64, 'PNG', pageWidth - 90, signaturePosition + 2, 50, 20);
+        doc.addImage(signatureBase64, 'PNG', pageWidth - 70, signaturePosition + 2, 50, 20);
         console.log("Successfully added signature to diamond PDF template");
       } catch (e) {
         console.error("Error adding signature image to diamond template:", e);
         // If signature image fails, fall back to signature line
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
-        doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
+        doc.line(pageWidth - 70, signaturePosition + 15, pageWidth - 20, signaturePosition + 15);
       }
     } else if (profile?.digital_signature_url) {
       try {
@@ -309,33 +310,33 @@ export const diamondTemplate = async (props: TemplateProps) => {
         const signatureBase64Data = await fetchImageAsBase64(signatureUrl);
         
         if (signatureBase64Data) {
-          doc.addImage(signatureBase64Data, 'PNG', pageWidth - 90, signaturePosition + 2, 50, 20);
+          doc.addImage(signatureBase64Data, 'PNG', pageWidth - 70, signaturePosition + 2, 50, 20);
           console.log("Successfully added signature to diamond PDF template");
         } else {
           // Fall back to signature line
           doc.setDrawColor(0);
           doc.setLineWidth(0.5);
-          doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
+          doc.line(pageWidth - 70, signaturePosition + 15, pageWidth - 20, signaturePosition + 15);
         }
       } catch (signatureError) {
         console.error("Error adding signature to diamond PDF:", signatureError);
         // Fall back to signature line
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
-        doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
+        doc.line(pageWidth - 70, signaturePosition + 15, pageWidth - 20, signaturePosition + 15);
       }
     } else {
       // Add signature line only if no image
       doc.setDrawColor(0);
       doc.setLineWidth(0.5);
-      doc.line(pageWidth - 90, signaturePosition + 15, pageWidth - 30, signaturePosition + 15);
+      doc.line(pageWidth - 70, signaturePosition + 15, pageWidth - 20, signaturePosition + 15);
     }
     
     // Add only signer name if available - positioned properly under the signature
     if (profile?.name) {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(profile.name, pageWidth - 65, signaturePosition + 25);
+      doc.text(profile.name, pageWidth - 45, signaturePosition + 25);
     }
 
     // Footer
@@ -367,3 +368,4 @@ export const diamondTemplate = async (props: TemplateProps) => {
     return doc;
   }
 };
+
