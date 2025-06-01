@@ -42,6 +42,24 @@ export function CreateInvoiceDialog() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Optimized queries with proper caching - moved businessDetails query before usage
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000, // Updated from cacheTime to gcTime
+  });
+
   // Memoized calculations for better performance
   const subtotal = useMemo(() => 
     products.reduce((sum, product) => sum + (product.quantity * product.price), 0), 
@@ -63,7 +81,6 @@ export function CreateInvoiceDialog() {
 
   const total = useMemo(() => subtotal + totalTax, [subtotal, totalTax]);
 
-  // Optimized queries with proper caching
   const { data: inventoryProducts } = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
@@ -71,8 +88,8 @@ export function CreateInvoiceDialog() {
       if (error) throw error;
       return data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000, // Updated from cacheTime to gcTime
   });
 
   const { data: customers } = useQuery({
@@ -88,6 +105,7 @@ export function CreateInvoiceDialog() {
       return data;
     },
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000, // Updated from cacheTime to gcTime
   });
 
   const { data: profile } = useQuery({
@@ -104,22 +122,7 @@ export function CreateInvoiceDialog() {
       return data;
     },
     staleTime: 10 * 60 * 1000,
-  });
-
-  const { data: businessDetails } = useQuery({
-    queryKey: ['businessDetails'],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return null;
-      const { data, error } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000, // Updated from cacheTime to gcTime
   });
 
   const { data: logos } = useQuery({
@@ -141,6 +144,7 @@ export function CreateInvoiceDialog() {
     },
     enabled: !!profile?.id,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000, // Updated from cacheTime to gcTime
   });
 
   // Optimized product update with debouncing
