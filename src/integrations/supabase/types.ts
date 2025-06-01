@@ -57,6 +57,33 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_columns: {
+        Row: {
+          column_name: string
+          column_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          user_id: string
+        }
+        Insert: {
+          column_name: string
+          column_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_id: string
+        }
+        Update: {
+          column_name?: string
+          column_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           company: string | null
@@ -93,6 +120,85 @@ export type Database = {
         }
         Relationships: []
       }
+      estimate_items: {
+        Row: {
+          description: string | null
+          estimate_id: string | null
+          id: string
+          price: number
+          product_name: string
+          quantity: number
+          total: number
+        }
+        Insert: {
+          description?: string | null
+          estimate_id?: string | null
+          id?: string
+          price: number
+          product_name: string
+          quantity: number
+          total: number
+        }
+        Update: {
+          description?: string | null
+          estimate_id?: string | null
+          id?: string
+          price?: number
+          product_name?: string
+          quantity?: number
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimates: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          id: string
+          status: string
+          tax_amount: number
+          total_amount: number
+          user_id: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+          user_id?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          status?: string
+          tax_amount?: number
+          total_amount?: number
+          user_id?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimates_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           created_at: string
@@ -125,6 +231,7 @@ export type Database = {
       }
       invoice_items: {
         Row: {
+          description: string | null
           id: string
           invoice_id: string | null
           price: number
@@ -133,6 +240,7 @@ export type Database = {
           total: number
         }
         Insert: {
+          description?: string | null
           id?: string
           invoice_id?: string | null
           price: number
@@ -141,6 +249,7 @@ export type Database = {
           total: number
         }
         Update: {
+          description?: string | null
           id?: string
           invoice_id?: string | null
           price?: number

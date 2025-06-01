@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { templates, InvoiceData } from "@/utils/invoiceTemplates";
 import { jsPDF } from "jspdf";
+import { AdditionalFeaturesSettings } from "@/components/AdditionalFeaturesSettings";
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -201,8 +203,8 @@ export default function Settings() {
         phone: "+1 234 567 890",
         email: "customer@example.com",
         products: [
-          { name: "Product 1", quantity: 2, price: 100 },
-          { name: "Product 2", quantity: 1, price: 200 },
+          { name: "Product 1", quantity: 2, price: 100, description: "Sample description" },
+          { name: "Product 2", quantity: 1, price: 200, description: "Another description" },
         ],
         subtotal: 400,
         tax: 40,
@@ -261,6 +263,7 @@ export default function Settings() {
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="business">Business</TabsTrigger>
             <TabsTrigger value="templates">Invoice Templates</TabsTrigger>
+            <TabsTrigger value="features">Additional Features</TabsTrigger>
           </TabsList>
           
           <TabsContent value="profile" className="space-y-4">
@@ -363,42 +366,6 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  {/* Modern Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'modern' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-gray-800 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-6 bg-white w-1/3 mb-2"></div>
-                        <div className="h-4 bg-gray-400 w-1/2 mb-1"></div>
-                        <div className="h-4 bg-gray-400 w-1/3"></div>
-                        <div className="mt-4 h-5 bg-white w-full"></div>
-                        <div className="mt-2 h-3 bg-gray-400 w-3/4"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Modern</h3>
-                    <p className="text-sm text-gray-500 mb-4">Contemporary, minimalist design</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('modern');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('modern');
-                          handleUpdateBusinessDetails({ invoice_template: 'modern' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'modern' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
-                  
                   {/* Professional Template */}
                   <div className={`border rounded-lg p-4 ${previewTemplate === 'professional' ? 'ring-2 ring-primary' : ''}`}>
                     <div className="h-40 bg-blue-50 flex items-center justify-center mb-4">
@@ -472,114 +439,13 @@ export default function Settings() {
                       </Button>
                     </div>
                   </div>
-                  
-                  {/* Golden Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'golden' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-amber-50 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-6 bg-amber-600 w-1/2 mb-2"></div>
-                        <div className="h-4 bg-amber-200 w-2/3 mb-1"></div>
-                        <div className="mt-4 h-5 bg-amber-400 w-full"></div>
-                        <div className="mt-2 h-3 bg-amber-300 w-3/4"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Golden</h3>
-                    <p className="text-sm text-gray-500 mb-4">Elegant, premium design with gold accents</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('golden');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('golden');
-                          handleUpdateBusinessDetails({ invoice_template: 'golden' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'golden' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Bold Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'bold' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-black flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-8 bg-white w-1/3 mb-2"></div>
-                        <div className="h-4 bg-gray-400 w-1/2 mb-1"></div>
-                        <div className="mt-4 h-6 bg-white w-full"></div>
-                        <div className="mt-2 h-4 bg-gray-200 w-1/2"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Bold</h3>
-                    <p className="text-sm text-gray-500 mb-4">Strong, high-contrast design</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('bold');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('bold');
-                          handleUpdateBusinessDetails({ invoice_template: 'bold' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'bold' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Funky Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'funky' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-pink-500 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-6 bg-yellow-300 w-1/2 mb-2"></div>
-                        <div className="h-4 bg-blue-400 w-2/3 mb-1"></div>
-                        <div className="mt-4 h-5 bg-green-400 w-full"></div>
-                        <div className="mt-2 h-3 bg-purple-400 w-3/4"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Funky</h3>
-                    <p className="text-sm text-gray-500 mb-4">Colorful, vibrant design for creative businesses</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('funky');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('funky');
-                          handleUpdateBusinessDetails({ invoice_template: 'funky' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'funky' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="features" className="space-y-4">
+            <AdditionalFeaturesSettings />
           </TabsContent>
         </Tabs>
       </div>

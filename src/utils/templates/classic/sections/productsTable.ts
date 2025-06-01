@@ -12,7 +12,8 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
   // Table header
   doc.setFont('helvetica', 'bold');
   doc.text('Item', 10, yPos);
-  doc.text('Quantity', pageWidth - 80, yPos);
+  doc.text('Description', 80, yPos);
+  doc.text('Qty', pageWidth - 80, yPos);
   doc.text('Price', pageWidth - 50, yPos);
   doc.text('Total', pageWidth - 25, yPos);
   yPos += 5;
@@ -33,7 +34,8 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     // Add header for new page
     doc.setFont('helvetica', 'bold');
     doc.text('Item', 10, yPos);
-    doc.text('Quantity', pageWidth - 80, yPos);
+    doc.text('Description', 80, yPos);
+    doc.text('Qty', pageWidth - 80, yPos);
     doc.text('Price', pageWidth - 50, yPos);
     doc.text('Total', pageWidth - 25, yPos);
     yPos += 5;
@@ -59,11 +61,13 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     
     // Ensure product data is valid
     const productName = product?.name || 'Unknown Product';
+    const productDescription = product?.description || '';
     const productQuantity = isNaN(product?.quantity) ? 0 : product.quantity;
     const productPrice = isNaN(product?.price) ? 0 : product.price;
     const productTotal = productQuantity * productPrice;
     
     doc.text(productName, 10, yPos);
+    doc.text(productDescription, 80, yPos);
     doc.text(productQuantity.toString(), pageWidth - 80, yPos);
     doc.text(`${productPrice.toFixed(2)}`, pageWidth - 50, yPos);
     doc.text(`${productTotal.toFixed(2)}`, pageWidth - 25, yPos);

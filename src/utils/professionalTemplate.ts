@@ -17,7 +17,8 @@ export const professionalTemplate = async (props: TemplateProps) => {
     businessDetails,
     profile,
     logoBase64,
-    signatureBase64
+    signatureBase64,
+    isEstimate = false
   } = props;
 
   // Create a new PDF document
@@ -69,9 +70,9 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFont('helvetica', 'bold');
   doc.text(businessDetails?.business_name || 'Company Name', companyNameXPos, 20);
   
-  // INVOICE text in header
+  // Document type text in header
   doc.setFontSize(16);
-  doc.text('INVOICE', pageWidth - 20, 20, { align: 'right' });
+  doc.text(isEstimate ? 'ESTIMATE' : 'INVOICE', pageWidth - 20, 20, { align: 'right' });
   
   let yPos = 40;
   
@@ -132,19 +133,21 @@ export const professionalTemplate = async (props: TemplateProps) => {
     yPos += 5;
   }
   
-  // Invoice details
+  // Document details
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   yPos += 10;
   
-  doc.text('Invoice Date:', pageWidth - 90, yPos);
+  const dateLabel = isEstimate ? 'Estimate Date:' : 'Invoice Date:';
+  doc.text(dateLabel, pageWidth - 90, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(new Date().toLocaleDateString(), pageWidth - 25, yPos, { align: 'right' });
   yPos += 7;
   
   if (dueDate) {
     doc.setFont('helvetica', 'bold');
-    doc.text('Due Date:', pageWidth - 90, yPos);
+    const dueDateLabel = isEstimate ? 'Valid Until:' : 'Due Date:';
+    doc.text(dueDateLabel, pageWidth - 90, yPos);
     doc.setFont('helvetica', 'normal');
     doc.text(dueDate.toLocaleDateString(), pageWidth - 25, yPos, { align: 'right' });
     yPos += 7;
@@ -164,6 +167,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('Item', 15, yPos);
+  doc.text('Description', 80, yPos);
   doc.text('Quantity', pageWidth - 85, yPos, { align: 'center' });
   doc.text('Price', pageWidth - 50, yPos, { align: 'center' });
   doc.text('Total', pageWidth - 15, yPos, { align: 'right' });
@@ -186,6 +190,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('Item', 15, yPos);
+    doc.text('Description', 80, yPos);
     doc.text('Quantity', pageWidth - 85, yPos, { align: 'center' });
     doc.text('Price', pageWidth - 50, yPos, { align: 'center' });
     doc.text('Total', pageWidth - 15, yPos, { align: 'right' });
@@ -214,6 +219,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
     }
     
     doc.text(product.name, 15, yPos);
+    doc.text(product.description || '', 80, yPos);
     doc.text(product.quantity.toString(), pageWidth - 85, yPos, { align: 'center' });
     doc.text(`${product.price.toFixed(2)}`, pageWidth - 50, yPos, { align: 'center' });
     doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 15, yPos, { align: 'right' });
@@ -257,23 +263,41 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.text('TOTAL:', pageWidth - 90, yPos);
   doc.text(`${total.toFixed(2)}`, pageWidth - 15, yPos, { align: 'right' });
   
-  // Privacy Policy instead of payment terms
+  // Terms and Conditions or Privacy Policy
   yPos += 20;
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.text('Privacy Policy:', 10, yPos);
-  yPos += 7;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
   
-  if (businessDetails?.privacy_policy) {
-    const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
-    for (let i = 0; i < Math.min(policyText.length, 3); i++) {
-      doc.text(policyText[i], 10, yPos);
-      yPos += 5;
+  if (isEstimate) {
+    doc.text('Terms & Conditions:', 10, yPos);
+    yPos += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    if (businessDetails?.terms_and_conditions) {
+      const termsText = doc.splitTextToSize(businessDetails.terms_and_conditions, pageWidth - 20);
+      for (let i = 0; i < Math.min(termsText.length, 3); i++) {
+        doc.text(termsText[i], 10, yPos);
+        yPos += 5;
+      }
+    } else {
+      doc.text('This estimate is valid for 30 days. Terms and conditions apply.', 10, yPos);
     }
   } else {
-    doc.text('Your privacy is important to us. We protect your personal information.', 10, yPos);
+    doc.text('Privacy Policy:', 10, yPos);
+    yPos += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    if (businessDetails?.privacy_policy) {
+      const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 20);
+      for (let i = 0; i < Math.min(policyText.length, 3); i++) {
+        doc.text(policyText[i], 10, yPos);
+        yPos += 5;
+      }
+    } else {
+      doc.text('Your privacy is important to us. We protect your personal information.', 10, yPos);
+    }
   }
 
   // Add signature - position it above the footer
@@ -352,4 +376,3 @@ export const professionalTemplate = async (props: TemplateProps) => {
   
   return doc;
 };
-

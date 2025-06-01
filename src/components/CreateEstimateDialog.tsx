@@ -14,12 +14,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Textarea } from "./ui/textarea";
 
 interface Product {
   id: string;
   name: string;
   quantity: number;
   price: number;
+  description?: string;
 }
 
 export function CreateEstimateDialog() {
@@ -62,12 +64,29 @@ export function CreateEstimateDialog() {
     }
   });
 
+  const { data: inventory } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const addProduct = () => {
     setProducts([...products, { 
       id: Date.now().toString(), 
       name: "", 
       quantity: 1, 
-      price: 0 
+      price: 0,
+      description: ""
     }]);
   };
 
@@ -78,6 +97,17 @@ export function CreateEstimateDialog() {
   const updateProduct = (id: string, field: keyof Product, value: string | number) => {
     setProducts(products.map(p => 
       p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const selectInventoryItem = (id: string, inventoryItem: any) => {
+    setProducts(products.map(p => 
+      p.id === id ? { 
+        ...p, 
+        name: inventoryItem.product_name,
+        price: inventoryItem.price,
+        description: inventoryItem.description || ""
+      } : p
     ));
   };
 
@@ -125,6 +155,7 @@ export function CreateEstimateDialog() {
       const estimateItems = products.map(product => ({
         estimate_id: estimate.id,
         product_name: product.name,
+        description: product.description || null,
         quantity: product.quantity,
         price: product.price,
         total: product.quantity * product.price
@@ -229,52 +260,84 @@ export function CreateEstimateDialog() {
             </div>
 
             {products.map((product, index) => (
-              <div key={product.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-4 border rounded-lg">
-                <div className="sm:col-span-5">
-                  <Label className="text-sm">Product/Service Name</Label>
-                  <Input
-                    value={product.name}
-                    onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                    placeholder="Enter product name"
-                    required
-                  />
+              <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm">Product/Service Name</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={product.name}
+                        onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                        placeholder="Enter product name"
+                        required
+                        className="flex-1"
+                      />
+                      <Select onValueChange={(value) => {
+                        const item = inventory?.find(inv => inv.id === value);
+                        if (item) selectInventoryItem(product.id, item);
+                      }}>
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="From Inventory" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {inventory?.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.product_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Description</Label>
+                    <Textarea
+                      value={product.description || ""}
+                      onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                      placeholder="Enter description (optional)"
+                      className="min-h-[60px]"
+                    />
+                  </div>
                 </div>
-                <div className="sm:col-span-2">
-                  <Label className="text-sm">Quantity</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={product.quantity}
-                    onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-3">
-                  <Label className="text-sm">Price (Rs.)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={product.price}
-                    onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-1 flex items-end">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeProduct(product.id)}
-                    className="w-full sm:w-auto"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="sm:col-span-1 flex items-end">
-                  <span className="text-sm font-medium">
-                    Rs.{(product.quantity * product.price).toFixed(2)}
-                  </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                  <div>
+                    <Label className="text-sm">Quantity</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={product.quantity}
+                      onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Price (Rs.)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={product.price}
+                      onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <span className="text-sm font-medium">
+                      Total: Rs.{(product.quantity * product.price).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeProduct(product.id)}
+                      className="w-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

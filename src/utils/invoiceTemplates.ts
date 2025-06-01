@@ -13,6 +13,7 @@ export interface TemplateProps {
     name: string;
     quantity: number;
     price: number;
+    description?: string;
   }[];
   subtotal: number;
   tax: number;
