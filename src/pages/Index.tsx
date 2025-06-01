@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2, CheckCircle, Receipt } from "lucide-react";
+import { FileText, ChartBar, Package, UserPlus, Plus, IndianRupee, Download, Eye, Trash2, CheckCircle, Receipt, Edit2, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { templates } from "@/utils/invoiceTemplates";
+
 interface TaxPayment {
   id: string;
   amount: number;
@@ -32,6 +33,7 @@ interface MonthlyData {
   expenses: number;
   growth: number;
 }
+
 const Index = () => {
   const navigate = useNavigate();
   const {
@@ -45,6 +47,7 @@ const Index = () => {
   const [taxDate, setTaxDate] = useState<Date>();
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+
   const {
     data: customers
   } = useQuery({
@@ -99,6 +102,7 @@ const Index = () => {
     },
     refetchInterval: 1000 * 60 * 60 // Refresh every hour
   });
+
   const handleDeleteCustomer = async (customerId: string) => {
     try {
       const {
@@ -127,6 +131,7 @@ const Index = () => {
       });
     }
   };
+
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
       const {
@@ -148,6 +153,7 @@ const Index = () => {
       });
     }
   };
+
   const handleMarkAsPaid = async (invoiceId: string) => {
     try {
       const {
@@ -171,8 +177,10 @@ const Index = () => {
       });
     }
   };
+
   const totalPaidInvoices = invoices?.reduce((sum, invoice) => invoice.status === 'paid' ? sum + Number(invoice.total_amount) : sum, 0) || 0;
   const totalUnpaidInvoices = invoices?.reduce((sum, invoice) => invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0) || 0;
+
   const calculateSalesData = () => {
     if (!invoices?.length) return [];
     const now = new Date();
@@ -236,7 +244,9 @@ const Index = () => {
       amount: parseFloat(amount.toFixed(2))
     }));
   };
+
   const salesData = calculateSalesData();
+
   const {
     data: taxPayments
   } = useQuery({
@@ -246,16 +256,36 @@ const Index = () => {
         data: userData
       } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-      const {
-        data,
-        error
-      } = await supabase.from('tax_payments').select('*').eq('user_id', userData.user.id).order('payment_date', {
-        ascending: false
-      });
+      
+      const { data, error } = await supabase
+        .from('tax_payments')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .order('payment_date', { ascending: false });
+      
       if (error) throw error;
       return data as TaxPayment[];
     }
   });
+
+  const deleteTaxPayment = useMutation({
+    mutationFn: async (taxId: string) => {
+      const { error } = await supabase
+        .from('tax_payments')
+        .delete()
+        .eq('id', taxId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['taxPayments'] });
+      toast({
+        title: "Success",
+        description: "Tax payment deleted successfully"
+      });
+    }
+  });
+
   const handlePreviewInvoice = async (invoice: any) => {
     try {
       const {
@@ -325,6 +355,7 @@ const Index = () => {
       });
     }
   };
+
   const handleDownloadInvoice = async (invoice: any) => {
     try {
       const {
@@ -381,6 +412,7 @@ const Index = () => {
       });
     }
   };
+
   const addTaxPayment = useMutation({
     mutationFn: async (payment: {
       amount: number;
@@ -413,6 +445,7 @@ const Index = () => {
       });
     }
   });
+
   const calculateGrowthData = (): MonthlyData[] => {
     if (!invoices?.length) return [];
     const monthlyData: {
@@ -445,6 +478,7 @@ const Index = () => {
     });
     return monthsArray;
   };
+
   const fetchInvoiceItems = async (invoiceId: string) => {
     try {
       console.log("Fetching invoice items for:", invoiceId);
@@ -463,6 +497,7 @@ const Index = () => {
       return [];
     }
   };
+
   useEffect(() => {
     if (selectedInvoice && !selectedInvoice.items) {
       fetchInvoiceItems(selectedInvoice.id).then(items => {
@@ -473,6 +508,7 @@ const Index = () => {
       });
     }
   }, [selectedInvoice]);
+
   return <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
@@ -505,56 +541,84 @@ const Index = () => {
           </div>}
 
         <div className="mt-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
-              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
-                <FileText className="w-6 h-6 text-primary" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {/* Invoice */}
+            <div onClick={() => document.querySelector<HTMLButtonElement>('[data-create-invoice]')?.click()} 
+                 className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-3 sm:mb-4">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
-              <p className="text-gray-600">Create and manage your invoices easily</p>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Invoice</h3>
+              <p className="text-sm text-gray-600">Create and manage your invoices easily</p>
             </div>
 
-            <div onClick={() => navigate('/reports')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
-              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
-                <ChartBar className="w-6 h-6 text-primary" />
+            {/* Estimates */}
+            <div onClick={() => navigate('/estimates')} 
+                 className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-3 sm:mb-4">
+                <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Report</h3>
-              <p className="text-gray-600">View detailed financial reports and analytics</p>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Estimates</h3>
+              <p className="text-sm text-gray-600">Create estimates and quotes for clients</p>
             </div>
 
-            <div onClick={() => navigate('/inventory')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
-              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
-                <Package className="w-6 h-6 text-primary" />
+            {/* Report */}
+            <div onClick={() => navigate('/reports')} 
+                 className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-3 sm:mb-4">
+                <ChartBar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Inventory</h3>
-              <p className="text-gray-600">Track and manage your product stock</p>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Report</h3>
+              <p className="text-sm text-gray-600">View detailed financial reports and analytics</p>
             </div>
 
-            <div onClick={() => setShowTaxDialog(true)} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
-              <div className="w-12 h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-4">
-                <IndianRupee className="w-6 h-6 text-primary" />
+            {/* Inventory */}
+            <div onClick={() => navigate('/inventory')} 
+                 className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-3 sm:mb-4">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Tax</h3>
-              <p className="text-gray-600">Record and track your tax payments</p>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Inventory</h3>
+              <p className="text-sm text-gray-600">Track and manage your product stock</p>
+            </div>
+
+            {/* Tax */}
+            <div onClick={() => setShowTaxDialog(true)} 
+                 className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 hover:border-primary/30 transition-colors group cursor-pointer sm:col-span-2 lg:col-span-1 lg:col-start-2">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/5 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors mb-3 sm:mb-4">
+                <IndianRupee className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              </div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Tax</h3>
+              <p className="text-sm text-gray-600">Record and track your tax payments</p>
             </div>
           </div>
         </div>
 
         <div className="mt-12">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 className="text-xl font-semibold text-gray-900">Customers</h2>
-            <CreateCustomerDialog />
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <CreateCustomerDialog />
+              {customers && customers.length > 3 && (
+                <Button variant="outline" onClick={() => navigate('/all-customers')} className="w-full sm:w-auto">
+                  View All ({customers.length})
+                </Button>
+              )}
+            </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6">
-              {customers?.length ? <div className="divide-y">
-                  {customers.map(customer => <div key={customer.id} className="py-4 flex justify-between items-center hover:bg-gray-50 px-4 -mx-4 transition-colors">
-                      <div className="cursor-pointer" onClick={() => navigate(`/customer/${customer.id}`)}>
+            <div className="p-4 sm:p-6">
+              {customers?.length ? (
+                <div className="divide-y">
+                  {customers.slice(0, 3).map((customer) => (
+                    <div key={customer.id} className="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center hover:bg-gray-50 px-4 -mx-4 transition-colors gap-4">
+                      <div className="cursor-pointer flex-1" onClick={() => navigate(`/customer/${customer.id}`)}>
                         <h3 className="font-medium">{customer.name}</h3>
                         <p className="text-sm text-gray-600">{customer.email}</p>
+                        {customer.company && <p className="text-sm text-gray-500">{customer.company}</p>}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
+                      <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <div className="text-right flex-1 sm:flex-none">
                           <p className="text-sm font-medium">Total Outstanding</p>
                           <p className="text-sm text-red-600">Rs.{customer.total_unpaid?.toLocaleString() || '0'}</p>
                         </div>
@@ -562,43 +626,57 @@ const Index = () => {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>)}
-                </div> : <div className="text-center py-8">
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
                   <UserPlus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No customers yet</h3>
                   <p className="text-gray-600 mb-4">Start by adding your first customer</p>
-                  <Button className="gap-2">
-                    <UserPlus className="w-4 h-4" />
-                    Add Customer
-                  </Button>
-                </div>}
+                  <CreateCustomerDialog />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="mt-12">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 className="text-xl font-semibold text-gray-900">Recent Invoices</h2>
-            <div className="flex gap-2">
-              {selectedInvoices.length > 0 && <Button variant="outline" onClick={() => {
-              selectedInvoices.forEach(id => {
-                const invoice = invoices?.find(inv => inv.id === id);
-                if (invoice) handleDownloadInvoice(invoice);
-              });
-            }}>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {selectedInvoices.length > 0 && (
+                <Button variant="outline" onClick={() => {
+                  selectedInvoices.forEach(id => {
+                    const invoice = invoices?.find(inv => inv.id === id);
+                    if (invoice) handleDownloadInvoice(invoice);
+                  });
+                }} className="w-full sm:w-auto">
                   Download Selected
-                </Button>}
+                </Button>
+              )}
               <CreateInvoiceDialog />
+              {invoices && invoices.length > 5 && (
+                <Button variant="outline" onClick={() => navigate('/all-invoices')} className="w-full sm:w-auto">
+                  View All ({invoices.length})
+                </Button>
+              )}
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6">
-              {invoices?.length ? <div className="divide-y">
-                  {invoices.map(invoice => <Card key={invoice.id} className="overflow-hidden">
+            <div className="p-4 sm:p-6">
+              {invoices?.length ? (
+                <div className="space-y-4">
+                  {invoices.slice(0, 5).map((invoice) => (
+                    <Card key={invoice.id} className="overflow-hidden">
                       <CardHeader className="pb-2">
-                        <CardTitle className="flex justify-between items-center">
-                          <span>{invoice.customers.name}</span>
-                          <span className={`px-2 py-1 text-xs rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                        <CardTitle className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <span className="text-lg">{invoice.customers.name}</span>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            invoice.status === 'paid' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
                             {invoice.status}
                           </span>
                         </CardTitle>
@@ -607,68 +685,76 @@ const Index = () => {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-2xl font-bold">Rs.{invoice.total_amount + invoice.tax_amount}</p>
+                        <p className="text-xl sm:text-2xl font-bold">Rs.{(invoice.total_amount + invoice.tax_amount).toLocaleString()}</p>
                         <p className="text-sm text-gray-500">
                           Created: {format(new Date(invoice.created_at), 'MMM d, yyyy')}
                         </p>
-                        {invoice.due_date && <p className="text-sm text-gray-500">
+                        {invoice.due_date && (
+                          <p className="text-sm text-gray-500">
                             Due: {format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                          </p>}
+                          </p>
+                        )}
                       </CardContent>
-                      <CardFooter className="flex justify-between border-t pt-4">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)}>
+                      <CardFooter className="flex flex-col sm:flex-row justify-between border-t pt-4 gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)} className="w-full sm:w-auto">
                           <Eye className="w-4 h-4 mr-2" />
                           Details
                         </Button>
-                        <div className="flex space-x-2">
-                          {invoice.status === 'unpaid' && <Button variant="success" size="sm" onClick={() => handleMarkAsPaid(invoice.id)} className="flex items-center gap-1">
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                          {invoice.status === 'unpaid' && (
+                            <Button variant="default" size="sm" onClick={() => handleMarkAsPaid(invoice.id)} 
+                                    className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700">
                               <CheckCircle className="w-4 h-4" />
-                              Mark Paid
-                            </Button>}
-                          <Button variant="outline" size="sm" onClick={() => handlePreviewInvoice(invoice)}>
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => handlePreviewInvoice(invoice)} className="flex-1 sm:flex-none">
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDownloadInvoice(invoice)}>
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadInvoice(invoice)} className="flex-1 sm:flex-none">
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteInvoice(invoice.id)}>
+                          <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteInvoice(invoice.id)} className="flex-1 sm:flex-none">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </CardFooter>
-                    </Card>)}
-                </div> : <div className="text-center py-8">
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No invoices yet</h3>
                   <p className="text-gray-600 mb-4">Start by creating your first invoice</p>
-                  <Button className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Create Invoice
-                  </Button>
-                </div>}
+                  <CreateInvoiceDialog />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         <div className="mt-12">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h3 className="text-lg font-semibold text-gray-900">Sales Overview</h3>
-            <div className="flex gap-2">
-              <Button variant={timeRange === '1D' ? 'default' : 'outline'} onClick={() => setTimeRange('1D')}>
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <Button variant={timeRange === '1D' ? 'default' : 'outline'} onClick={() => setTimeRange('1D')} size="sm">
                 1 Day
               </Button>
-              <Button variant={timeRange === '30D' ? 'default' : 'outline'} onClick={() => setTimeRange('30D')}>
+              <Button variant={timeRange === '30D' ? 'default' : 'outline'} onClick={() => setTimeRange('30D')} size="sm">
                 30 Days
               </Button>
-              <Button variant={timeRange === '1Y' ? 'default' : 'outline'} onClick={() => setTimeRange('1Y')}>
+              <Button variant={timeRange === '1Y' ? 'default' : 'outline'} onClick={() => setTimeRange('1Y')} size="sm">
                 1 Year
               </Button>
-              <Button variant={timeRange === '5Y' ? 'default' : 'outline'} onClick={() => setTimeRange('5Y')}>
+              <Button variant={timeRange === '5Y' ? 'default' : 'outline'} onClick={() => setTimeRange('5Y')} size="sm">
                 5 Years
               </Button>
             </div>
           </div>
-          <div className="h-80">
+          <div className="h-64 sm:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -688,7 +774,7 @@ const Index = () => {
                 <CardTitle>Business Growth</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
+                <div className="h-64 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={calculateGrowthData()}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -707,17 +793,24 @@ const Index = () => {
                 <CardTitle>Tax Payments</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {taxPayments?.map(payment => <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
-                      <div>
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {taxPayments?.map((payment) => (
+                    <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
+                      <div className="flex-1">
                         <p className="font-medium">Rs.{payment.amount.toLocaleString()}</p>
                         <p className="text-sm text-gray-500">{new Date(payment.payment_date).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-600">{payment.description}</p>
                       </div>
-                      <p className="text-sm text-gray-600">{payment.description}</p>
-                    </div>)}
-                  <Button onClick={() => {
-                  setShowTaxDialog(true);
-                }} className="w-full">
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => deleteTaxPayment.mutate(payment.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button onClick={() => setShowTaxDialog(true)} className="w-full">
                     Record Tax Payment
                   </Button>
                 </div>
@@ -727,39 +820,60 @@ const Index = () => {
         </div>
 
         <Dialog open={showTaxDialog} onOpenChange={setShowTaxDialog}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Record Tax Payment</DialogTitle>
             </DialogHeader>
-            <form onSubmit={e => {
-            e.preventDefault();
-            if (!taxDate || !taxAmount) return;
-            addTaxPayment.mutate({
-              amount: parseFloat(taxAmount),
-              description: taxDescription,
-              payment_date: taxDate
-            });
-          }}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!taxDate || !taxAmount) return;
+              addTaxPayment.mutate({
+                amount: parseFloat(taxAmount),
+                description: taxDescription,
+                payment_date: taxDate
+              });
+            }}>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Amount</Label>
-                  <Input type="number" value={taxAmount} onChange={e => setTaxAmount(e.target.value)} placeholder="Enter amount" required />
+                  <Input 
+                    type="number" 
+                    value={taxAmount} 
+                    onChange={(e) => setTaxAmount(e.target.value)} 
+                    placeholder="Enter amount" 
+                    required 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Input value={taxDescription} onChange={e => setTaxDescription(e.target.value)} placeholder="Enter description" />
+                  <Input 
+                    value={taxDescription} 
+                    onChange={(e) => setTaxDescription(e.target.value)} 
+                    placeholder="Enter description" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Date</Label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !taxDate && "text-muted-foreground")}>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !taxDate && "text-muted-foreground"
+                        )}
+                      >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {taxDate ? format(taxDate, "PPP") : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={taxDate} onSelect={setTaxDate} initialFocus />
+                      <Calendar
+                        mode="single"
+                        selected={taxDate}
+                        onSelect={setTaxDate}
+                        initialFocus
+                      />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -826,13 +940,15 @@ const Index = () => {
                     <p className="font-bold">Total: Rs.{(selectedInvoice.total_amount || 0) + (selectedInvoice.tax_amount || 0)}</p>
                   </div>
                   <div className="flex space-x-2">
-                    {selectedInvoice.status === 'unpaid' && <Button variant="success" onClick={() => {
-                  handleMarkAsPaid(selectedInvoice.id);
-                  setSelectedInvoice(null);
-                }}>
+                    {selectedInvoice.status === 'unpaid' && (
+                      <Button variant="success" onClick={() => {
+                        handleMarkAsPaid(selectedInvoice.id);
+                        setSelectedInvoice(null);
+                      }}>
                         <CheckCircle className="w-4 h-4 mr-2" />
                         Mark as Paid
-                      </Button>}
+                      </Button>
+                    )}
                     <Button onClick={() => handlePreviewInvoice(selectedInvoice)}>
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
@@ -849,4 +965,5 @@ const Index = () => {
       </main>
     </div>;
 };
+
 export default Index;

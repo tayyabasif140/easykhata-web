@@ -19,6 +19,9 @@ const Account = lazy(() => import("./pages/Account"));
 const CustomerDetails = lazy(() => import("./pages/CustomerDetails"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Inventory = lazy(() => import("./pages/Inventory"));
+const Estimates = lazy(() => import("./pages/Estimates"));
+const AllCustomers = lazy(() => import("./pages/AllCustomers"));
+const AllInvoices = lazy(() => import("./pages/AllInvoices"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Create QueryClient with better performance options - moved outside component
@@ -146,6 +149,21 @@ const AppContent = () => (
         <Route path="/customer/:id" element={
           <PrivateRoute>
             <CustomerDetails />
+          </PrivateRoute>
+        } />
+        <Route path="/estimates" element={
+          <PrivateRoute>
+            <Estimates />
+          </PrivateRoute>
+        } />
+        <Route path="/all-customers" element={
+          <PrivateRoute>
+            <AllCustomers />
+          </PrivateRoute>
+        } />
+        <Route path="/all-invoices" element={
+          <PrivateRoute>
+            <AllInvoices />
           </PrivateRoute>
         } />
         <Route path="/reports" element={

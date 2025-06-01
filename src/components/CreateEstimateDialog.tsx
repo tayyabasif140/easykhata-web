@@ -1,0 +1,312 @@
+
+import { useState, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Plus, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+
+interface Product {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+export function CreateEstimateDialog() {
+  const [open, setOpen] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [validUntil, setValidUntil] = useState<Date>();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Memoized calculations
+  const subtotal = useMemo(() => 
+    products.reduce((sum, product) => sum + (product.quantity * product.price), 0), 
+    [products]
+  );
+
+  const totalTax = useMemo(() => {
+    return products.reduce((sum, product) => {
+      const productTotal = product.quantity * product.price;
+      return sum + (productTotal * 0.17); // 17% tax
+    }, 0);
+  }, [products]);
+
+  const total = useMemo(() => subtotal + totalTax, [subtotal, totalTax]);
+
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const addProduct = () => {
+    setProducts([...products, { 
+      id: Date.now().toString(), 
+      name: "", 
+      quantity: 1, 
+      price: 0 
+    }]);
+  };
+
+  const removeProduct = (id: string) => {
+    setProducts(products.filter(p => p.id !== id));
+  };
+
+  const updateProduct = (id: string, field: keyof Product, value: string | number) => {
+    setProducts(products.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!customerId || products.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select a customer and add at least one product",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    // Show immediate notification
+    toast({
+      title: "Creating estimate...",
+      description: "Your estimate is being generated",
+    });
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Create estimate
+      const { data: estimate, error: estimateError } = await supabase
+        .from('estimates')
+        .insert([{
+          customer_id: customerId,
+          total_amount: subtotal,
+          tax_amount: totalTax,
+          valid_until: validUntil?.toISOString().split('T')[0],
+          user_id: userData.user.id,
+          status: 'draft'
+        }])
+        .select()
+        .single();
+
+      if (estimateError) throw estimateError;
+
+      // Create estimate items
+      const estimateItems = products.map(product => ({
+        estimate_id: estimate.id,
+        product_name: product.name,
+        quantity: product.quantity,
+        price: product.price,
+        total: product.quantity * product.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('estimate_items')
+        .insert(estimateItems);
+
+      if (itemsError) throw itemsError;
+
+      toast({
+        title: "Success",
+        description: "Estimate created successfully!",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['estimates'] });
+      setOpen(false);
+      
+      // Reset form
+      setCustomerId("");
+      setValidUntil(undefined);
+      setProducts([]);
+
+    } catch (error: any) {
+      console.error('Error creating estimate:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create estimate",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="gap-2 w-full sm:w-auto" data-create-estimate>
+          <Plus className="w-4 h-4" />
+          Create Estimate
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Estimate</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <Select value={customerId} onValueChange={setCustomerId} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers?.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name} {customer.company ? `(${customer.company})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Valid Until</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !validUntil && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {validUntil ? format(validUntil, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={validUntil}
+                    onSelect={setValidUntil}
+                    initialFocus
+                    className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-lg font-semibold">Products/Services</Label>
+              <Button type="button" onClick={addProduct} size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Item
+              </Button>
+            </div>
+
+            {products.map((product, index) => (
+              <div key={product.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-4 border rounded-lg">
+                <div className="sm:col-span-5">
+                  <Label className="text-sm">Product/Service Name</Label>
+                  <Input
+                    value={product.name}
+                    onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                    placeholder="Enter product name"
+                    required
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-sm">Quantity</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={product.quantity}
+                    onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
+                    required
+                  />
+                </div>
+                <div className="sm:col-span-3">
+                  <Label className="text-sm">Price (Rs.)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={product.price}
+                    onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                    required
+                  />
+                </div>
+                <div className="sm:col-span-1 flex items-end">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeProduct(product.id)}
+                    className="w-full sm:w-auto"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="sm:col-span-1 flex items-end">
+                  <span className="text-sm font-medium">
+                    Rs.{(product.quantity * product.price).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="space-y-2 text-right">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>Rs.{subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax (17%):</span>
+                <span>Rs.{totalTax.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Total:</span>
+                <span>Rs.{total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Estimate"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
