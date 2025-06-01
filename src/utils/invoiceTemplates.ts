@@ -22,6 +22,7 @@ export interface TemplateProps {
   profile: any;
   signatureBase64?: string | null;
   logoBase64?: string | null;
+  isEstimate?: boolean;
 }
 
 export interface InvoiceData extends TemplateProps {}
