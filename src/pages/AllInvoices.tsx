@@ -1,20 +1,20 @@
 
 import Header from "@/components/Header";
-import { FileText, Download, Eye, Trash2, CheckCircle, Edit2, ArrowLeft } from "lucide-react";
+import { FileText, Eye, Download, Trash2, Edit2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 import { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
-import { templates } from "@/utils/invoiceTemplates";
+import { generateInvoicePDF } from "@/utils/invoiceTemplates";
+import { EditInvoiceDialog } from "@/components/EditInvoiceDialog";
 
 const AllInvoices = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
 
   const { data: invoices } = useQuery({
     queryKey: ['invoices'],
@@ -28,7 +28,9 @@ const AllInvoices = () => {
           *,
           customers (
             name,
-            company
+            company,
+            email,
+            phone
           )
         `)
         .eq('user_id', userData.user.id)
@@ -96,14 +98,6 @@ const AllInvoices = () => {
       
       if (itemsError) throw itemsError;
 
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', invoice.customer_id)
-        .single();
-      
-      if (customerError) throw customerError;
-
       const { data: businessDetails, error: businessError } = await supabase
         .from('business_details')
         .select('*')
@@ -121,19 +115,17 @@ const AllInvoices = () => {
       if (profileError) throw profileError;
 
       const template = businessDetails?.invoice_template || 'classic';
-      const templateFn = templates[template as keyof typeof templates];
       
-      if (!templateFn) throw new Error('Invalid template');
-
-      const doc = await templateFn({
-        customerName: customer.name,
-        companyName: customer.company || '',
-        phone: customer.phone || '',
-        email: customer.email,
+      const doc = await generateInvoicePDF(template, {
+        customerName: invoice.customers.name,
+        companyName: invoice.customers.company || '',
+        phone: invoice.customers.phone || '',
+        email: invoice.customers.email,
         products: invoiceItems.map((item: any) => ({
           name: item.product_name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          description: item.description || ''
         })),
         subtotal: invoice.total_amount,
         tax: invoice.tax_amount,
@@ -149,7 +141,7 @@ const AllInvoices = () => {
         previewWindow.document.write(`
           <html>
             <head>
-              <title>Invoice Preview - ${customer.name}</title>
+              <title>Invoice Preview - ${invoice.customers.name}</title>
               <style>
                 body { margin: 0; padding: 0; }
                 iframe { width: 100%; height: 100vh; border: none; }
@@ -180,14 +172,6 @@ const AllInvoices = () => {
       
       if (itemsError) throw itemsError;
 
-      const { data: customer, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', invoice.customer_id)
-        .single();
-      
-      if (customerError) throw customerError;
-
       const { data: businessDetails, error: businessError } = await supabase
         .from('business_details')
         .select('*')
@@ -205,19 +189,17 @@ const AllInvoices = () => {
       if (profileError) throw profileError;
 
       const template = businessDetails?.invoice_template || 'classic';
-      const templateFn = templates[template as keyof typeof templates];
       
-      if (!templateFn) throw new Error('Invalid template');
-
-      const doc = await templateFn({
-        customerName: customer.name,
-        companyName: customer.company || '',
-        phone: customer.phone || '',
-        email: customer.email,
+      const doc = await generateInvoicePDF(template, {
+        customerName: invoice.customers.name,
+        companyName: invoice.customers.company || '',
+        phone: invoice.customers.phone || '',
+        email: invoice.customers.email,
         products: invoiceItems.map((item: any) => ({
           name: item.product_name,
           quantity: item.quantity,
-          price: item.price
+          price: item.price,
+          description: item.description || ''
         })),
         subtotal: invoice.total_amount,
         tax: invoice.tax_amount,
@@ -246,20 +228,8 @@ const AllInvoices = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => navigate('/')}
-              className="gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">All Invoices</h1>
-          </div>
-          <CreateInvoiceDialog />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">All Invoices</h1>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -274,9 +244,9 @@ const AllInvoices = () => {
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           invoice.status === 'paid' 
                             ? 'bg-green-100 text-green-800' 
-                            : 'bg-amber-100 text-amber-800'
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {invoice.status}
+                          {invoice.status === 'paid' ? 'Paid' : 'Unpaid'}
                         </span>
                       </CardTitle>
                       <CardDescription>
@@ -284,9 +254,7 @@ const AllInvoices = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-xl sm:text-2xl font-bold">
-                        Rs.{(invoice.total_amount + invoice.tax_amount).toLocaleString()}
-                      </p>
+                      <p className="text-xl sm:text-2xl font-bold">Rs.{(invoice.total_amount + invoice.tax_amount).toLocaleString()}</p>
                       <p className="text-sm text-gray-500">
                         Created: {format(new Date(invoice.created_at), 'MMM d, yyyy')}
                       </p>
@@ -297,25 +265,7 @@ const AllInvoices = () => {
                       )}
                     </CardContent>
                     <CardFooter className="flex flex-col sm:flex-row justify-between border-t pt-4 gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full sm:w-auto"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Details
-                      </Button>
-                      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                        {invoice.status === 'unpaid' && (
-                          <Button 
-                            variant="default" 
-                            size="sm" 
-                            onClick={() => handleMarkAsPaid(invoice.id)}
-                            className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </Button>
-                        )}
+                      <div className="flex flex-wrap gap-2 w-full">
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -335,10 +285,21 @@ const AllInvoices = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
+                          onClick={() => setEditingInvoiceId(invoice.id)}
                           className="flex-1 sm:flex-none"
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
+                        {invoice.status !== 'paid' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleMarkAsPaid(invoice.id)}
+                            className="flex-1 sm:flex-none"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button 
                           variant="destructive" 
                           size="sm" 
@@ -357,12 +318,19 @@ const AllInvoices = () => {
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No invoices yet</h3>
                 <p className="text-gray-600 mb-6">Start by creating your first invoice</p>
-                <CreateInvoiceDialog />
               </div>
             )}
           </div>
         </div>
       </main>
+
+      {editingInvoiceId && (
+        <EditInvoiceDialog
+          open={!!editingInvoiceId}
+          onOpenChange={(open) => !open && setEditingInvoiceId(null)}
+          invoiceId={editingInvoiceId}
+        />
+      )}
     </div>
   );
 };

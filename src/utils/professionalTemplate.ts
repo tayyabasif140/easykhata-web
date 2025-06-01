@@ -17,7 +17,8 @@ export const professionalTemplate = async (props: TemplateProps) => {
     businessDetails,
     profile,
     logoBase64,
-    signatureBase64
+    signatureBase64,
+    isEstimate
   } = props;
 
   // Create a new PDF document
@@ -69,9 +70,9 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFont('helvetica', 'bold');
   doc.text(businessDetails?.business_name || 'Company Name', companyNameXPos, 20);
   
-  // INVOICE text in header
+  // Document type text in header
   doc.setFontSize(16);
-  doc.text('INVOICE', pageWidth - 20, 20, { align: 'right' });
+  doc.text(isEstimate ? 'ESTIMATE' : 'INVOICE', pageWidth - 20, 20, { align: 'right' });
   
   let yPos = 40;
   
@@ -132,19 +133,19 @@ export const professionalTemplate = async (props: TemplateProps) => {
     yPos += 5;
   }
   
-  // Invoice details
+  // Document details
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   yPos += 10;
   
-  doc.text('Invoice Date:', pageWidth - 90, yPos);
+  doc.text(isEstimate ? 'Estimate Date:' : 'Invoice Date:', pageWidth - 90, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(new Date().toLocaleDateString(), pageWidth - 25, yPos, { align: 'right' });
   yPos += 7;
   
   if (dueDate) {
     doc.setFont('helvetica', 'bold');
-    doc.text('Due Date:', pageWidth - 90, yPos);
+    doc.text(isEstimate ? 'Valid Until:' : 'Due Date:', pageWidth - 90, yPos);
     doc.setFont('helvetica', 'normal');
     doc.text(dueDate.toLocaleDateString(), pageWidth - 25, yPos, { align: 'right' });
     yPos += 7;
@@ -164,7 +165,8 @@ export const professionalTemplate = async (props: TemplateProps) => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text('Item', 15, yPos);
-  doc.text('Quantity', pageWidth - 85, yPos, { align: 'center' });
+  doc.text('Description', 60, yPos);
+  doc.text('Qty', pageWidth - 85, yPos, { align: 'center' });
   doc.text('Price', pageWidth - 50, yPos, { align: 'center' });
   doc.text('Total', pageWidth - 15, yPos, { align: 'right' });
   yPos += 10;
@@ -186,7 +188,8 @@ export const professionalTemplate = async (props: TemplateProps) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('Item', 15, yPos);
-    doc.text('Quantity', pageWidth - 85, yPos, { align: 'center' });
+    doc.text('Description', 60, yPos);
+    doc.text('Qty', pageWidth - 85, yPos, { align: 'center' });
     doc.text('Price', pageWidth - 50, yPos, { align: 'center' });
     doc.text('Total', pageWidth - 15, yPos, { align: 'right' });
     yPos += 10;
@@ -214,6 +217,17 @@ export const professionalTemplate = async (props: TemplateProps) => {
     }
     
     doc.text(product.name, 15, yPos);
+    
+    // Handle description
+    if (product.description) {
+      const descriptionLines = doc.splitTextToSize(product.description, 35);
+      if (descriptionLines.length > 1) {
+        doc.text(descriptionLines[0] + '...', 60, yPos);
+      } else {
+        doc.text(product.description, 60, yPos);
+      }
+    }
+    
     doc.text(product.quantity.toString(), pageWidth - 85, yPos, { align: 'center' });
     doc.text(`${product.price.toFixed(2)}`, pageWidth - 50, yPos, { align: 'center' });
     doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 15, yPos, { align: 'right' });
@@ -352,4 +366,3 @@ export const professionalTemplate = async (props: TemplateProps) => {
   
   return doc;
 };
-

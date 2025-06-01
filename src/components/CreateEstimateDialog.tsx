@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -14,12 +14,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Textarea } from "./ui/textarea";
+import { SignatureManager } from "./SignatureManager";
 
 interface Product {
   id: string;
   name: string;
   quantity: number;
   price: number;
+  description: string;
 }
 
 export function CreateEstimateDialog() {
@@ -28,6 +31,11 @@ export function CreateEstimateDialog() {
   const [validUntil, setValidUntil] = useState<Date>();
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSignature, setSelectedSignature] = useState<string>('');
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string>('');
+  const [showLogoSelector, setShowLogoSelector] = useState(false);
+  const [terms, setTerms] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -62,12 +70,79 @@ export function CreateEstimateDialog() {
     }
   });
 
+  const { data: inventoryProducts } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: logos } = useQuery({
+    queryKey: ['logos', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      try {
+        const { data, error } = await supabase.storage
+          .from('business_files')
+          .list(`${profile.id}/logo`, {
+            sortBy: { column: 'name', order: 'desc' }
+          });
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching logos:", error);
+        return [];
+      }
+    },
+    enabled: !!profile?.id
+  });
+
   const addProduct = () => {
     setProducts([...products, { 
       id: Date.now().toString(), 
       name: "", 
       quantity: 1, 
-      price: 0 
+      price: 0,
+      description: ""
     }]);
   };
 
@@ -76,9 +151,38 @@ export function CreateEstimateDialog() {
   };
 
   const updateProduct = (id: string, field: keyof Product, value: string | number) => {
+    if (field === 'name' && typeof value === 'string') {
+      const inventoryProduct = inventoryProducts?.find(
+        p => p.product_name.toLowerCase() === value.toLowerCase()
+      );
+      
+      if (inventoryProduct) {
+        setProducts(products.map(p => 
+          p.id === id 
+            ? { ...p, name: inventoryProduct.product_name, price: inventoryProduct.price, description: inventoryProduct.description || '' }
+            : p
+        ));
+        return;
+      }
+    }
+    
     setProducts(products.map(p => 
       p.id === id ? { ...p, [field]: value } : p
     ));
+  };
+
+  const handleCustomerSelect = (selectedCustomerId: string) => {
+    setCustomerId(selectedCustomerId);
+  };
+
+  const handleSignatureSelect = (signatureUrl: string) => {
+    setSelectedSignature(signatureUrl);
+    setShowSignatureCanvas(false);
+  };
+
+  const handleLogoSelect = (logoUrl: string) => {
+    setSelectedLogo(logoUrl);
+    setShowLogoSelector(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,7 +199,6 @@ export function CreateEstimateDialog() {
 
     setIsSubmitting(true);
     
-    // Show immediate notification
     toast({
       title: "Creating estimate...",
       description: "Your estimate is being generated",
@@ -119,7 +222,10 @@ export function CreateEstimateDialog() {
         .select()
         .single();
 
-      if (estimateError) throw estimateError;
+      if (estimateError) {
+        console.error('Estimate creation error:', estimateError);
+        throw estimateError;
+      }
 
       // Create estimate items
       const estimateItems = products.map(product => ({
@@ -127,14 +233,18 @@ export function CreateEstimateDialog() {
         product_name: product.name,
         quantity: product.quantity,
         price: product.price,
-        total: product.quantity * product.price
+        total: product.quantity * product.price,
+        description: product.description
       }));
 
       const { error: itemsError } = await supabase
         .from('estimate_items')
         .insert(estimateItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Estimate items creation error:', itemsError);
+        throw itemsError;
+      }
 
       toast({
         title: "Success",
@@ -148,6 +258,9 @@ export function CreateEstimateDialog() {
       setCustomerId("");
       setValidUntil(undefined);
       setProducts([]);
+      setSelectedSignature("");
+      setSelectedLogo("");
+      setTerms("");
 
     } catch (error: any) {
       console.error('Error creating estimate:', error);
@@ -177,7 +290,7 @@ export function CreateEstimateDialog() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Customer</Label>
-              <Select value={customerId} onValueChange={setCustomerId} required>
+              <Select value={customerId} onValueChange={handleCustomerSelect} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a customer" />
                 </SelectTrigger>
@@ -230,13 +343,27 @@ export function CreateEstimateDialog() {
 
             {products.map((product, index) => (
               <div key={product.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-4 border rounded-lg">
-                <div className="sm:col-span-5">
+                <div className="sm:col-span-3">
                   <Label className="text-sm">Product/Service Name</Label>
                   <Input
+                    list={`products-${index}`}
                     value={product.name}
                     onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
                     placeholder="Enter product name"
                     required
+                  />
+                  <datalist id={`products-${index}`}>
+                    {inventoryProducts?.map((p) => (
+                      <option key={p.id} value={p.product_name} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="sm:col-span-3">
+                  <Label className="text-sm">Description</Label>
+                  <Input
+                    value={product.description}
+                    onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                    placeholder="Enter description"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -249,7 +376,7 @@ export function CreateEstimateDialog() {
                     required
                   />
                 </div>
-                <div className="sm:col-span-3">
+                <div className="sm:col-span-2">
                   <Label className="text-sm">Price (Rs.)</Label>
                   <Input
                     type="number"
@@ -278,6 +405,144 @@ export function CreateEstimateDialog() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Logo Selection */}
+          <div className="space-y-2">
+            <Label>Business Logo</Label>
+            <div>
+              {showLogoSelector ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                    {businessDetails?.business_logo_url && (
+                      <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                           onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
+                        <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                          <img
+                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                            alt="Default logo"
+                            className="h-20 w-auto object-contain"
+                            loading="lazy"
+                          />
+                        </div>
+                        <p className="text-center text-sm">
+                          {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
+                      const logoPath = `${profile?.id}/logo/${logo.name}`;
+                      if (businessDetails?.business_logo_url === logoPath) return null;
+                      
+                      return (
+                        <div 
+                          key={logo.id} 
+                          className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                          onClick={() => handleLogoSelect(logoPath)}
+                        >
+                          <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                            <img
+                              src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoPath}`}
+                              alt={`Logo ${logo.name}`}
+                              className="h-20 w-auto object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                          <p className="text-center text-sm">
+                            {selectedLogo === logoPath ? 'Selected' : 'Select'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => setShowLogoSelector(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  {(selectedLogo || businessDetails?.business_logo_url) ? (
+                    <div className="flex flex-col space-y-2">
+                      <img 
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
+                        alt="Business logo" 
+                        className="h-20 border border-gray-200 bg-white p-2"
+                        loading="lazy"
+                      />
+                      <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                        Change Logo
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                      Select Logo
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Signature section */}
+          {showSignatureCanvas ? (
+            <div className="space-y-4">
+              <Label>Signature</Label>
+              {profile?.id && (
+                <SignatureManager
+                  userId={profile.id}
+                  onSignatureSelect={handleSignatureSelect}
+                  defaultSignature={selectedSignature || profile?.digital_signature_url}
+                />
+              )}
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={() => setShowSignatureCanvas(false)}
+              >
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Signature</Label>
+              <div>
+                {(selectedSignature || profile?.digital_signature_url) ? (
+                  <div className="flex flex-col space-y-2">
+                    <img 
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
+                      alt="Your signature" 
+                      className="h-20 border border-gray-200 bg-white p-2"
+                      loading="lazy"
+                    />
+                    <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                      Change Signature
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                    Add Your Signature
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Terms */}
+          <div className="space-y-2">
+            <Label htmlFor="terms">Terms & Conditions</Label>
+            <Textarea
+              id="terms"
+              value={terms}
+              onChange={(e) => setTerms(e.target.value)}
+              placeholder="Enter terms and conditions for this estimate"
+              rows={3}
+            />
           </div>
 
           <div className="border-t pt-4">
