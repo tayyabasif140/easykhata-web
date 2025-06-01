@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
 
 export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: number): number => {
-  const { products, isEstimate } = props;
+  const { products } = props;
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   let yPos = startY;
@@ -12,9 +12,8 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
   // Table header
   doc.setFont('helvetica', 'bold');
   doc.text('Item', 10, yPos);
-  doc.text('Description', 60, yPos);
-  doc.text('Qty', pageWidth - 90, yPos);
-  doc.text('Price', pageWidth - 60, yPos);
+  doc.text('Quantity', pageWidth - 80, yPos);
+  doc.text('Price', pageWidth - 50, yPos);
   doc.text('Total', pageWidth - 25, yPos);
   yPos += 5;
   
@@ -34,9 +33,8 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     // Add header for new page
     doc.setFont('helvetica', 'bold');
     doc.text('Item', 10, yPos);
-    doc.text('Description', 60, yPos);
-    doc.text('Qty', pageWidth - 90, yPos);
-    doc.text('Price', pageWidth - 60, yPos);
+    doc.text('Quantity', pageWidth - 80, yPos);
+    doc.text('Price', pageWidth - 50, yPos);
     doc.text('Total', pageWidth - 25, yPos);
     yPos += 5;
     
@@ -61,26 +59,13 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     
     // Ensure product data is valid
     const productName = product?.name || 'Unknown Product';
-    const productDescription = product?.description || '';
     const productQuantity = isNaN(product?.quantity) ? 0 : product.quantity;
     const productPrice = isNaN(product?.price) ? 0 : product.price;
     const productTotal = productQuantity * productPrice;
     
     doc.text(productName, 10, yPos);
-    
-    // Handle description - split into multiple lines if needed
-    if (productDescription) {
-      const descriptionLines = doc.splitTextToSize(productDescription, 40);
-      if (descriptionLines.length > 1) {
-        // If description is long, just show first line
-        doc.text(descriptionLines[0] + '...', 60, yPos);
-      } else {
-        doc.text(productDescription, 60, yPos);
-      }
-    }
-    
-    doc.text(productQuantity.toString(), pageWidth - 90, yPos);
-    doc.text(`${productPrice.toFixed(2)}`, pageWidth - 60, yPos);
+    doc.text(productQuantity.toString(), pageWidth - 80, yPos);
+    doc.text(`${productPrice.toFixed(2)}`, pageWidth - 50, yPos);
     doc.text(`${productTotal.toFixed(2)}`, pageWidth - 25, yPos);
     
     yPos += 10;

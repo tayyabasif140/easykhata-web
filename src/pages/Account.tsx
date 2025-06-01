@@ -1,379 +1,654 @@
-import Header from "@/components/Header";
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { supabase, getPublicImageUrl } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Plus } from "lucide-react";
-import { AdditionalFeaturesSettings } from "@/components/AdditionalFeaturesSettings";
+import { BackButton } from "@/components/BackButton";
+import Header from "@/components/Header"; // Fixed this import
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SignatureManager } from "@/components/SignatureManager";
+import { Textarea } from "@/components/ui/textarea";
+import { Camera, Upload, ImageIcon, X } from "lucide-react";
+import { validateImageUrl, handleImageFileUpload } from "@/utils/templates/classic/utils/images";
 
-const Account = () => {
-  const [businessName, setBusinessName] = useState("");
-  const [businessAddress, setBusinessAddress] = useState("");
-  const [ntnNumber, setNtnNumber] = useState("");
-  const [businessCategory, setBusinessCategory] = useState("");
-  const [website, setWebsite] = useState("");
+export default function Account() {
+  const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
+  const [digitalSignature, setDigitalSignature] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("classic");
+  const [userId, setUserId] = useState("");
   const [privacyPolicy, setPrivacyPolicy] = useState("");
-  const [invoiceTemplate, setInvoiceTemplate] = useState("classic");
-  const [taxConfig, setTaxConfig] = useState<any[]>([]);
-  const [taxPayments, setTaxPayments] = useState<any[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [googleProfilePic, setGoogleProfilePic] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: businessDetails } = useQuery({
-    queryKey: ['businessDetails'],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return null;
-      const { data, error } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .single();
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: taxPaymentsData } = useQuery({
-    queryKey: ['taxPayments'],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return [];
-      const { data, error } = await supabase
-        .from('tax_payments')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .order('payment_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
-  });
 
   useEffect(() => {
-    if (businessDetails) {
-      setBusinessName(businessDetails.business_name || "");
-      setBusinessAddress(businessDetails.business_address || "");
-      setNtnNumber(businessDetails.ntn_number || "");
-      setBusinessCategory(businessDetails.business_category || "");
-      setWebsite(businessDetails.website || "");
-      setPrivacyPolicy(businessDetails.privacy_policy || "");
-      setInvoiceTemplate(businessDetails.invoice_template || "classic");
-      setTaxConfig(businessDetails.tax_configuration || []);
-    }
-  }, [businessDetails]);
+    getProfile();
+  }, []);
 
   useEffect(() => {
-    if (taxPaymentsData) {
-      setTaxPayments(taxPaymentsData);
+    async function validateAvatar() {
+      if (avatarUrl) {
+        setImageLoading(true);
+        setImageError(false);
+        
+        try {
+          const url = avatarUrl.startsWith('http') ? avatarUrl : getPublicImageUrl(avatarUrl) || "";
+          console.log("Setting avatar preview URL to:", url);
+          setAvatarPreviewUrl(url);
+          
+          if (url) {
+            const isValid = await validateImageUrl(url);
+            setImageError(!isValid);
+            if (!isValid) {
+              console.error("Avatar URL is invalid:", url);
+            }
+          } else {
+            setImageError(true);
+            console.error("No valid URL found for avatar");
+          }
+        } catch (error) {
+          console.error("Error validating avatar:", error);
+          setImageError(true);
+        } finally {
+          setImageLoading(false);
+        }
+      }
     }
-  }, [taxPaymentsData]);
+    
+    validateAvatar();
+  }, [avatarUrl]);
 
-  const addTaxType = () => {
-    const newTax = {
-      id: Date.now().toString(),
-      name: '',
-      rate: 0,
-      enabled: true
-    };
-    setTaxConfig([...taxConfig, newTax]);
-  };
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
-  const removeTaxType = (id: string) => {
-    setTaxConfig(taxConfig.filter(tax => tax.id !== id));
-  };
+  const handleDragIn = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
 
-  const updateTaxType = (id: string, field: string, value: any) => {
-    setTaxConfig(taxConfig.map(tax => 
-      tax.id === id ? { ...tax, [field]: value } : tax
-    ));
-  };
+  const handleDragOut = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
 
-  const deleteTaxPayment = async (paymentId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      handleFileUploadHelper(e.dataTransfer.files[0]);
+    }
+  }, []);
+
+  async function getProfile() {
     try {
-      const { error } = await supabase
-        .from('tax_payments')
-        .delete()
-        .eq('id', paymentId);
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
       
-      if (error) throw error;
+      setUserId(userData.user.id);
+      setEmail(userData.user.email || "");
       
-      toast({
-        title: "Success",
-        description: "Tax payment deleted successfully"
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['taxPayments'] });
+      if (userData.user.app_metadata?.avatar_url) {
+        setGoogleProfilePic(userData.user.app_metadata.avatar_url);
+      }
+
+      let { data, error, status } = await supabase
+        .from("profiles")
+        .select(`full_name, username, avatar_url, digital_signature_url`)
+        .eq("id", userData.user.id)
+        .single();
+
+      if (error && status !== 406) {
+        throw error;
+      }
+
+      const { data: businessData, error: businessError } = await supabase
+        .from("business_details")
+        .select("invoice_template, privacy_policy, business_logo_url")
+        .eq("user_id", userData.user.id)
+        .single();
+
+      if (businessError && businessError.code !== 'PGRST116') {
+        console.error("Error fetching business details:", businessError);
+      } else if (businessData) {
+        console.log("Business data retrieved:", businessData);
+        setSelectedTemplate(businessData.invoice_template || "classic");
+        setPrivacyPolicy(businessData.privacy_policy || "");
+        
+        if (businessData.business_logo_url) {
+          console.log("Business logo URL found:", businessData.business_logo_url);
+        } else {
+          console.log("No business logo URL found in database");
+        }
+      }
+
+      if (data) {
+        setFullName(data.full_name || "");
+        setUsername(data.username || "");
+        
+        if (googleProfilePic && !data.avatar_url) {
+          setAvatarUrl(googleProfilePic);
+        } else {
+          setAvatarUrl(data.avatar_url || "");
+        }
+        
+        setDigitalSignature(data.digital_signature_url || "");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
+  async function updateProfile({
+    username,
+    fullName,
+  }: {
+    username: string;
+    fullName: string;
+  }) {
     try {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Make sure both email and username are valid
+      if (!email) {
+        throw new Error('Email is required');
+      }
+      
+      if (!username) {
+        throw new Error('Username is required');
+      }
+      
+      const updates = {
+        id: userData.user.id,
+        full_name: fullName,
+        username,
+        email: email, // Include email to prevent the not-null constraint violation
+        updated_at: new Date(),
+      };
+
+      let { error } = await supabase.from("profiles").upsert(updates, {
+        onConflict: 'id'
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully!",
+      });
+      
+      getProfile();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateBusinessTemplate(template: string) {
+    try {
+      setLoading(true);
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
       const { error } = await supabase
-        .from('business_details')
-        .upsert([
-          {
-            user_id: userData.user.id,
-            business_name: businessName,
-            business_address: businessAddress,
-            ntn_number: ntnNumber,
-            business_category: businessCategory,
-            website: website,
-            privacy_policy: privacyPolicy,
-            invoice_template: invoiceTemplate,
-            tax_configuration: taxConfig
-          }
-        ]);
+        .from("business_details")
+        .update({ invoice_template: template })
+        .eq("user_id", userData.user.id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
+      setSelectedTemplate(template);
+      
       toast({
         title: "Success",
-        description: "Business settings saved successfully"
+        description: "Invoice template updated successfully!",
       });
-
-      queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to save business settings",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
-  };
+  }
+
+  async function updatePrivacyPolicy() {
+    try {
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { data, error: checkError } = await supabase
+        .from("business_details")
+        .select("id")
+        .eq("user_id", userData.user.id)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+      
+      if (data) {
+        const { error } = await supabase
+          .from("business_details")
+          .update({ privacy_policy: privacyPolicy })
+          .eq("user_id", userData.user.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("business_details")
+          .insert({ 
+            user_id: userData.user.id, 
+            privacy_policy: privacyPolicy,
+            invoice_template: selectedTemplate
+          });
+        
+        if (error) throw error;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Privacy policy updated successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleFileUploadHelper(file: File) {
+    try {
+      setUploading(true);
+      setImageError(false);
+      
+      if (!file) {
+        return;
+      }
+      
+      console.log("Processing file upload:", file.name, file.type, file.size);
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        throw new Error("You need to be logged in to upload images");
+      }
+      
+      const result = await handleImageFileUpload(file, userId, 'avatar');
+      
+      if (!result) {
+        throw new Error("Failed to upload image");
+      }
+      
+      console.log("Image uploaded successfully:", result);
+      
+      setAvatarUrl(result.path);
+      setAvatarPreviewUrl(result.publicUrl);
+      
+      toast({
+        title: "Success",
+        description: "Profile picture and business logo updated successfully!",
+      });
+      
+      setTimeout(() => {
+        getProfile();
+        window.dispatchEvent(new CustomEvent('profile-image-updated'));
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      setImageError(true);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+    
+    const file = e.target.files[0];
+    handleFileUploadHelper(file);
+  }
+
+  async function setGoogleProfilePicAsAvatar() {
+    if (!googleProfilePic) return;
+    
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          avatar_url: googleProfilePic,
+          updated_at: new Date()
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      
+      setAvatarUrl(googleProfilePic);
+      setAvatarPreviewUrl(googleProfilePic);
+      
+      toast({
+        title: "Success",
+        description: "Profile picture updated with Google avatar!",
+      });
+      
+      window.dispatchEvent(new CustomEvent('profile-image-updated'));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function signOut() {
+    try {
+      await supabase.auth.signOut();
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-600">Manage your business information and preferences</p>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <BackButton className="mb-4" />
+        <div className="space-y-6">
+          <Tabs defaultValue="profile" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="business">Business Settings</TabsTrigger>
+            </TabsList>
 
-        <Tabs defaultValue="business" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3">
-            <TabsTrigger value="business">Business Settings</TabsTrigger>
-            <TabsTrigger value="additional">Additional Features</TabsTrigger>
-            <TabsTrigger value="tax">Tax Management</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="business">
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Information</CardTitle>
-                <CardDescription>
-                  Update your business details that appear on invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="businessName">Business Name</Label>
-                      <Input
-                        id="businessName"
-                        value={businessName}
-                        onChange={(e) => setBusinessName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="businessCategory">Business Category</Label>
-                      <Input
-                        id="businessCategory"
-                        value={businessCategory}
-                        onChange={(e) => setBusinessCategory(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="businessAddress">Business Address</Label>
-                    <Textarea
-                      id="businessAddress"
-                      value={businessAddress}
-                      onChange={(e) => setBusinessAddress(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ntnNumber">NTN Number</Label>
-                      <Input
-                        id="ntnNumber"
-                        value={ntnNumber}
-                        onChange={(e) => setNtnNumber(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="website">Website</Label>
-                      <Input
-                        id="website"
-                        type="url"
-                        value={website}
-                        onChange={(e) => setWebsite(e.target.value)}
-                        placeholder="https://"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="privacyPolicy">Privacy Policy</Label>
-                    <Textarea
-                      id="privacyPolicy"
-                      value={privacyPolicy}
-                      onChange={(e) => setPrivacyPolicy(e.target.value)}
-                      rows={4}
-                      placeholder="Enter your privacy policy text that will appear on invoices"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="invoiceTemplate">Invoice Template</Label>
-                    <select
-                      id="invoiceTemplate"
-                      value={invoiceTemplate}
-                      onChange={(e) => setInvoiceTemplate(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+            <TabsContent value="profile">
+              <div className="bg-white shadow-md rounded-md p-6">
+                <div className="flex items-center space-x-4">
+                  <div 
+                    className="relative" 
+                    ref={dropZoneRef}
+                    onDragEnter={handleDragIn}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDragOut}
+                    onDrop={handleDrop}
+                  >
+                    <div 
+                      className={`w-20 h-20 rounded-full relative overflow-hidden transition-all duration-200 ${
+                        isDragging ? 'ring-4 ring-primary border-dashed border-2 scale-110' : ''
+                      }`}
                     >
-                      <option value="classic">Classic</option>
-                      <option value="professional">Professional</option>
-                      <option value="diamond">Diamond</option>
-                    </select>
-                  </div>
+                      <Avatar className="w-20 h-20">
+                        {!imageLoading && avatarPreviewUrl && !imageError ? (
+                          <AvatarImage 
+                            src={avatarPreviewUrl} 
+                            alt="Avatar" 
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="bg-primary/10">
+                            {imageLoading ? (
+                              <div className="animate-pulse flex items-center justify-center w-full h-full">
+                                <div className="w-10 h-10 bg-primary/30 rounded-full"></div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center w-full h-full">
+                                {imageError ? (
+                                  <ImageIcon className="w-8 h-8 text-primary/70" />
+                                ) : (
+                                  <span className="text-xl font-semibold">{fullName?.charAt(0).toUpperCase() || '?'}</span>
+                                )}
+                              </div>
+                            )}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      
+                      {isDragging && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <Upload className="w-8 h-8 text-primary" />
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-lg font-semibold">Tax Configuration</Label>
-                      <Button type="button" variant="outline" onClick={addTaxType} size="sm">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Tax Type
+                    <label 
+                      htmlFor="avatar-upload" 
+                      className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer shadow-md hover:bg-primary/90 transition-colors"
+                      title="Upload profile picture"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <input 
+                        id="avatar-upload" 
+                        type="file" 
+                        accept="image/png,image/jpeg,image/jpg" 
+                        className="hidden" 
+                        onChange={uploadAvatar}
+                        disabled={uploading}
+                        ref={fileInputRef}
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Profile Information</h2>
+                    <p className="text-gray-500">Update your personal details here.</p>
+                    <p className="text-sm text-primary mt-1">
+                      <strong>Drag & drop</strong> a PNG or JPG image or click the camera icon
+                    </p>
+                    {googleProfilePic && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2" 
+                        onClick={setGoogleProfilePicAsAvatar}
+                      >
+                        Use Google Profile Picture
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="mt-6">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      updateProfile({
+                        username,
+                        fullName,
+                      });
+                    }}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  >
+                    <div>
+                      <Label htmlFor="fullName">Full Name</Label>
+                      <Input
+                        id="fullName"
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={email}
+                        readOnly
+                        disabled
+                        className="bg-gray-100"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Button type="submit" disabled={loading} className="w-full">
+                        {loading ? "Updating ..." : "Update Profile"}
                       </Button>
                     </div>
-
-                    {taxConfig.map((tax, index) => (
-                      <div key={tax.id} className="flex gap-4 items-end p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <Label>Tax Name</Label>
-                          <Input
-                            value={tax.name}
-                            onChange={(e) => updateTaxType(tax.id, 'name', e.target.value)}
-                            placeholder="e.g., VAT, GST"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <Label>Rate (%)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={tax.rate}
-                            onChange={(e) => updateTaxType(tax.id, 'rate', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={tax.enabled}
-                            onChange={(e) => updateTaxType(tax.id, 'enabled', e.target.checked)}
-                          />
-                          <Label>Enabled</Label>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => removeTaxType(tax.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : "Save Settings"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="additional">
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Features</CardTitle>
-                <CardDescription>
-                  Customize your invoices and estimates with additional features
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AdditionalFeaturesSettings />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tax">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax Payments</CardTitle>
-                <CardDescription>
-                  View and manage your tax payment history
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {taxPayments.length > 0 ? (
-                    taxPayments.map((payment) => (
-                      <div key={payment.id} className="flex justify-between items-center p-4 border rounded-lg">
-                        <div>
-                          <p className="font-semibold">Rs.{payment.amount}</p>
-                          <p className="text-sm text-gray-600">{payment.description || 'Tax Payment'}</p>
-                          <p className="text-sm text-gray-500">
-                            Paid on: {new Date(payment.payment_date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteTaxPayment(payment.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-8">No tax payments recorded</p>
-                  )}
+                  </form>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="business">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Invoice Template</CardTitle>
+                    <CardDescription>Choose your default invoice template</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div 
+                        className={`border rounded-md p-4 cursor-pointer ${selectedTemplate === 'classic' ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                        onClick={() => updateBusinessTemplate('classic')}
+                      >
+                        <div className="h-32 bg-gray-100 mb-2 flex items-center justify-center">
+                          <span className="text-gray-500">Classic Template</span>
+                        </div>
+                        <p className="font-medium">Classic</p>
+                        <p className="text-sm text-gray-500">Simple and clean design</p>
+                      </div>
+                      <div 
+                        className={`border rounded-md p-4 cursor-pointer ${selectedTemplate === 'professional' ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                        onClick={() => updateBusinessTemplate('professional')}
+                      >
+                        <div className="h-32 bg-gray-100 mb-2 flex items-center justify-center">
+                          <span className="text-gray-500">Professional Template</span>
+                        </div>
+                        <p className="font-medium">Professional</p>
+                        <p className="text-sm text-gray-500">Modern business design</p>
+                      </div>
+                      <div 
+                        className={`border rounded-md p-4 cursor-pointer ${selectedTemplate === 'diamond' ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                        onClick={() => updateBusinessTemplate('diamond')}
+                      >
+                        <div className="h-32 bg-gray-100 mb-2 flex items-center justify-center">
+                          <span className="text-gray-500">Diamond Template</span>
+                        </div>
+                        <p className="font-medium">Diamond</p>
+                        <p className="text-sm text-gray-500">Premium elegant design</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Digital Signature</CardTitle>
+                    <CardDescription>Add or update your digital signature</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {!loading && userId && (
+                      <SignatureManager 
+                        userId={userId} 
+                        onSignatureSelect={setDigitalSignature} 
+                        defaultSignature={digitalSignature}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Privacy Policy</CardTitle>
+                    <CardDescription>Add your business privacy policy to include on invoices</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <Textarea 
+                        placeholder="Enter your privacy policy here..." 
+                        value={privacyPolicy}
+                        onChange={(e) => setPrivacyPolicy(e.target.value)}
+                        className="min-h-[200px]"
+                      />
+                      <Button onClick={updatePrivacyPolicy} disabled={loading}>
+                        {loading ? "Saving..." : "Save Privacy Policy"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="bg-white shadow-md rounded-md p-6">
+            <h2 className="text-lg font-semibold">Account Actions</h2>
+            <p className="text-gray-500 mt-1">Manage your account settings.</p>
+            <div className="mt-6">
+              <Button onClick={signOut} variant="destructive" className="w-full">
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
-};
-
-export default Account;
+}
