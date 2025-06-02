@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,18 +40,20 @@ const Settings = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      if (data) {
-        setBusinessName(data.business_name || "");
-        setBusinessEmail(data.business_email || "");
-        setBusinessPhone(data.business_phone || "");
-        setBusinessAddress(data.business_address || "");
-        setBusinessLogoUrl(data.business_logo_url || "");
-        setInvoiceTemplate(data.invoice_template || "classic");
-        setTaxConfiguration(data.tax_configuration || []);
-      }
-    },
   });
+
+  // Handle business details data when it's loaded
+  useEffect(() => {
+    if (businessDetails) {
+      setBusinessName(businessDetails.business_name || "");
+      setBusinessEmail(businessDetails.business_email || "");
+      setBusinessPhone(businessDetails.business_phone || "");
+      setBusinessAddress(businessDetails.business_address || "");
+      setBusinessLogoUrl(businessDetails.business_logo_url || "");
+      setInvoiceTemplate(businessDetails.invoice_template || "classic");
+      setTaxConfiguration(businessDetails.tax_configuration || []);
+    }
+  }, [businessDetails]);
 
   const handleSaveBusinessDetails = async () => {
     try {
