@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mail, Phone, Building, FileText, Calculator } from "lucide-react";
-import BackButton from "@/components/BackButton";
+import { BackButton } from "@/components/BackButton";
 
 const CustomerDetails = () => {
   const { id } = useParams();

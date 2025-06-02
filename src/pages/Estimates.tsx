@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateInvoicePDF } from "@/utils/invoiceTemplates";
 import { Edit, Download, Trash2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import BackButton from "@/components/BackButton";
+import { BackButton } from "@/components/BackButton";
 
 const Estimates = () => {
   const [editEstimateId, setEditEstimateId] = useState<string | null>(null);
