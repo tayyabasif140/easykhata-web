@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -18,11 +17,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { generateInvoicePDF } from "@/utils/invoiceTemplates";
 import { SignatureManager } from "./SignatureManager";
+import { Textarea } from "./ui/textarea";
 
 interface Product {
   name: string;
   quantity: number;
   price: number;
+  description?: string;
 }
 
 export function CreateInvoiceDialog() {
@@ -31,7 +32,7 @@ export function CreateInvoiceDialog() {
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [products, setProducts] = useState<Product[]>([{ name: "", quantity: 1, price: 0 }]);
+  const [products, setProducts] = useState<Product[]>([{ name: "", quantity: 1, price: 0, description: "" }]);
   const [tax, setTax] = useState(0);
   const [dueDate, setDueDate] = useState<Date>();
   const [selectedTaxes, setSelectedTaxes] = useState<{[key: string]: boolean}>({});
@@ -157,7 +158,7 @@ export function CreateInvoiceDialog() {
       if (inventoryProduct) {
         setProducts(prev => prev.map((product, i) => 
           i === index 
-            ? { ...product, name: inventoryProduct.product_name, price: inventoryProduct.price }
+            ? { ...product, name: inventoryProduct.product_name, price: inventoryProduct.price, description: inventoryProduct.description || '' }
             : product
         ));
         return;
@@ -170,7 +171,7 @@ export function CreateInvoiceDialog() {
   }, [inventoryProducts]);
 
   const addProduct = useCallback(() => {
-    setProducts(prev => [...prev, { name: "", quantity: 1, price: 0 }]);
+    setProducts(prev => [...prev, { name: "", quantity: 1, price: 0, description: "" }]);
   }, []);
 
   const removeProduct = useCallback((index: number) => {
@@ -377,7 +378,7 @@ export function CreateInvoiceDialog() {
     setCompanyName("");
     setEmail("");
     setPhone("");
-    setProducts([{ name: "", quantity: 1, price: 0 }]);
+    setProducts([{ name: "", quantity: 1, price: 0, description: "" }]);
     setTax(0);
     setDueDate(undefined);
     setSelectedTaxes({});
@@ -461,50 +462,68 @@ export function CreateInvoiceDialog() {
               </Button>
             </div>
             {products.map((product, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label>Product Name</Label>
-                  <Input
-                    list={`products-${index}`}
-                    value={product.name}
-                    onChange={(e) => updateProduct(index, "name", e.target.value)}
-                    required
-                  />
-                  <datalist id={`products-${index}`}>
-                    {inventoryProducts?.map((p) => (
-                      <option key={p.id} value={p.product_name} />
-                    ))}
-                  </datalist>
+              <div key={index} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Product Name</Label>
+                    <Input
+                      list={`products-${index}`}
+                      value={product.name}
+                      onChange={(e) => updateProduct(index, "name", e.target.value)}
+                      required
+                    />
+                    <datalist id={`products-${index}`}>
+                      {inventoryProducts?.map((p) => (
+                        <option key={p.id} value={p.product_name} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={product.description || ""}
+                      onChange={(e) => updateProduct(index, "description", e.target.value)}
+                      placeholder="Enter description (optional)"
+                      className="min-h-[60px]"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Quantity</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={product.quantity}
-                    onChange={(e) => updateProduct(index, "quantity", parseInt(e.target.value))}
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label>Quantity</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={product.quantity}
+                      onChange={(e) => updateProduct(index, "quantity", parseInt(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Price</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={product.price}
+                      onChange={(e) => updateProduct(index, "price", parseFloat(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <span className="text-sm font-medium">
+                      Total: Rs.{(product.quantity * product.price).toFixed(2)}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="flex-shrink-0"
+                    onClick={() => removeProduct(index)}
+                    disabled={products.length === 1}
+                  >
+                    <Trash className="w-4 h-4" />
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Price</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={product.price}
-                    onChange={(e) => updateProduct(index, "price", parseFloat(e.target.value))}
-                    required
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="flex-shrink-0"
-                  onClick={() => removeProduct(index)}
-                  disabled={products.length === 1}
-                >
-                  <Trash className="w-4 h-4" />
-                </Button>
               </div>
             ))}
           </div>

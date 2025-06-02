@@ -49,20 +49,13 @@ export function AdditionalFeaturesSettings() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['customColumns'] });
       setNewColumnName("");
       setNewColumnType("text");
       toast({
         title: "Success",
         description: "Custom column added successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add custom column",
-        variant: "destructive",
       });
     }
   });
@@ -76,18 +69,11 @@ export function AdditionalFeaturesSettings() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['customColumns'] });
       toast({
         title: "Success",
         description: "Custom column removed successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to remove custom column",
-        variant: "destructive",
       });
     }
   });

@@ -15,6 +15,8 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Textarea } from "./ui/textarea";
+import { generateInvoicePDF } from "@/utils/invoiceTemplates";
+import { SignatureManager } from "./SignatureManager";
 
 interface Product {
   id: string;
@@ -30,6 +32,10 @@ export function CreateEstimateDialog() {
   const [validUntil, setValidUntil] = useState<Date>();
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSignature, setSelectedSignature] = useState<string>('');
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string>('');
+  const [showLogoSelector, setShowLogoSelector] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -80,6 +86,56 @@ export function CreateEstimateDialog() {
     }
   });
 
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: logos } = useQuery({
+    queryKey: ['logos', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      try {
+        const { data, error } = await supabase.storage
+          .from('business_files')
+          .list(`${profile.id}/logo`, {
+            sortBy: { column: 'name', order: 'desc' }
+          });
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching logos:", error);
+        return [];
+      }
+    },
+    enabled: !!profile?.id
+  });
+
   const addProduct = () => {
     setProducts([...products, { 
       id: Date.now().toString(), 
@@ -109,6 +165,47 @@ export function CreateEstimateDialog() {
         description: inventoryItem.description || ""
       } : p
     ));
+  };
+
+  const handleSignatureSelect = (signatureUrl: string) => {
+    setSelectedSignature(signatureUrl);
+    setShowSignatureCanvas(false);
+  };
+
+  const handleLogoSelect = (logoUrl: string) => {
+    setSelectedLogo(logoUrl);
+    setShowLogoSelector(false);
+  };
+
+  const generatePDF = async () => {
+    try {
+      const template = businessDetails?.invoice_template || 'classic';
+      
+      const estimateData = {
+        customerName: customers?.find(c => c.id === customerId)?.name || 'Customer',
+        companyName: customers?.find(c => c.id === customerId)?.company || '',
+        phone: customers?.find(c => c.id === customerId)?.phone || '',
+        email: customers?.find(c => c.id === customerId)?.email || '',
+        products,
+        subtotal,
+        tax: totalTax,
+        total,
+        dueDate: validUntil,
+        businessDetails,
+        profile: {
+          ...profile,
+          digital_signature_url: selectedSignature || profile?.digital_signature_url
+        },
+        logoBase64: null,
+        signatureBase64: null,
+        isEstimate: true
+      };
+      
+      return await generateInvoicePDF(template, estimateData);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -167,6 +264,13 @@ export function CreateEstimateDialog() {
 
       if (itemsError) throw itemsError;
 
+      // Generate and download PDF
+      const doc = await generatePDF();
+      if (doc) {
+        const fileName = `estimate_${estimate.id}.pdf`;
+        doc.save(fileName);
+      }
+
       toast({
         title: "Success",
         description: "Estimate created successfully!",
@@ -179,6 +283,8 @@ export function CreateEstimateDialog() {
       setCustomerId("");
       setValidUntil(undefined);
       setProducts([]);
+      setSelectedSignature("");
+      setSelectedLogo("");
 
     } catch (error: any) {
       console.error('Error creating estimate:', error);
@@ -342,6 +448,132 @@ export function CreateEstimateDialog() {
               </div>
             ))}
           </div>
+
+          {/* Logo Selection */}
+          <div className="space-y-2">
+            <Label>Business Logo</Label>
+            <div>
+              {showLogoSelector ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                    {businessDetails?.business_logo_url && (
+                      <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                           onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
+                        <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                          <img
+                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                            alt="Default logo"
+                            className="h-20 w-auto object-contain"
+                            loading="lazy"
+                          />
+                        </div>
+                        <p className="text-center text-sm">
+                          {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
+                      const logoPath = `${profile?.id}/logo/${logo.name}`;
+                      if (businessDetails?.business_logo_url === logoPath) return null;
+                      
+                      return (
+                        <div 
+                          key={logo.id} 
+                          className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                          onClick={() => handleLogoSelect(logoPath)}
+                        >
+                          <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                            <img
+                              src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoPath}`}
+                              alt={`Logo ${logo.name}`}
+                              className="h-20 w-auto object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                          <p className="text-center text-sm">
+                            {selectedLogo === logoPath ? 'Selected' : 'Select'}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => setShowLogoSelector(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  {(selectedLogo || businessDetails?.business_logo_url) ? (
+                    <div className="flex flex-col space-y-2">
+                      <img 
+                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
+                        alt="Business logo" 
+                        className="h-20 border border-gray-200 bg-white p-2"
+                        loading="lazy"
+                      />
+                      <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                        Change Logo
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                      Select Logo
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Signature section */}
+          {showSignatureCanvas ? (
+            <div className="space-y-4">
+              <Label>Signature</Label>
+              {profile?.id && (
+                <SignatureManager
+                  userId={profile.id}
+                  onSignatureSelect={handleSignatureSelect}
+                  defaultSignature={selectedSignature || profile?.digital_signature_url}
+                />
+              )}
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={() => setShowSignatureCanvas(false)}
+              >
+                Done
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Signature</Label>
+              <div>
+                {(selectedSignature || profile?.digital_signature_url) ? (
+                  <div className="flex flex-col space-y-2">
+                    <img 
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
+                      alt="Your signature" 
+                      className="h-20 border border-gray-200 bg-white p-2"
+                      loading="lazy"
+                    />
+                    <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                      Change Signature
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                    Add Your Signature
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="border-t pt-4">
             <div className="space-y-2 text-right">

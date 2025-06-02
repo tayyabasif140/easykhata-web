@@ -1,454 +1,390 @@
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import Header from "@/components/Header";
-import { useEffect, useState } from "react";
-import { format } from "date-fns";
-import { templates, InvoiceData } from "@/utils/invoiceTemplates";
-import { jsPDF } from "jspdf";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Upload, Trash2, Plus } from "lucide-react";
 import { AdditionalFeaturesSettings } from "@/components/AdditionalFeaturesSettings";
 
-export default function Settings() {
+const Settings = () => {
+  const [businessName, setBusinessName] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [businessLogoUrl, setBusinessLogoUrl] = useState("");
+  const [invoiceTemplate, setInvoiceTemplate] = useState("classic");
+  const [taxConfiguration, setTaxConfiguration] = useState<any[]>([]);
+  const [newTaxName, setNewTaxName] = useState("");
+  const [newTaxRate, setNewTaxRate] = useState(0);
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [previewTemplate, setPreviewTemplate] = useState<string>("classic");
-  const [showPreview, setShowPreview] = useState(false);
 
-  const {
-    data: profile,
-    error,
-    isLoading
-  } = useQuery({
-    queryKey: ['profile'],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userData.user.id)
-        .single();
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const ProfileCard = ({ profile }: { profile: any }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [formData, setFormData] = useState(profile);
-    
-    const updateProfile = useMutation({
-      mutationFn: async (updates: any) => {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) throw new Error('Not authenticated');
-        
-        const { error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', userData.user.id);
-        
-        if (error) throw error;
-      },
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        setIsEditing(false);
-        toast({
-          title: "Profile updated",
-          description: "Your profile has been updated successfully."
-        });
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to update profile. Please try again.",
-          variant: "destructive"
-        });
-      }
-    });
-    
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      updateProfile.mutate(formData);
-    };
-    
-    if (isEditing) {
-      return (
-        <form onSubmit={handleSubmit}>
-          {/* Form fields */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input 
-                id="fullName" 
-                value={formData.full_name || ''}
-                onChange={e => setFormData({...formData, full_name: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                value={formData.email || ''}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input 
-                id="phone" 
-                value={formData.phone_number || ''}
-                onChange={e => setFormData({...formData, phone_number: e.target.value})}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button variant="outline" type="button" onClick={() => setIsEditing(false)}>Cancel</Button>
-            <Button type="submit">Save Changes</Button>
-          </div>
-        </form>
-      );
-    }
-    
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-sm font-medium">Full Name</p>
-            <p className="text-sm text-gray-500">{profile.full_name}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium">Email</p>
-            <p className="text-sm text-gray-500">{profile.email}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium">Phone</p>
-            <p className="text-sm text-gray-500">{profile.phone_number || 'Not provided'}</p>
-          </div>
-        </div>
-        <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
-      </div>
-    );
-  };
-
-  const {
-    data: businessDetails,
-    error: businessError,
-    refetch: refetchBusinessDetails
-  } = useQuery({
+  const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
-      
       const { data, error } = await supabase
         .from('business_details')
         .select('*')
         .eq('user_id', userData.user.id)
         .single();
-      
       if (error) throw error;
       return data;
-    }
+    },
+    onSuccess: (data) => {
+      if (data) {
+        setBusinessName(data.business_name || "");
+        setBusinessEmail(data.business_email || "");
+        setBusinessPhone(data.business_phone || "");
+        setBusinessAddress(data.business_address || "");
+        setBusinessLogoUrl(data.business_logo_url || "");
+        setInvoiceTemplate(data.invoice_template || "classic");
+        setTaxConfiguration(data.tax_configuration || []);
+      }
+    },
   });
 
-  const updateBusinessDetails = useMutation({
-    mutationFn: async (updates: any) => {
+  const handleSaveBusinessDetails = async () => {
+    try {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
+      if (!userData.user) throw new Error('Not authenticated');
 
       const { error } = await supabase
         .from('business_details')
-        .update(updates)
-        .eq('user_id', userData.user.id);
+        .upsert([
+          {
+            user_id: userData.user.id,
+            business_name: businessName,
+            business_email: businessEmail,
+            business_phone: businessPhone,
+            business_address: businessAddress,
+            business_logo_url: businessLogoUrl,
+            invoice_template: invoiceTemplate,
+            tax_configuration: taxConfiguration,
+          },
+        ], { onConflict: 'user_id' });
 
       if (error) throw error;
-      return true;
-    },
-    onSuccess: () => {
-      refetchBusinessDetails();
+
       toast({
         title: "Success",
-        description: "Business details updated successfully",
+        description: "Business details saved successfully",
       });
-    },
-    onError: () => {
+
+      queryClient.invalidateQueries({ queryKey: ['businessDetails'] });
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update business details",
+        description: error.message,
         variant: "destructive",
       });
     }
-  });
-
-  const handleUpdateBusinessDetails = (updates: any) => {
-    updateBusinessDetails.mutate(updates);
   };
 
-  const handlePreviewInvoice = async () => {
+  const handleLogoUpload = async (e: any) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
     try {
-      // Sample invoice data for preview
-      const sampleData: InvoiceData = {
-        customerName: "Sample Customer",
-        companyName: "Sample Company Ltd.",
-        phone: "+1 234 567 890",
-        email: "customer@example.com",
-        products: [
-          { name: "Product 1", quantity: 2, price: 100, description: "Sample description" },
-          { name: "Product 2", quantity: 1, price: 200, description: "Another description" },
-        ],
-        subtotal: 400,
-        tax: 40,
-        total: 440,
-        dueDate: new Date(),
-        businessDetails: businessDetails,
-        profile: profile
-      };
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
 
-      // Get template function
-      const templateFn = templates[previewTemplate as keyof typeof templates];
-      if (!templateFn) {
-        throw new Error("Template not found");
-      }
+      const filePath = `${userData.user.id}/logo/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('business_files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      // Generate PDF
-      const doc = await templateFn(sampleData);
-      
-      // Convert to data URL for preview
-      const pdfDataUrl = doc.output('dataurlstring');
-      
-      // Open preview in new window
-      const previewWindow = window.open();
-      if (previewWindow) {
-        previewWindow.document.write(`
-          <html>
-            <head>
-              <title>Invoice Preview - ${previewTemplate} Template</title>
-              <style>
-                body { margin: 0; padding: 0; }
-                iframe { width: 100%; height: 100vh; border: none; }
-              </style>
-            </head>
-            <body>
-              <iframe src="${pdfDataUrl}"></iframe>
-            </body>
-          </html>
-        `);
-      }
-    } catch (error) {
-      console.error("Error generating preview:", error);
+      if (uploadError) throw uploadError;
+
+      setBusinessLogoUrl(filePath);
+      toast({
+        title: "Success",
+        description: "Logo uploaded successfully",
+      });
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to generate invoice preview",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
     }
+  };
+
+  const handleRemoveLogo = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { error: deleteError } = await supabase.storage
+        .from('business_files')
+        .remove([businessLogoUrl]);
+
+      if (deleteError) throw deleteError;
+
+      setBusinessLogoUrl("");
+      toast({
+        title: "Success",
+        description: "Logo removed successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddTax = () => {
+    if (!newTaxName || newTaxRate <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid tax name and rate",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTaxConfiguration([
+      ...taxConfiguration,
+      { name: newTaxName, rate: newTaxRate, enabled: true },
+    ]);
+    setNewTaxName("");
+    setNewTaxRate(0);
+  };
+
+  const handleRemoveTax = (index: number) => {
+    const newTaxConfig = [...taxConfiguration];
+    newTaxConfig.splice(index, 1);
+    setTaxConfiguration(newTaxConfig);
+  };
+
+  const handleTaxEnableChange = (index: number, enabled: boolean) => {
+    const newTaxConfig = [...taxConfiguration];
+    newTaxConfig[index] = { ...newTaxConfig[index], enabled };
+    setTaxConfiguration(newTaxConfig);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="container mx-auto py-10 pt-24">
-        <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="business">Business</TabsTrigger>
-            <TabsTrigger value="templates">Invoice Templates</TabsTrigger>
-            <TabsTrigger value="features">Additional Features</TabsTrigger>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+        
+        <Tabs defaultValue="business" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="business">Business Settings</TabsTrigger>
+            <TabsTrigger value="template">Template Settings</TabsTrigger>
+            <TabsTrigger value="tax">Tax Settings</TabsTrigger>
+            <TabsTrigger value="additional">Additional Features</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="profile" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>
-                  Manage your personal information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {profile && <ProfileCard profile={profile} />}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="business" className="space-y-4">
+
+          <TabsContent value="business">
             <Card>
               <CardHeader>
                 <CardTitle>Business Details</CardTitle>
                 <CardDescription>
-                  Manage your business information
+                  Update your business information
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-6">
-                  <div className="space-y-2">
-                    <Label>Business Name</Label>
-                    <Input
-                      value={businessDetails?.business_name || ''}
-                      onChange={(e) => handleUpdateBusinessDetails({ business_name: e.target.value })}
-                      placeholder="Enter your business name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Business Address</Label>
-                    <Input
-                      value={businessDetails?.business_address || ''}
-                      onChange={(e) => handleUpdateBusinessDetails({ business_address: e.target.value })}
-                      placeholder="Enter your business address"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Terms and Conditions</Label>
-                    <Textarea
-                      className="min-h-[200px]"
-                      value={businessDetails?.terms_and_conditions || ''}
-                      onChange={(e) => handleUpdateBusinessDetails({ terms_and_conditions: e.target.value })}
-                      placeholder="Enter your business terms and conditions"
-                    />
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="businessName">Business Name</Label>
+                  <Input
+                    id="businessName"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="templates" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Invoice Templates</CardTitle>
-                <CardDescription>
-                  Choose and preview your invoice templates
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Classic Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'classic' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-gray-100 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-6 bg-gray-400 w-1/2 mb-2"></div>
-                        <div className="h-4 bg-gray-300 w-full mb-1"></div>
-                        <div className="h-4 bg-gray-300 w-2/3"></div>
-                        <div className="mt-4 h-5 bg-gray-400 w-full"></div>
-                        <div className="mt-2 h-3 bg-gray-300 w-full"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Classic</h3>
-                    <p className="text-sm text-gray-500 mb-4">Simple, traditional invoice layout</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('classic');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('classic');
-                          handleUpdateBusinessDetails({ invoice_template: 'classic' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'classic' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Professional Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'professional' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-blue-50 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="flex justify-between mb-2">
-                          <div className="h-8 bg-blue-200 w-1/4"></div>
-                          <div className="h-8 bg-blue-800 w-1/4"></div>
-                        </div>
-                        <div className="h-4 bg-blue-100 w-1/2 mb-1"></div>
-                        <div className="mt-4 h-5 bg-blue-800 w-full"></div>
-                        <div className="mt-2 h-3 bg-blue-200 w-full"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Professional</h3>
-                    <p className="text-sm text-gray-500 mb-4">Business-focused, professional design</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('professional');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('professional');
-                          handleUpdateBusinessDetails({ invoice_template: 'professional' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'professional' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Diamond Template */}
-                  <div className={`border rounded-lg p-4 ${previewTemplate === 'diamond' ? 'ring-2 ring-primary' : ''}`}>
-                    <div className="h-40 bg-gray-900 flex items-center justify-center mb-4">
-                      <div className="p-4 w-full">
-                        <div className="h-6 bg-white w-1/2 mb-2"></div>
-                        <div className="h-4 bg-gray-400 w-1/3 mb-1"></div>
-                        <div className="mt-4 h-5 bg-gray-200 w-full"></div>
-                        <div className="mt-2 h-4 bg-gray-300 w-full"></div>
-                        <div className="mt-2 h-4 bg-gray-100 w-1/4 ml-auto"></div>
-                      </div>
-                    </div>
-                    <h3 className="font-medium">Diamond</h3>
-                    <p className="text-sm text-gray-500 mb-4">Luxury design for premium businesses</p>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('diamond');
-                          handlePreviewInvoice();
-                        }}
-                      >
-                        Preview
-                      </Button>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setPreviewTemplate('diamond');
-                          handleUpdateBusinessDetails({ invoice_template: 'diamond' });
-                        }}
-                      >
-                        {businessDetails?.invoice_template === 'diamond' ? 'Selected' : 'Select'}
-                      </Button>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessEmail">Business Email</Label>
+                  <Input
+                    id="businessEmail"
+                    type="email"
+                    value={businessEmail}
+                    onChange={(e) => setBusinessEmail(e.target.value)}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessPhone">Business Phone</Label>
+                  <Input
+                    id="businessPhone"
+                    value={businessPhone}
+                    onChange={(e) => setBusinessPhone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessAddress">Business Address</Label>
+                  <Textarea
+                    id="businessAddress"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="businessLogo">Business Logo</Label>
+                  <div className="flex items-center space-x-4">
+                    <Input
+                      type="file"
+                      id="businessLogo"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                    />
+                    <Label
+                      htmlFor="businessLogo"
+                      className="cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-md px-4 py-2"
+                    >
+                      <Upload className="w-4 h-4 mr-2 inline-block" />
+                      Upload Logo
+                    </Label>
+                    {businessLogoUrl && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleRemoveLogo}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {businessLogoUrl && (
+                    <img
+                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessLogoUrl}`}
+                      alt="Business Logo"
+                      className="mt-2 h-20 w-auto"
+                    />
+                  )}
+                </div>
+                <Button onClick={handleSaveBusinessDetails}>Save Details</Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="features" className="space-y-4">
+          <TabsContent value="template">
+            <Card>
+              <CardHeader>
+                <CardTitle>Template Settings</CardTitle>
+                <CardDescription>
+                  Customize your invoice template
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invoiceTemplate">Invoice Template</Label>
+                  <Select
+                    value={invoiceTemplate}
+                    onValueChange={setInvoiceTemplate}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="classic">Classic</SelectItem>
+                      <SelectItem value="professional">Professional</SelectItem>
+                      <SelectItem value="diamond">Diamond</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleSaveBusinessDetails}>Save Template</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tax">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tax Settings</CardTitle>
+                <CardDescription>
+                  Configure your tax rates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Add New Tax</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="newTaxName">Tax Name</Label>
+                      <Input
+                        id="newTaxName"
+                        value={newTaxName}
+                        onChange={(e) => setNewTaxName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="newTaxRate">Tax Rate (%)</Label>
+                      <Input
+                        id="newTaxRate"
+                        type="number"
+                        value={newTaxRate}
+                        onChange={(e) => setNewTaxRate(parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleAddTax} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Tax
+                  </Button>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium">Existing Taxes</h4>
+                  <div className="space-y-2">
+                    {taxConfiguration.map((tax, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 border rounded-md"
+                      >
+                        <div>
+                          <span>{tax.name}</span>
+                          <span className="text-gray-500 ml-2">
+                            ({tax.rate}%)
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={tax.enabled}
+                            onCheckedChange={(checked) =>
+                              handleTaxEnableChange(index, checked)
+                            }
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleRemoveTax(index)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={handleSaveBusinessDetails}>Save Tax Configuration</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="additional">
             <AdditionalFeaturesSettings />
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
     </div>
   );
-}
+};
+
+export default Settings;

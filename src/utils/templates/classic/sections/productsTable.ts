@@ -12,7 +12,7 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
   // Table header
   doc.setFont('helvetica', 'bold');
   doc.text('Item', 10, yPos);
-  doc.text('Description', 80, yPos);
+  doc.text('Description', 70, yPos);
   doc.text('Qty', pageWidth - 80, yPos);
   doc.text('Price', pageWidth - 50, yPos);
   doc.text('Total', pageWidth - 25, yPos);
@@ -34,7 +34,7 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     // Add header for new page
     doc.setFont('helvetica', 'bold');
     doc.text('Item', 10, yPos);
-    doc.text('Description', 80, yPos);
+    doc.text('Description', 70, yPos);
     doc.text('Qty', pageWidth - 80, yPos);
     doc.text('Price', pageWidth - 50, yPos);
     doc.text('Total', pageWidth - 25, yPos);
@@ -67,7 +67,7 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     const productTotal = productQuantity * productPrice;
     
     doc.text(productName, 10, yPos);
-    doc.text(productDescription, 80, yPos);
+    doc.text(productDescription, 70, yPos);
     doc.text(productQuantity.toString(), pageWidth - 80, yPos);
     doc.text(`${productPrice.toFixed(2)}`, pageWidth - 50, yPos);
     doc.text(`${productTotal.toFixed(2)}`, pageWidth - 25, yPos);

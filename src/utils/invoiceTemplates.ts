@@ -45,9 +45,10 @@ const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
       data.products.map(product => ({
         name: product.name?.trim() || 'Product',
         quantity: Math.max(1, product.quantity || 1),
-        price: Math.max(0, product.price || 0)
+        price: Math.max(0, product.price || 0),
+        description: product.description?.trim() || ''
       })) : 
-      [{ name: 'Product', quantity: 1, price: 0 }],
+      [{ name: 'Product', quantity: 1, price: 0, description: '' }],
     subtotal: Math.max(0, data.subtotal || 0),
     tax: Math.max(0, data.tax || 0),
     total: Math.max(0, data.total || 0),
@@ -55,7 +56,8 @@ const sanitizeInvoiceData = (data: InvoiceData): InvoiceData => {
     businessDetails: data.businessDetails || {},
     profile: data.profile || {},
     logoBase64: data.logoBase64 || null,
-    signatureBase64: data.signatureBase64 || null
+    signatureBase64: data.signatureBase64 || null,
+    isEstimate: data.isEstimate || false
   };
 };
 
@@ -64,7 +66,7 @@ const createFallbackPDF = (data: InvoiceData): jsPDF => {
   const pdf = new jsPDF();
   
   pdf.setFontSize(20);
-  pdf.text("INVOICE", 105, 20, { align: "center" });
+  pdf.text(data.isEstimate ? "ESTIMATE" : "INVOICE", 105, 20, { align: "center" });
   
   pdf.setFontSize(12);
   pdf.text(`Customer: ${data.customerName}`, 20, 40);
@@ -78,6 +80,10 @@ const createFallbackPDF = (data: InvoiceData): jsPDF => {
   
   data.products.forEach((product, index) => {
     pdf.text(`${index + 1}. ${product.name} (${product.quantity} x Rs.${product.price})`, 25, y);
+    if (product.description) {
+      y += 8;
+      pdf.text(`   ${product.description}`, 25, y);
+    }
     y += 8;
   });
   
