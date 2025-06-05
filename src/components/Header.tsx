@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
@@ -7,25 +8,22 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { ChevronDown, User, Settings, LogOut, Calculator } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+
 const Header = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const {
-    data: profile
-  } = useQuery({
+  
+  const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
-      const {
-        data: userData
-      } = await supabase.auth.getUser();
+      const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
-      const {
-        data,
-        error
-      } = await supabase.from('profiles').select('*').eq('id', userData.user.id).single();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .single();
       if (error) {
         console.error('Error fetching profile:', error);
         return null;
@@ -33,6 +31,7 @@ const Header = () => {
       return data;
     }
   });
+
   const handleSignOut = async () => {
     setIsLoggingOut(true);
     try {
@@ -53,33 +52,15 @@ const Header = () => {
       setIsLoggingOut(false);
     }
   };
-  return <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-8">
+          <div className="flex items-center">
             <Link to="/" className="text-xl font-bold text-primary">
               Invoice Manager
             </Link>
-            <nav className="hidden md:flex space-x-6">
-              <Link to="/" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Dashboard
-              </Link>
-              <Link to="/invoices" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Invoices
-              </Link>
-              <Link to="/estimates" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Estimates
-              </Link>
-              <Link to="/customers" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Customers
-              </Link>
-              <Link to="/inventory" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Inventory
-              </Link>
-              <Link to="/reports" className="text-gray-600 hover:text-gray-900 transition-colors">
-                Reports
-              </Link>
-            </nav>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -121,6 +102,8 @@ const Header = () => {
           </div>
         </div>
       </div>
-    </header>;
+    </header>
+  );
 };
+
 export default Header;

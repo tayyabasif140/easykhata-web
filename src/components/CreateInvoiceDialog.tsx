@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -18,6 +17,8 @@ import { Textarea } from "./ui/textarea";
 import { generateInvoicePDF } from "@/utils/invoiceTemplates";
 import { SignatureManager } from "./SignatureManager";
 import { useNavigate } from "react-router-dom";
+import { CustomerSelector } from "./CustomerSelector";
+import { Checkbox } from "./ui/checkbox";
 
 interface Product {
   id: string;
@@ -37,6 +38,9 @@ export function CreateInvoiceDialog() {
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
   const [selectedLogo, setSelectedLogo] = useState<string>('');
   const [showLogoSelector, setShowLogoSelector] = useState(false);
+  const [enableCustomFields, setEnableCustomFields] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [selectedTaxes, setSelectedTaxes] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -48,11 +52,14 @@ export function CreateInvoiceDialog() {
   );
 
   const totalTax = useMemo(() => {
-    return products.reduce((sum, product) => {
-      const productTotal = product.quantity * product.price;
-      return sum + (productTotal * 0.17); // 17% tax
+    return selectedTaxes.reduce((sum, taxId) => {
+      const tax = taxConfigurations.find(t => t.id === taxId);
+      if (tax) {
+        return sum + (subtotal * (tax.rate / 100));
+      }
+      return sum;
     }, 0);
-  }, [products]);
+  }, [products, selectedTaxes, taxConfigurations, subtotal]);
 
   const total = useMemo(() => subtotal + totalTax, [subtotal, totalTax]);
 
@@ -103,6 +110,8 @@ export function CreateInvoiceDialog() {
     }
   });
 
+  const taxConfigurations = businessDetails?.tax_configuration || [];
+
   const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
@@ -136,6 +145,23 @@ export function CreateInvoiceDialog() {
       }
     },
     enabled: !!profile?.id
+  });
+
+  const { data: customFields } = useQuery({
+    queryKey: ['customFields'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('custom_columns')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      return data;
+    }
   });
 
   const addProduct = () => {
@@ -227,7 +253,6 @@ export function CreateInvoiceDialog() {
 
     setIsSubmitting(true);
     
-    // Show immediate notification
     toast({
       title: "Creating invoice...",
       description: "Your invoice is being generated",
@@ -238,16 +263,28 @@ export function CreateInvoiceDialog() {
       if (!userData.user) throw new Error('Not authenticated');
 
       // Create invoice
+      const invoiceData: any = {
+        customer_id: customerId,
+        total_amount: subtotal,
+        tax_amount: totalTax,
+        due_date: dueDate?.toISOString().split('T')[0],
+        user_id: userData.user.id,
+        status: 'unpaid'
+      };
+
+      // Add custom fields if enabled
+      if (enableCustomFields && customFields) {
+        customFields.forEach(field => {
+          const value = customFieldValues[field.id];
+          if (value) {
+            invoiceData[field.column_name] = value;
+          }
+        });
+      }
+
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
-        .insert([{
-          customer_id: customerId,
-          total_amount: subtotal,
-          tax_amount: totalTax,
-          due_date: dueDate?.toISOString().split('T')[0],
-          user_id: userData.user.id,
-          status: 'unpaid'
-        }])
+        .insert([invoiceData])
         .select()
         .single();
 
@@ -290,6 +327,9 @@ export function CreateInvoiceDialog() {
       setProducts([]);
       setSelectedSignature("");
       setSelectedLogo("");
+      setEnableCustomFields(false);
+      setCustomFieldValues({});
+      setSelectedTaxes([]);
 
     } catch (error: any) {
       console.error('Error creating invoice:', error);
@@ -319,21 +359,11 @@ export function CreateInvoiceDialog() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Customer</Label>
-                  <Select value={customerId} onValueChange={setCustomerId} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers?.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name} {customer.company ? `(${customer.company})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <CustomerSelector
+                  value={customerId}
+                  onValueChange={setCustomerId}
+                  required
+                />
                 
                 <div className="space-y-2">
                   <Label>Due Date</Label>
@@ -362,6 +392,67 @@ export function CreateInvoiceDialog() {
                   </Popover>
                 </div>
               </div>
+
+              {/* Custom Fields Section */}
+              {customFields && customFields.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="enable-custom-fields"
+                      checked={enableCustomFields}
+                      onCheckedChange={(checked) => setEnableCustomFields(checked as boolean)}
+                    />
+                    <Label htmlFor="enable-custom-fields">Enable Custom Fields</Label>
+                  </div>
+
+                  {enableCustomFields && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
+                      {customFields.map((field) => (
+                        <div key={field.id}>
+                          <Label htmlFor={field.id}>{field.column_name}</Label>
+                          <Input
+                            id={field.id}
+                            type={field.column_type === 'number' ? 'number' : field.column_type === 'date' ? 'date' : 'text'}
+                            value={customFieldValues[field.id] || ''}
+                            onChange={(e) => setCustomFieldValues(prev => ({
+                              ...prev,
+                              [field.id]: e.target.value
+                            }))}
+                            placeholder={`Enter ${field.column_name.toLowerCase()}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tax Selection */}
+              {taxConfigurations.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Apply Taxes</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {taxConfigurations.map((tax) => (
+                      <div key={tax.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`tax-${tax.id}`}
+                          checked={selectedTaxes.includes(tax.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedTaxes(prev => [...prev, tax.id]);
+                            } else {
+                              setSelectedTaxes(prev => prev.filter(id => id !== tax.id));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`tax-${tax.id}`} className="text-sm">
+                          {tax.name} ({tax.rate}%)
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -593,10 +684,21 @@ export function CreateInvoiceDialog() {
                     <span>Subtotal:</span>
                     <span>Rs.{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Tax (17%):</span>
-                    <span>Rs.{totalTax.toFixed(2)}</span>
-                  </div>
+                  {selectedTaxes.length > 0 && (
+                    <div className="space-y-1">
+                      {selectedTaxes.map(taxId => {
+                        const tax = taxConfigurations.find(t => t.id === taxId);
+                        if (!tax) return null;
+                        const taxAmount = subtotal * (tax.rate / 100);
+                        return (
+                          <div key={taxId} className="flex justify-between text-sm">
+                            <span>{tax.name} ({tax.rate}%):</span>
+                            <span>Rs.{taxAmount.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
                     <span>Rs.{total.toFixed(2)}</span>
