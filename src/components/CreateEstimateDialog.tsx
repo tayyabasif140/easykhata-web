@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "./ui/textarea";
 import { generateInvoicePDF } from "@/utils/invoiceTemplates";
 import { SignatureManager } from "./SignatureManager";
+import { useNavigate } from "react-router-dom";
 
 interface Product {
   id: string;
@@ -38,6 +39,7 @@ export function CreateEstimateDialog() {
   const [showLogoSelector, setShowLogoSelector] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Memoized calculations
   const subtotal = useMemo(() => 
@@ -191,7 +193,10 @@ export function CreateEstimateDialog() {
         tax: totalTax,
         total,
         dueDate: validUntil,
-        businessDetails,
+        businessDetails: {
+          ...businessDetails,
+          business_logo_url: selectedLogo || businessDetails?.business_logo_url
+        },
         profile: {
           ...profile,
           digital_signature_url: selectedSignature || profile?.digital_signature_url
@@ -264,7 +269,7 @@ export function CreateEstimateDialog() {
 
       if (itemsError) throw itemsError;
 
-      // Generate and download PDF
+      // Generate and download PDF with template
       const doc = await generatePDF();
       if (doc) {
         const fileName = `estimate_${estimate.id}.pdf`;
@@ -299,309 +304,325 @@ export function CreateEstimateDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2 w-full sm:w-auto" data-create-estimate>
-          <Plus className="w-4 h-4" />
-          Create Estimate
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New Estimate</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Customer</Label>
-              <Select value={customerId} onValueChange={setCustomerId} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers?.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name} {customer.company ? `(${customer.company})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Valid Until</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !validUntil && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {validUntil ? format(validUntil, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={validUntil}
-                    onSelect={setValidUntil}
-                    initialFocus
-                    className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Label className="text-lg font-semibold">Products/Services</Label>
-              <Button type="button" onClick={addProduct} size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Item
-              </Button>
-            </div>
-
-            {products.map((product, index) => (
-              <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm">Product/Service Name</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={product.name}
-                        onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                        placeholder="Enter product name"
-                        required
-                        className="flex-1"
-                      />
-                      <Select onValueChange={(value) => {
-                        const item = inventory?.find(inv => inv.id === value);
-                        if (item) selectInventoryItem(product.id, item);
-                      }}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="From Inventory" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {inventory?.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.product_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm">Description</Label>
-                    <Textarea
-                      value={product.description || ""}
-                      onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
-                      placeholder="Enter description (optional)"
-                      className="min-h-[60px]"
-                    />
-                  </div>
+    <>
+      <div className="flex gap-2">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 w-full sm:w-auto" data-create-estimate>
+              <Plus className="w-4 h-4" />
+              Create Estimate
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Estimate</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Customer</Label>
+                  <Select value={customerId} onValueChange={setCustomerId} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers?.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} {customer.company ? `(${customer.company})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
-                  <div>
-                    <Label className="text-sm">Quantity</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={product.quantity}
-                      onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm">Price (Rs.)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={product.price}
-                      onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
-                      required
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <span className="text-sm font-medium">
-                      Total: Rs.{(product.quantity * product.price).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeProduct(product.id)}
-                      className="w-full"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Valid Until</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !validUntil && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {validUntil ? format(validUntil, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={validUntil}
+                        onSelect={setValidUntil}
+                        initialFocus
+                        className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Logo Selection */}
-          <div className="space-y-2">
-            <Label>Business Logo</Label>
-            <div>
-              {showLogoSelector ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
-                    {businessDetails?.business_logo_url && (
-                      <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
-                           onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
-                        <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
-                          <img
-                            src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
-                            alt="Default logo"
-                            className="h-20 w-auto object-contain"
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-lg font-semibold">Products/Services</Label>
+                  <Button type="button" onClick={addProduct} size="sm" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </Button>
+                </div>
+
+                {products.map((product, index) => (
+                  <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm">Product/Service Name</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={product.name}
+                            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                            placeholder="Enter product name"
+                            required
+                            className="flex-1"
+                          />
+                          <Select onValueChange={(value) => {
+                            if (value === "custom") {
+                              // User wants to add custom product, do nothing special
+                              return;
+                            }
+                            const item = inventory?.find(inv => inv.id === value);
+                            if (item) selectInventoryItem(product.id, item);
+                          }}>
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Import from Inventory" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="custom">Add Custom Product</SelectItem>
+                              {inventory?.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.product_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Description</Label>
+                        <Textarea
+                          value={product.description || ""}
+                          onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                          placeholder="Enter description (optional)"
+                          className="min-h-[60px]"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                      <div>
+                        <Label className="text-sm">Quantity</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={product.quantity}
+                          onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Price (Rs.)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={product.price}
+                          onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                          required
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <span className="text-sm font-medium">
+                          Total: Rs.{(product.quantity * product.price).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeProduct(product.id)}
+                          className="w-full"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Logo Selection */}
+              <div className="space-y-2">
+                <Label>Business Logo</Label>
+                <div>
+                  {showLogoSelector ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                        {businessDetails?.business_logo_url && (
+                          <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                               onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
+                            <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                              <img
+                                src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                                alt="Default logo"
+                                className="h-20 w-auto object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                            <p className="text-center text-sm">
+                              {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
+                          const logoPath = `${profile?.id}/logo/${logo.name}`;
+                          if (businessDetails?.business_logo_url === logoPath) return null;
+                          
+                          return (
+                            <div 
+                              key={logo.id} 
+                              className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                              onClick={() => handleLogoSelect(logoPath)}
+                            >
+                              <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                                <img
+                                  src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${logoPath}`}
+                                  alt={`Logo ${logo.name}`}
+                                  className="h-20 w-auto object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <p className="text-center text-sm">
+                                {selectedLogo === logoPath ? 'Selected' : 'Select'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        onClick={() => setShowLogoSelector(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      {(selectedLogo || businessDetails?.business_logo_url) ? (
+                        <div className="flex flex-col space-y-2">
+                          <img 
+                            src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
+                            alt="Business logo" 
+                            className="h-20 border border-gray-200 bg-white p-2"
                             loading="lazy"
                           />
+                          <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                            Change Logo
+                          </Button>
                         </div>
-                        <p className="text-center text-sm">
-                          {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
-                      const logoPath = `${profile?.id}/logo/${logo.name}`;
-                      if (businessDetails?.business_logo_url === logoPath) return null;
-                      
-                      return (
-                        <div 
-                          key={logo.id} 
-                          className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
-                          onClick={() => handleLogoSelect(logoPath)}
-                        >
-                          <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
-                            <img
-                              src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${logoPath}`}
-                              alt={`Logo ${logo.name}`}
-                              className="h-20 w-auto object-contain"
-                              loading="lazy"
-                            />
-                          </div>
-                          <p className="text-center text-sm">
-                            {selectedLogo === logoPath ? 'Selected' : 'Select'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
+                      ) : (
+                        <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                          Select Logo
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Signature section */}
+              {showSignatureCanvas ? (
+                <div className="space-y-4">
+                  <Label>Signature</Label>
+                  {profile?.id && (
+                    <SignatureManager
+                      userId={profile.id}
+                      onSignatureSelect={handleSignatureSelect}
+                      defaultSignature={selectedSignature || profile?.digital_signature_url}
+                    />
+                  )}
                   <Button 
                     type="button" 
                     variant="secondary" 
-                    onClick={() => setShowLogoSelector(false)}
+                    onClick={() => setShowSignatureCanvas(false)}
                   >
                     Done
                   </Button>
                 </div>
               ) : (
-                <div>
-                  {(selectedLogo || businessDetails?.business_logo_url) ? (
-                    <div className="flex flex-col space-y-2">
-                      <img 
-                        src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
-                        alt="Business logo" 
-                        className="h-20 border border-gray-200 bg-white p-2"
-                        loading="lazy"
-                      />
-                      <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
-                        Change Logo
+                <div className="space-y-2">
+                  <Label>Signature</Label>
+                  <div>
+                    {(selectedSignature || profile?.digital_signature_url) ? (
+                      <div className="flex flex-col space-y-2">
+                        <img 
+                          src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
+                          alt="Your signature" 
+                          className="h-20 border border-gray-200 bg-white p-2"
+                          loading="lazy"
+                        />
+                        <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                          Change Signature
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                        Add Your Signature
                       </Button>
-                    </div>
-                  ) : (
-                    <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
-                      Select Logo
-                    </Button>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Signature section */}
-          {showSignatureCanvas ? (
-            <div className="space-y-4">
-              <Label>Signature</Label>
-              {profile?.id && (
-                <SignatureManager
-                  userId={profile.id}
-                  onSignatureSelect={handleSignatureSelect}
-                  defaultSignature={selectedSignature || profile?.digital_signature_url}
-                />
-              )}
-              <Button 
-                type="button" 
-                variant="secondary" 
-                onClick={() => setShowSignatureCanvas(false)}
-              >
-                Done
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Signature</Label>
-              <div>
-                {(selectedSignature || profile?.digital_signature_url) ? (
-                  <div className="flex flex-col space-y-2">
-                    <img 
-                      src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
-                      alt="Your signature" 
-                      className="h-20 border border-gray-200 bg-white p-2"
-                      loading="lazy"
-                    />
-                    <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
-                      Change Signature
-                    </Button>
+              <div className="border-t pt-4">
+                <div className="space-y-2 text-right">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>Rs.{subtotal.toFixed(2)}</span>
                   </div>
-                ) : (
-                  <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
-                    Add Your Signature
-                  </Button>
-                )}
+                  <div className="flex justify-between">
+                    <span>Tax (17%):</span>
+                    <span>Rs.{totalTax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                    <span>Total:</span>
+                    <span>Rs.{total.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
 
-          <div className="border-t pt-4">
-            <div className="space-y-2 text-right">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>Rs.{subtotal.toFixed(2)}</span>
+              <div className="flex flex-col sm:flex-row justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Estimate"}
+                </Button>
               </div>
-              <div className="flex justify-between">
-                <span>Tax (17%):</span>
-                <span>Rs.{totalTax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total:</span>
-                <span>Rs.{total.toFixed(2)}</span>
-              </div>
-            </div>
-          </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Estimate"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/estimates')}
+        >
+          View All
+        </Button>
+      </div>
+    </>
   );
 }

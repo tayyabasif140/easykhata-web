@@ -1,314 +1,287 @@
-import Header from "@/components/Header";
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line 
-} from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { 
-  TrendingUp, TrendingDown, Users, Receipt, 
-  DollarSign, Package, ArrowUpRight, ArrowDownRight, CheckCircle
-} from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import Header from "@/components/Header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { BackButton } from "@/components/BackButton";
 
 const Reports = () => {
-  const { data: invoices } = useQuery({
-    queryKey: ['invoices'],
+  const { data: invoiceStats } = useQuery({
+    queryKey: ['invoice-stats'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { data, error } = await supabase
+      
+      const { data: invoices, error } = await supabase
         .from('invoices')
-        .select('*, customers(name)')
+        .select('status, total_amount, tax_amount, created_at')
         .eq('user_id', userData.user.id);
+      
       if (error) throw error;
-      return data;
+
+      const totalRevenue = invoices.reduce((sum, invoice) => 
+        invoice.status === 'paid' ? sum + invoice.total_amount + invoice.tax_amount : sum, 0
+      );
+
+      const paidInvoices = invoices.filter(inv => inv.status === 'paid').length;
+      const unpaidInvoices = invoices.filter(inv => inv.status === 'unpaid').length;
+      const cancelledInvoices = invoices.filter(inv => inv.status === 'cancelled').length;
+
+      const monthlyData = invoices.reduce((acc: any, invoice) => {
+        if (invoice.status === 'paid') {
+          const month = new Date(invoice.created_at).toLocaleString('default', { month: 'short' });
+          acc[month] = (acc[month] || 0) + invoice.total_amount + invoice.tax_amount;
+        }
+        return acc;
+      }, {});
+
+      const chartData = Object.entries(monthlyData).map(([month, amount]) => ({
+        month,
+        revenue: amount
+      }));
+
+      return {
+        totalRevenue,
+        totalInvoices: invoices.length,
+        paidInvoices,
+        unpaidInvoices,
+        cancelledInvoices,
+        chartData,
+        statusData: [
+          { name: 'Paid', value: paidInvoices, color: '#10B981' },
+          { name: 'Unpaid', value: unpaidInvoices, color: '#F59E0B' },
+          { name: 'Cancelled', value: cancelledInvoices, color: '#EF4444' }
+        ]
+      };
     }
   });
 
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory'],
+  const { data: estimateStats } = useQuery({
+    queryKey: ['estimate-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('inventory').select('*');
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const totalRevenue = invoices?.reduce((sum, invoice) => 
-    invoice.status === 'paid' ? sum + Number(invoice.total_amount) : sum, 0
-  ) || 0;
-
-  const totalUnpaid = invoices?.reduce((sum, invoice) => 
-    invoice.status === 'unpaid' ? sum + Number(invoice.total_amount) : sum, 0
-  ) || 0;
-
-  const monthlyData = invoices?.reduce((acc: any, invoice) => {
-    const month = new Date(invoice.created_at).toLocaleString('default', { month: 'short' });
-    if (!acc[month]) acc[month] = 0;
-    if (invoice.status === 'paid') {
-      acc[month] += Number(invoice.total_amount);
-    }
-    return acc;
-  }, {});
-
-  const chartData = Object.entries(monthlyData || {}).map(([month, amount]) => ({
-    month,
-    amount,
-  }));
-
-  const pieData = [
-    { name: 'Paid', value: invoices?.filter(i => i.status === 'paid').length || 0 },
-    { name: 'Unpaid', value: invoices?.filter(i => i.status === 'unpaid').length || 0 },
-  ];
-
-  const COLORS = ['#22c55e', '#ef4444'];
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  const markAsPaidMutation = useMutation({
-    mutationFn: async (invoiceId: string) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
       
-      const { error } = await supabase
-        .from('invoices')
-        .update({ status: 'paid' })
-        .eq('id', invoiceId)
+      const { data: estimates, error } = await supabase
+        .from('estimates')
+        .select('status, total_amount, tax_amount, created_at, valid_until')
         .eq('user_id', userData.user.id);
       
       if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({
-        title: "Success",
-        description: "Invoice marked as paid",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+
+      const totalEstimates = estimates.length;
+      const draftEstimates = estimates.filter(est => est.status === 'draft').length;
+      const sentEstimates = estimates.filter(est => est.status === 'sent').length;
+      const acceptedEstimates = estimates.filter(est => est.status === 'accepted').length;
+      const rejectedEstimates = estimates.filter(est => est.status === 'rejected').length;
+      
+      const expiredEstimates = estimates.filter(est => 
+        est.valid_until && new Date(est.valid_until) < new Date()
+      ).length;
+
+      const totalEstimateValue = estimates.reduce((sum, estimate) => 
+        sum + estimate.total_amount + estimate.tax_amount, 0
+      );
+
+      const monthlyEstimateData = estimates.reduce((acc: any, estimate) => {
+        const month = new Date(estimate.created_at).toLocaleString('default', { month: 'short' });
+        acc[month] = (acc[month] || 0) + 1;
+        return acc;
+      }, {});
+
+      const estimateChartData = Object.entries(monthlyEstimateData).map(([month, count]) => ({
+        month,
+        estimates: count
+      }));
+
+      return {
+        totalEstimates,
+        draftEstimates,
+        sentEstimates,
+        acceptedEstimates,
+        rejectedEstimates,
+        expiredEstimates,
+        totalEstimateValue,
+        estimateChartData,
+        estimateStatusData: [
+          { name: 'Draft', value: draftEstimates, color: '#6B7280' },
+          { name: 'Sent', value: sentEstimates, color: '#3B82F6' },
+          { name: 'Accepted', value: acceptedEstimates, color: '#10B981' },
+          { name: 'Rejected', value: rejectedEstimates, color: '#EF4444' },
+          { name: 'Expired', value: expiredEstimates, color: '#F59E0B' }
+        ]
+      };
     }
   });
 
-  const handleMarkAsPaid = (invoiceId: string) => {
-    markAsPaidMutation.mutate(invoiceId);
-  };
+  const { data: customerStats } = useQuery({
+    queryKey: ['customer-stats'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data: customers, error } = await supabase
+        .from('customers')
+        .select('total_paid, total_unpaid')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+
+      const totalCustomers = customers.length;
+      const totalReceivables = customers.reduce((sum, customer) => sum + (customer.total_unpaid || 0), 0);
+
+      return {
+        totalCustomers,
+        totalReceivables
+      };
+    }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <BackButton className="mb-4" />
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Financial Reports</h1>
-          <p className="text-gray-600 mt-1">Track your business performance</p>
+        <div className="flex items-center gap-4 mb-8">
+          <BackButton />
+          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
         </div>
 
+        {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-gray-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">Rs.{totalRevenue.toLocaleString()}</div>
-                  <p className="text-xs text-gray-500">+12.5% from last month</p>
-                </div>
-                <div className="bg-green-50 p-2 rounded-full">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                </div>
-              </div>
+              <div className="text-2xl font-bold">Rs.{(invoiceStats?.totalRevenue || 0).toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">From paid invoices</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Unpaid Invoices
-              </CardTitle>
-              <Receipt className="h-4 w-4 text-gray-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">Rs.{totalUnpaid.toLocaleString()}</div>
-                  <p className="text-xs text-gray-500">{pieData[1].value} invoices pending</p>
-                </div>
-                <div className="bg-red-50 p-2 rounded-full">
-                  <TrendingDown className="h-4 w-4 text-red-500" />
-                </div>
-              </div>
+              <div className="text-2xl font-bold">{invoiceStats?.totalInvoices || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                <Badge variant="secondary" className="mr-1">{invoiceStats?.paidInvoices || 0} Paid</Badge>
+                <Badge variant="outline">{invoiceStats?.unpaidInvoices || 0} Unpaid</Badge>
+              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Active Customers
-              </CardTitle>
-              <Users className="h-4 w-4 text-gray-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Estimates</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">
-                    {new Set(invoices?.map(i => i.customer_id)).size || 0}
-                  </div>
-                  <p className="text-xs text-gray-500">+2 this month</p>
-                </div>
-                <div className="bg-blue-50 p-2 rounded-full">
-                  <ArrowUpRight className="h-4 w-4 text-blue-500" />
-                </div>
-              </div>
+              <div className="text-2xl font-bold">{estimateStats?.totalEstimates || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                <Badge variant="secondary" className="mr-1">{estimateStats?.acceptedEstimates || 0} Accepted</Badge>
+                <Badge variant="outline">{estimateStats?.expiredEstimates || 0} Expired</Badge>
+              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Low Stock Items
-              </CardTitle>
-              <Package className="h-4 w-4 text-gray-500" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold">
-                    {inventory?.filter(item => item.quantity < 5).length || 0}
-                  </div>
-                  <p className="text-xs text-gray-500">Products need restock</p>
-                </div>
-                <div className="bg-yellow-50 p-2 rounded-full">
-                  <ArrowDownRight className="h-4 w-4 text-yellow-500" />
-                </div>
-              </div>
+              <div className="text-2xl font-bold">Rs.{(customerStats?.totalReceivables || 0).toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">From {customerStats?.totalCustomers || 0} customers</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Recent Invoices</h2>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {invoices?.slice(0, 5).map((invoice) => (
-                  <tr key={invoice.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {invoice.customers?.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Rs.{Number(invoice.total_amount).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(invoice.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {invoice.status === 'paid' ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Paid
-                        </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Unpaid
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {invoice.status === 'unpaid' && (
-                        <Button 
-                          variant="success"
-                          size="sm"
-                          onClick={() => handleMarkAsPaid(invoice.id)}
-                          className="flex items-center gap-1"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Mark Paid
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 mt-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Revenue Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Revenue Overview</CardTitle>
+              <CardTitle>Monthly Revenue</CardTitle>
+              <CardDescription>Revenue from paid invoices by month</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={invoiceStats?.chartData || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip />
-                  <Line 
-                    type="monotone" 
-                    dataKey="amount" 
-                    stroke="#0ea5e9" 
-                    strokeWidth={2}
-                  />
-                </LineChart>
+                  <Tooltip formatter={(value) => [`Rs.${value}`, 'Revenue']} />
+                  <Bar dataKey="revenue" fill="#3B82F6" />
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
+          {/* Invoice Status Distribution */}
           <Card>
             <CardHeader>
-              <CardTitle>Invoice Status</CardTitle>
+              <CardTitle>Invoice Status Distribution</CardTitle>
+              <CardDescription>Breakdown of invoice statuses</CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={pieData}
+                    data={invoiceStats?.statusData || []}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
                     outerRadius={80}
-                    fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, value }) => `${name}: ${value}`}
                   >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    {invoiceStats?.statusData?.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Estimates Created Monthly */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Estimates</CardTitle>
+              <CardDescription>Number of estimates created by month</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={estimateStats?.estimateChartData || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => [`${value}`, 'Estimates']} />
+                  <Bar dataKey="estimates" fill="#10B981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Estimate Status Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Estimate Status Distribution</CardTitle>
+              <CardDescription>Breakdown of estimate statuses</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={estimateStats?.estimateStatusData?.filter(item => item.value > 0) || []}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {estimateStats?.estimateStatusData?.filter(item => item.value > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -317,6 +290,47 @@ const Reports = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Detailed Estimate Statistics */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Estimate Details</CardTitle>
+            <CardDescription>Comprehensive breakdown of estimate data</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-600">{estimateStats?.draftEstimates || 0}</div>
+                <p className="text-sm text-gray-500">Draft</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{estimateStats?.sentEstimates || 0}</div>
+                <p className="text-sm text-gray-500">Sent</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{estimateStats?.acceptedEstimates || 0}</div>
+                <p className="text-sm text-gray-500">Accepted</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{estimateStats?.rejectedEstimates || 0}</div>
+                <p className="text-sm text-gray-500">Rejected</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-yellow-600">{estimateStats?.expiredEstimates || 0}</div>
+                <p className="text-sm text-gray-500">Expired</p>
+              </div>
+            </div>
+            <div className="mt-6 pt-6 border-t">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-primary">Rs.{(estimateStats?.totalEstimateValue || 0).toFixed(2)}</div>
+                <p className="text-sm text-gray-500">Total Estimate Value</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  (Note: Estimates are not included in revenue calculations)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

@@ -1,158 +1,134 @@
 
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Settings, User } from "lucide-react";
-import { 
-  Drawer,
-  DrawerTrigger,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose
-} from "./ui/drawer";
+import { Button } from "./ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { ChevronDown, User, Settings, LogOut, Calculator } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const Header = () => {
-  const [user, setUser] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { toast } = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function getSession() {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        setUser(data.session.user);
-        fetchUserAvatar(data.session.user.id);
-      }
-    }
-
-    getSession();
-  }, []);
-
-  async function fetchUserAvatar(userId: string) {
-    try {
-      setAvatarLoading(true);
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      
       const { data, error } = await supabase
         .from('profiles')
-        .select('avatar_url')
-        .eq('id', userId)
+        .select('*')
+        .eq('id', userData.user.id)
         .single();
-
+      
       if (error) {
-        console.error("Error fetching avatar:", error);
-      } else if (data?.avatar_url) {
-        // Add a cache-busting timestamp to the avatar URL
-        const timestamp = new Date().getTime();
-        let url = data.avatar_url;
-        
-        // If it's a relative path, construct the full URL
-        if (!url.startsWith('http') && !url.startsWith('data:')) {
-          url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/business_files/${url}`;
-        }
-        
-        // Add the timestamp parameter to prevent caching
-        const finalUrl = url.includes('?') ? `${url}&t=${timestamp}` : `${url}?t=${timestamp}`;
-        setAvatarUrl(finalUrl);
-        console.log("Set avatar URL to:", finalUrl);
+        console.error('Error fetching profile:', error);
+        return null;
       }
-    } catch (err) {
-      console.error("Failed to fetch avatar:", err);
-    } finally {
-      setAvatarLoading(false);
+      
+      return data;
     }
-  }
+  });
 
-  async function signOut() {
+  const handleSignOut = async () => {
+    setIsLoggingOut(true);
     try {
       await supabase.auth.signOut();
-      window.location.href = '/auth';
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
+      });
+      navigate("/auth");
     } catch (error) {
       console.error("Error signing out:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoggingOut(false);
     }
-  }
-
-  const handleProfileClick = () => {
-    navigate('/account');
   };
 
   return (
-    <header className="w-full py-2 border-b border-border/40 bg-background sticky top-0 z-10">
-      <div className="container flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-bold tracking-tight">EzKhata</h2>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          {user ? (
-            <div className="flex items-center space-x-4">
-              <Drawer>
-                <DrawerTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </DrawerTrigger>
-                <DrawerContent className="p-4">
-                  <DrawerHeader className="p-0">
-                    <DrawerTitle>Settings</DrawerTitle>
-                  </DrawerHeader>
-                  
-                  <div className="flex items-center space-x-3 my-4 p-2 border rounded-md hover:bg-accent cursor-pointer" onClick={handleProfileClick}>
-                    <Avatar className="h-10 w-10">
-                      {avatarUrl ? (
-                        <AvatarImage 
-                          src={avatarUrl} 
-                          alt="User avatar" 
-                          loading="eager"
-                          fetchPriority="high"
-                        />
-                      ) : (
-                        <AvatarFallback>
-                          {avatarLoading ? "..." : user?.email?.charAt(0).toUpperCase() || "U"}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Profile Settings</p>
-                      <p className="text-xs text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <Button variant="outline" className="w-full justify-start" onClick={signOut}>
-                      <User className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </Button>
-                    
-                    <DrawerClose asChild>
-                      <Button variant="secondary" className="w-full">Close</Button>
-                    </DrawerClose>
-                  </div>
-                </DrawerContent>
-              </Drawer>
-              
-              <Avatar className="cursor-pointer" onClick={handleProfileClick}>
-                {avatarUrl ? (
-                  <AvatarImage 
-                    src={avatarUrl} 
-                    alt="User avatar" 
-                    loading="eager"
-                    fetchPriority="high"
-                  />
-                ) : (
-                  <AvatarFallback>
-                    {avatarLoading ? "..." : user?.email?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-            </div>
-          ) : (
-            <Link to="/auth">
-              <Button>Sign in</Button>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center space-x-8">
+            <Link to="/" className="text-xl font-bold text-primary">
+              Invoice Manager
             </Link>
-          )}
+            <nav className="hidden md:flex space-x-6">
+              <Link to="/" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Dashboard
+              </Link>
+              <Link to="/invoices" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Invoices
+              </Link>
+              <Link to="/estimates" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Estimates
+              </Link>
+              <Link to="/customers" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Customers
+              </Link>
+              <Link to="/inventory" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Inventory
+              </Link>
+              <Link to="/reports" className="text-gray-600 hover:text-gray-900 transition-colors">
+                Reports
+              </Link>
+            </nav>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={profile?.avatar_url} alt={profile?.full_name} />
+                    <AvatarFallback>
+                      {profile?.full_name?.charAt(0)?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:block text-sm font-medium">
+                    {profile?.full_name || "User"}
+                  </span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => navigate("/account")}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/account")}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/tax-management")}>
+                  <Calculator className="mr-2 h-4 w-4" />
+                  <span>Tax</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} disabled={isLoggingOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{isLoggingOut ? "Signing out..." : "Sign out"}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </header>

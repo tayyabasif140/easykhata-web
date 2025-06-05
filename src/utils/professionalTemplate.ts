@@ -48,7 +48,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
       let logoUrl = businessDetails.business_logo_url;
       
       if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
         logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
       }
       
@@ -219,7 +219,17 @@ export const professionalTemplate = async (props: TemplateProps) => {
     }
     
     doc.text(product.name, 15, yPos);
-    doc.text(product.description || '', 80, yPos);
+    
+    // Handle description with line wrapping
+    if (product.description) {
+      const descriptionLines = doc.splitTextToSize(product.description, 60);
+      let descYPos = yPos;
+      for (let j = 0; j < Math.min(descriptionLines.length, 2); j++) {
+        doc.text(descriptionLines[j], 80, descYPos);
+        if (j < descriptionLines.length - 1) descYPos += 5;
+      }
+    }
+    
     doc.text(product.quantity.toString(), pageWidth - 85, yPos, { align: 'center' });
     doc.text(`${product.price.toFixed(2)}`, pageWidth - 50, yPos, { align: 'center' });
     doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 15, yPos, { align: 'right' });
@@ -326,7 +336,7 @@ export const professionalTemplate = async (props: TemplateProps) => {
       let signatureUrl = profile.digital_signature_url;
       
       if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
         signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
       }
       

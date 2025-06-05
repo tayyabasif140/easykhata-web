@@ -1,5 +1,4 @@
 
-
 import jsPDF from 'jspdf';
 import { TemplateProps } from './invoiceTemplates';
 import { fetchImageAsBase64 } from './templates/classic/utils/images/conversion';
@@ -19,7 +18,8 @@ export const diamondTemplate = async (props: TemplateProps) => {
       businessDetails,
       profile,
       logoBase64,
-      signatureBase64
+      signatureBase64,
+      isEstimate = false
     } = props;
 
     // Create a new PDF document
@@ -50,7 +50,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
         let logoUrl = businessDetails.business_logo_url;
         
         if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
           logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
         }
         
@@ -76,7 +76,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', pageWidth - 60, 25);
+    doc.text(isEstimate ? 'ESTIMATE' : 'INVOICE', pageWidth - 60, 25);
 
     // Add decorative elements
     doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -149,8 +149,8 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.roundedRect(pageWidth - 90, yPos, 80, 25, 2, 2, 'F');
     
     doc.setFont('helvetica', 'bold');
-    doc.text('Invoice Date:', pageWidth - 85, yPos + 8);
-    doc.text('Due Date:', pageWidth - 85, yPos + 18);
+    doc.text(isEstimate ? 'Estimate Date:' : 'Invoice Date:', pageWidth - 85, yPos + 8);
+    doc.text(isEstimate ? 'Valid Until:' : 'Due Date:', pageWidth - 85, yPos + 18);
     
     const currentDate = new Date().toLocaleDateString();
     const formattedDueDate = dueDate ? dueDate.toLocaleDateString() : 'N/A';
@@ -169,6 +169,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.text('Product', 15, yPos + 7);
+    doc.text('Description', 70, yPos + 7);
     doc.text('Qty', pageWidth - 85, yPos + 7);
     doc.text('Price', pageWidth - 60, yPos + 7);
     doc.text('Total', pageWidth - 30, yPos + 7);
@@ -194,6 +195,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.text('Product', 15, yPos + 7);
+      doc.text('Description', 70, yPos + 7);
       doc.text('Qty', pageWidth - 85, yPos + 7);
       doc.text('Price', pageWidth - 60, yPos + 7);
       doc.text('Total', pageWidth - 30, yPos + 7);
@@ -217,6 +219,16 @@ export const diamondTemplate = async (props: TemplateProps) => {
       }
       
       doc.text(product.name, 15, yPos + 7);
+      
+      // Handle description with line wrapping
+      if (product.description) {
+        const descriptionLines = doc.splitTextToSize(product.description, 60);
+        let descYPos = yPos + 7;
+        for (let j = 0; j < Math.min(descriptionLines.length, 1); j++) {
+          doc.text(descriptionLines[j], 70, descYPos);
+        }
+      }
+      
       doc.text(product.quantity.toString(), pageWidth - 85, yPos + 7);
       doc.text(`${product.price.toFixed(2)}`, pageWidth - 60, yPos + 7);
       doc.text(`${(product.quantity * product.price).toFixed(2)}`, pageWidth - 30, yPos + 7);
@@ -269,20 +281,39 @@ export const diamondTemplate = async (props: TemplateProps) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    doc.text('Privacy Policy', 15, privacyPolicyYPos + 10);
     
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    
-    if (businessDetails?.privacy_policy) {
-      const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 30);
-      let policyYPos = privacyPolicyYPos + 18;
-      for (let i = 0; i < Math.min(policyText.length, 3); i++) {
-        doc.text(policyText[i], 15, policyYPos);
-        policyYPos += 5;
+    if (isEstimate) {
+      doc.text('Terms & Conditions', 15, privacyPolicyYPos + 10);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      
+      if (businessDetails?.terms_and_conditions) {
+        const termsText = doc.splitTextToSize(businessDetails.terms_and_conditions, pageWidth - 30);
+        let termsYPos = privacyPolicyYPos + 18;
+        for (let i = 0; i < Math.min(termsText.length, 3); i++) {
+          doc.text(termsText[i], 15, termsYPos);
+          termsYPos += 5;
+        }
+      } else {
+        doc.text('This estimate is valid for 30 days. Terms and conditions apply.', 15, privacyPolicyYPos + 20);
       }
     } else {
-      doc.text('Your privacy is important to us. We protect your personal information.', 15, privacyPolicyYPos + 20);
+      doc.text('Privacy Policy', 15, privacyPolicyYPos + 10);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      
+      if (businessDetails?.privacy_policy) {
+        const policyText = doc.splitTextToSize(businessDetails.privacy_policy, pageWidth - 30);
+        let policyYPos = privacyPolicyYPos + 18;
+        for (let i = 0; i < Math.min(policyText.length, 3); i++) {
+          doc.text(policyText[i], 15, policyYPos);
+          policyYPos += 5;
+        }
+      } else {
+        doc.text('Your privacy is important to us. We protect your personal information.', 15, privacyPolicyYPos + 20);
+      }
     }
 
     // Add signature on top of privacy policy (positioned on the far right side)
@@ -311,7 +342,7 @@ export const diamondTemplate = async (props: TemplateProps) => {
         let signatureUrl = profile.digital_signature_url;
         
         if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ykjtvqztcatrkinzfpov.supabase.co';
+          const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
           signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
         }
         
@@ -373,4 +404,3 @@ export const diamondTemplate = async (props: TemplateProps) => {
     return doc;
   }
 };
-

@@ -2,37 +2,6 @@
 import { TemplateProps } from '../../invoiceTemplates';
 import { createClassicPDF } from './createClassicPDF';
 import { fetchImageAsBase64 } from './utils/images/conversion';
-import { supabase } from '@/integrations/supabase/client';
-
-// Check if business_files bucket exists and is public
-const checkBusinessFilesBucket = async () => {
-  try {
-    const { data: buckets, error } = await supabase.storage.listBuckets();
-    
-    if (error) {
-      console.error("Error checking buckets:", error);
-      return;
-    }
-    
-    const businessFilesBucket = buckets.find(bucket => bucket.name === 'business_files');
-    
-    if (!businessFilesBucket) {
-      console.error("business_files bucket doesn't exist!");
-      return;
-    }
-    
-    if (!businessFilesBucket.public) {
-      console.error("business_files bucket exists but is not public - images won't be accessible");
-    } else {
-      console.log("business_files bucket is correctly configured as public");
-    }
-  } catch (err) {
-    console.error("Error in bucket check:", err);
-  }
-};
-
-// Run the check when this module is imported
-checkBusinessFilesBucket();
 
 export const classicTemplate = async (props: TemplateProps) => {
   const { businessDetails, profile } = props;
@@ -45,7 +14,15 @@ export const classicTemplate = async (props: TemplateProps) => {
     // Try to fetch signature if available
     if (profile?.digital_signature_url) {
       console.log("Attempting to load signature from:", profile.digital_signature_url);
-      signatureBase64 = await fetchImageAsBase64(profile.digital_signature_url);
+      
+      let signatureUrl = profile.digital_signature_url;
+      
+      if (!signatureUrl.startsWith('http') && !signatureUrl.startsWith('data:')) {
+        const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        signatureUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${signatureUrl}`;
+      }
+      
+      signatureBase64 = await fetchImageAsBase64(signatureUrl);
       console.log("Signature loaded successfully:", signatureBase64 ? "Yes" : "No");
     } else {
       console.log("No signature URL available");
@@ -54,7 +31,15 @@ export const classicTemplate = async (props: TemplateProps) => {
     // Try to fetch logo if available
     if (businessDetails?.business_logo_url) {
       console.log("Attempting to load logo from:", businessDetails.business_logo_url);
-      logoBase64 = await fetchImageAsBase64(businessDetails.business_logo_url);
+      
+      let logoUrl = businessDetails.business_logo_url;
+      
+      if (!logoUrl.startsWith('http') && !logoUrl.startsWith('data:')) {
+        const supabaseUrl = 'https://ykjtvqztcatrkinzfpov.supabase.co';
+        logoUrl = `${supabaseUrl}/storage/v1/object/public/business_files/${logoUrl}`;
+      }
+      
+      logoBase64 = await fetchImageAsBase64(logoUrl);
       console.log("Logo loaded successfully:", logoBase64 ? "Yes" : "No");
     } else {
       console.log("No logo URL available");

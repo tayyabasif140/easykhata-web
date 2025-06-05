@@ -1,24 +1,26 @@
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Switch } from "./ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function AdditionalFeaturesSettings() {
-  const [customColumns, setCustomColumns] = useState<any[]>([]);
+  const [columns, setColumns] = useState<any[]>([]);
   const [newColumnName, setNewColumnName] = useState("");
   const [newColumnType, setNewColumnType] = useState("text");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: existingColumns } = useQuery({
-    queryKey: ['customColumns'],
+  const { data: customColumns } = useQuery({
+    queryKey: ['custom-columns'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
@@ -26,20 +28,23 @@ export function AdditionalFeaturesSettings() {
       const { data, error } = await supabase
         .from('custom_columns')
         .select('*')
-        .eq('user_id', userData.user.id);
+        .eq('user_id', userData.user.id)
+        .eq('is_active', true);
       
       if (error) throw error;
-      return data;
+      return data || [];
     }
   });
 
   useEffect(() => {
-    if (existingColumns) {
-      setCustomColumns(existingColumns);
+    if (customColumns) {
+      setColumns(customColumns);
     }
-  }, [existingColumns]);
+  }, [customColumns]);
 
-  const handleAddColumn = async () => {
+  const handleAddColumn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!newColumnName.trim()) {
       toast({
         title: "Error",
@@ -48,36 +53,43 @@ export function AdditionalFeaturesSettings() {
       });
       return;
     }
-
+    
+    setIsSubmitting(true);
+    
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
+      
+      const { data, error } = await supabase
         .from('custom_columns')
         .insert([{
           user_id: userData.user.id,
           column_name: newColumnName.trim(),
           column_type: newColumnType,
           is_active: true
-        }]);
-
+        }])
+        .select();
+      
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Custom column added successfully",
-      });
-
+      
       setNewColumnName("");
       setNewColumnType("text");
-      queryClient.invalidateQueries({ queryKey: ['customColumns'] });
+      
+      toast({
+        title: "Success",
+        description: "Custom column added successfully"
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['custom-columns'] });
+      setColumns([...columns, data[0]]);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to add custom column",
         variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -85,127 +97,106 @@ export function AdditionalFeaturesSettings() {
     try {
       const { error } = await supabase
         .from('custom_columns')
-        .delete()
+        .update({ is_active: false })
         .eq('id', columnId);
-
+      
       if (error) throw error;
-
+      
       toast({
         title: "Success",
-        description: "Custom column deleted successfully",
+        description: "Custom column removed successfully"
       });
-
-      queryClient.invalidateQueries({ queryKey: ['customColumns'] });
+      
+      queryClient.invalidateQueries({ queryKey: ['custom-columns'] });
+      setColumns(columns.filter(col => col.id !== columnId));
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete custom column",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleToggleColumn = async (columnId: string, isActive: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('custom_columns')
-        .update({ is_active: isActive })
-        .eq('id', columnId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Custom column ${isActive ? 'activated' : 'deactivated'} successfully`,
-      });
-
-      queryClient.invalidateQueries({ queryKey: ['customColumns'] });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update custom column",
+        description: error.message || "Failed to remove custom column",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Additional Features</CardTitle>
-        <CardDescription>
-          Manage custom columns and additional features for your invoices and estimates
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Add New Custom Column */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium">Add Custom Column</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="columnName">Column Name</Label>
-              <Input
-                id="columnName"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                placeholder="Enter column name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="columnType">Column Type</Label>
-              <Select value={newColumnType} onValueChange={setNewColumnType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="boolean">Yes/No</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleAddColumn} className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Column
-              </Button>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Tax Management</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Configure tax rates and payment information for your invoices and estimates.
+          </p>
+          <Button asChild>
+            <Link to="/tax-management">
+              Manage Taxes
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
-        {/* Existing Custom Columns */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium">Existing Custom Columns</h4>
-          {customColumns && customColumns.length > 0 ? (
-            <div className="space-y-3">
-              {customColumns.map((column) => (
-                <div
-                  key={column.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                >
-                  <div className="space-y-1">
-                    <div className="font-medium">{column.column_name}</div>
-                    <div className="text-sm text-gray-500 capitalize">
-                      Type: {column.column_type}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor={`toggle-${column.id}`} className="text-sm">
-                        Active
-                      </Label>
-                      <Switch
-                        id={`toggle-${column.id}`}
-                        checked={column.is_active}
-                        onCheckedChange={(checked) =>
-                          handleToggleColumn(column.id, checked)
-                        }
-                      />
-                    </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Custom Fields</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Add custom fields to your invoices and estimates to track additional information.
+          </p>
+
+          <form onSubmit={handleAddColumn} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Field Name</Label>
+                <Input 
+                  value={newColumnName}
+                  onChange={(e) => setNewColumnName(e.target.value)}
+                  placeholder="e.g., Project ID"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Field Type</Label>
+                <Select value={newColumnType} onValueChange={setNewColumnType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end">
+                <Button type="submit" disabled={isSubmitting} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  {isSubmitting ? "Adding..." : "Add Field"}
+                </Button>
+              </div>
+            </div>
+          </form>
+
+          {columns.length > 0 ? (
+            <div className="border rounded-md">
+              <div className="p-4 bg-gray-50 border-b font-medium flex items-center justify-between">
+                <span>Field Name</span>
+                <span>Type</span>
+              </div>
+              {columns.map((column) => (
+                <div key={column.id} className="p-4 border-b last:border-b-0 flex items-center justify-between">
+                  <span>{column.column_name}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-500 capitalize">{column.column_type}</span>
                     <Button
-                      variant="destructive"
+                      variant="ghost"
                       size="sm"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       onClick={() => handleDeleteColumn(column.id)}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -215,22 +206,12 @@ export function AdditionalFeaturesSettings() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              No custom columns created yet. Add your first custom column above.
+            <div className="text-center p-4 border rounded-md bg-gray-50">
+              <p className="text-gray-500">No custom fields added yet.</p>
             </div>
           )}
-        </div>
-
-        {/* Feature Information */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">About Custom Columns</h4>
-          <p className="text-sm text-blue-700">
-            Custom columns allow you to add additional fields to your invoices and estimates. 
-            These fields will appear in your PDF templates and can be used to track custom 
-            information specific to your business needs.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

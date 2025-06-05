@@ -67,7 +67,17 @@ export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: nu
     const productTotal = productQuantity * productPrice;
     
     doc.text(productName, 10, yPos);
-    doc.text(productDescription, 70, yPos);
+    
+    // Handle description - split into multiple lines if needed
+    if (productDescription) {
+      const descriptionLines = doc.splitTextToSize(productDescription, 60);
+      let descYPos = yPos;
+      for (let j = 0; j < Math.min(descriptionLines.length, 2); j++) {
+        doc.text(descriptionLines[j], 70, descYPos);
+        if (j < descriptionLines.length - 1) descYPos += 5;
+      }
+    }
+    
     doc.text(productQuantity.toString(), pageWidth - 80, yPos);
     doc.text(`${productPrice.toFixed(2)}`, pageWidth - 50, yPos);
     doc.text(`${productTotal.toFixed(2)}`, pageWidth - 25, yPos);
