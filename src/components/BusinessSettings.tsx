@@ -51,6 +51,32 @@ export function BusinessSettings() {
     }
   });
 
+  // Get current user data
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      return userData.user;
+    }
+  });
+
+  // Get current profile for signature
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      if (!currentUser) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentUser
+  });
+
   const updateBusiness = useMutation({
     mutationFn: async (updates: typeof formData) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -84,6 +110,13 @@ export function BusinessSettings() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateBusiness.mutate(formData);
+  };
+
+  const handleSignatureSelect = (signatureUrl: string) => {
+    toast({
+      title: "Success",
+      description: "Digital signature updated successfully",
+    });
   };
 
   if (isLoading) {
@@ -198,7 +231,13 @@ export function BusinessSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SignatureManager />
+          {currentUser && (
+            <SignatureManager 
+              userId={currentUser.id}
+              onSignatureSelect={handleSignatureSelect}
+              defaultSignature={profile?.digital_signature_url}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
