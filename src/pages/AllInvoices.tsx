@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,7 +97,7 @@ const AllInvoices = () => {
     }
   });
 
-  const generateInvoicePDF = async (invoice: any) => {
+  const handleGenerateInvoicePDF = async (invoice: any) => {
     try {
       // Fetch invoice items
       const { data: invoiceItems, error } = await supabase
@@ -507,7 +506,7 @@ const AllInvoices = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => generateInvoicePDF(invoice)}
+                        onClick={() => handleGenerateInvoicePDF(invoice)}
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Download

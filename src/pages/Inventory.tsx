@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import Header from "@/components/Header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -149,7 +150,9 @@ const Inventory = () => {
     <div className="min-h-screen bg-gray-50 overflow-y-auto">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24">
-        <BackButton className="mb-4" />
+        <div className="mb-4">
+          <BackButton />
+        </div>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">Inventory Management</h1>

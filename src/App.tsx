@@ -6,7 +6,7 @@ import Index from "@/pages/Index";
 import Auth from "@/pages/Auth";
 import AllInvoices from "@/pages/AllInvoices";
 import Estimates from "@/pages/Estimates";
-import Customers from "@/pages/Customers";
+import AllCustomers from "@/pages/AllCustomers";
 import CustomerDetails from "@/pages/CustomerDetails";
 import Inventory from "@/pages/Inventory";
 import Reports from "@/pages/Reports";
@@ -60,7 +60,7 @@ function App() {
           />
           <Route
             path="/customers"
-            element={isAuthenticated ? <Customers /> : <Navigate to="/auth" />}
+            element={isAuthenticated ? <AllCustomers /> : <Navigate to="/auth" />}
           />
           <Route
             path="/customers/:id"
