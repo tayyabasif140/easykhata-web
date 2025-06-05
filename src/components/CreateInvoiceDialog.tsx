@@ -45,6 +45,9 @@ export function CreateInvoiceDialog() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Declare taxConfigurations before using it in memoized calculations
+  const taxConfigurations = businessDetails?.tax_configuration || [];
+
   // Memoized calculations
   const subtotal = useMemo(() => 
     products.reduce((sum, product) => sum + (product.quantity * product.price), 0), 
@@ -77,9 +80,6 @@ export function CreateInvoiceDialog() {
       return data;
     }
   });
-
-  // Move taxConfigurations declaration before the memoized calculations
-  const taxConfigurations = businessDetails?.tax_configuration || [];
 
   const { data: customers } = useQuery({
     queryKey: ['customers'],
