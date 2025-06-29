@@ -45,7 +45,22 @@ export function CreateInvoiceDialog() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Declare taxConfigurations before using it in memoized calculations
+  const { data: businessDetails } = useQuery({
+    queryKey: ['businessDetails'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return null;
+      const { data, error } = await supabase
+        .from('business_details')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Now we can safely use businessDetails
   const taxConfigurations = businessDetails?.tax_configuration || [];
 
   // Memoized calculations
@@ -65,21 +80,6 @@ export function CreateInvoiceDialog() {
   }, [products, selectedTaxes, taxConfigurations, subtotal]);
 
   const total = useMemo(() => subtotal + totalTax, [subtotal, totalTax]);
-
-  const { data: businessDetails } = useQuery({
-    queryKey: ['businessDetails'],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return null;
-      const { data, error } = await supabase
-        .from('business_details')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .single();
-      if (error) throw error;
-      return data;
-    }
-  });
 
   const { data: customers } = useQuery({
     queryKey: ['customers'],
