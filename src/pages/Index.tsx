@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -20,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import { CreateInvoiceDialog } from "@/components/CreateInvoiceDialog";
 import { CreateEstimateDialog } from "@/components/CreateEstimateDialog";
-import { SetupWizard } from "@/components/SetupWizard";
+import SetupWizard from "@/components/SetupWizard";
 import { format } from "date-fns";
 
 const Index = () => {
