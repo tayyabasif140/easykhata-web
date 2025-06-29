@@ -9,6 +9,7 @@ import Estimates from "@/pages/Estimates";
 import AllCustomers from "@/pages/AllCustomers";
 import CustomerDetails from "@/pages/CustomerDetails";
 import Inventory from "@/pages/Inventory";
+import Expenses from "@/pages/Expenses";
 import Reports from "@/pages/Reports";
 import Account from "@/pages/Account";
 import TaxManagement from "@/pages/TaxManagement";
@@ -69,6 +70,10 @@ function App() {
           <Route
             path="/inventory"
             element={isAuthenticated ? <Inventory /> : <Navigate to="/auth" />}
+          />
+          <Route
+            path="/expenses"
+            element={isAuthenticated ? <Expenses /> : <Navigate to="/auth" />}
           />
           <Route
             path="/reports"
