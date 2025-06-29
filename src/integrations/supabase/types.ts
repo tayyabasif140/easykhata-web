@@ -13,8 +13,10 @@ export type Database = {
         Row: {
           business_address: string | null
           business_category: string | null
+          business_email: string | null
           business_logo_url: string | null
           business_name: string
+          business_phone: string | null
           created_at: string
           id: string
           invoice_template: string | null
@@ -28,8 +30,10 @@ export type Database = {
         Insert: {
           business_address?: string | null
           business_category?: string | null
+          business_email?: string | null
           business_logo_url?: string | null
           business_name: string
+          business_phone?: string | null
           created_at?: string
           id?: string
           invoice_template?: string | null
@@ -43,8 +47,10 @@ export type Database = {
         Update: {
           business_address?: string | null
           business_category?: string | null
+          business_email?: string | null
           business_logo_url?: string | null
           business_name?: string
+          business_phone?: string | null
           created_at?: string
           id?: string
           invoice_template?: string | null
@@ -376,6 +382,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          phone: string | null
           phone_number: string | null
           updated_at: string
           username: string
@@ -387,6 +394,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          phone?: string | null
           phone_number?: string | null
           updated_at?: string
           username: string
@@ -398,6 +406,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          phone?: string | null
           phone_number?: string | null
           updated_at?: string
           username?: string

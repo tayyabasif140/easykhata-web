@@ -28,8 +28,12 @@ interface Product {
   description?: string;
 }
 
-export function CreateInvoiceDialog() {
-  const [open, setOpen] = useState(false);
+interface CreateInvoiceDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogProps) {
   const [customerId, setCustomerId] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
   const [products, setProducts] = useState<Product[]>([]);
@@ -345,387 +349,262 @@ export function CreateInvoiceDialog() {
   };
 
   return (
-    <>
-      <div className="flex gap-2">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" data-create-invoice>
-              <Plus className="w-4 h-4" />
-              Create Invoice
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Invoice</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <CustomerSelector
-                  value={customerId}
-                  onValueChange={setCustomerId}
-                  required
-                />
-                
-                <div className="space-y-2">
-                  <Label>Due Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dueDate && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dueDate ? format(dueDate, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dueDate}
-                        onSelect={setDueDate}
-                        initialFocus
-                        className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Invoice</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CustomerSelector
+              value={customerId}
+              onValueChange={setCustomerId}
+              required
+            />
+            
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dueDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(dueDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dueDate}
+                    onSelect={setDueDate}
+                    initialFocus
+                    className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Business Logo & Signature</h3>
+              <div className="flex gap-4 items-start">
+                <div className="flex-1">
+                  <Label htmlFor="businessLogo">Business Logo</Label>
+                  {businessDetails?.business_logo_url && (
+                    <div className="mt-2">
+                      <img
+                        src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                        alt="Business Logo"
+                        className="h-20 w-auto object-contain border rounded"
                       />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Custom Fields Section */}
-              {customFields && customFields.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="enable-custom-fields"
-                      checked={enableCustomFields}
-                      onCheckedChange={(checked) => setEnableCustomFields(checked as boolean)}
-                    />
-                    <Label htmlFor="enable-custom-fields">Enable Custom Fields</Label>
-                  </div>
-
-                  {enableCustomFields && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
-                      {customFields.map((field) => (
-                        <div key={field.id}>
-                          <Label htmlFor={field.id}>{field.column_name}</Label>
-                          <Input
-                            id={field.id}
-                            type={field.column_type === 'number' ? 'number' : field.column_type === 'date' ? 'date' : 'text'}
-                            value={customFieldValues[field.id] || ''}
-                            onChange={(e) => setCustomFieldValues(prev => ({
-                              ...prev,
-                              [field.id]: e.target.value
-                            }))}
-                            placeholder={`Enter ${field.column_name.toLowerCase()}`}
-                          />
-                        </div>
-                      ))}
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Tax Selection */}
-              {taxConfigurations.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Apply Taxes</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {taxConfigurations.map((tax) => (
-                      <div key={tax.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`tax-${tax.id}`}
-                          checked={selectedTaxes.includes(tax.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedTaxes(prev => [...prev, tax.id]);
-                            } else {
-                              setSelectedTaxes(prev => prev.filter(id => id !== tax.id));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`tax-${tax.id}`} className="text-sm">
-                          {tax.name} ({tax.rate}%)
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <Label className="text-lg font-semibold">Products/Services</Label>
-                  <Button type="button" onClick={addProduct} size="sm" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Item
-                  </Button>
-                </div>
-
-                {products.map((product, index) => (
-                  <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm">Product/Service Name</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={product.name}
-                            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
-                            placeholder="Enter product name"
-                            required
-                            className="flex-1"
-                          />
-                          <Select onValueChange={(value) => {
-                            if (value === "custom") {
-                              // User wants to add custom product, do nothing special
-                              return;
-                            }
-                            const item = inventory?.find(inv => inv.id === value);
-                            if (item) selectInventoryItem(product.id, item);
-                          }}>
-                            <SelectTrigger className="w-48">
-                              <SelectValue placeholder="Import from Inventory" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="custom">Add Custom Product</SelectItem>
-                              {inventory?.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.product_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm">Description</Label>
-                        <Textarea
-                          value={product.description || ""}
-                          onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
-                          placeholder="Enter description (optional)"
-                          className="min-h-[60px]"
-                        />
-                      </div>
+                <div className="flex-1">
+                  <Label htmlFor="signature">Digital Signature</Label>
+                  {profile?.digital_signature_url && (
+                    <div className="mt-2">
+                      <img
+                        src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${profile.digital_signature_url}`}
+                        alt="Digital Signature"
+                        className="h-20 w-auto object-contain border rounded"
+                      />
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
-                      <div>
-                        <Label className="text-sm">Quantity</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={product.quantity}
-                          onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-sm">Price (Rs.)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={product.price}
-                          onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
-                          required
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <span className="text-sm font-medium">
-                          Total: Rs.{(product.quantity * product.price).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => removeProduct(product.id)}
-                          className="w-full"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Custom Fields</h3>
+              {customFields.map((field) => (
+                <div key={field.id}>
+                  <Label htmlFor={field.id}>{field.column_name}</Label>
+                  <Input
+                    id={field.id}
+                    type={field.column_type === 'number' ? 'number' : 'text'}
+                    value={customFieldValues[field.id] || ''}
+                    onChange={(e) => setCustomFieldValues(prev => ({
+                      ...prev,
+                      [field.id]: e.target.value
+                    }))}
+                    placeholder={`Enter ${field.column_name.toLowerCase()}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tax Selection */}
+          {taxConfigurations.length > 0 && (
+            <div className="space-y-2">
+              <Label>Apply Taxes</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {taxConfigurations.map((tax) => (
+                  <div key={tax.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`tax-${tax.id}`}
+                      checked={selectedTaxes.includes(tax.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedTaxes(prev => [...prev, tax.id]);
+                        } else {
+                          setSelectedTaxes(prev => prev.filter(id => id !== tax.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`tax-${tax.id}`} className="text-sm">
+                      {tax.name} ({tax.rate}%)
+                    </Label>
                   </div>
                 ))}
               </div>
+            </div>
+          )}
 
-              {/* Logo Selection */}
-              <div className="space-y-2">
-                <Label>Business Logo</Label>
-                <div>
-                  {showLogoSelector ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
-                        {businessDetails?.business_logo_url && (
-                          <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
-                               onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
-                            <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
-                              <img
-                                src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
-                                alt="Default logo"
-                                className="h-20 w-auto object-contain"
-                                loading="lazy"
-                              />
-                            </div>
-                            <p className="text-center text-sm">
-                              {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
-                            </p>
-                          </div>
-                        )}
-                        
-                        {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
-                          const logoPath = `${profile?.id}/logo/${logo.name}`;
-                          if (businessDetails?.business_logo_url === logoPath) return null;
-                          
-                          return (
-                            <div 
-                              key={logo.id} 
-                              className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
-                              onClick={() => handleLogoSelect(logoPath)}
-                            >
-                              <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
-                                <img
-                                  src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${logoPath}`}
-                                  alt={`Logo ${logo.name}`}
-                                  className="h-20 w-auto object-contain"
-                                  loading="lazy"
-                                />
-                              </div>
-                              <p className="text-center text-sm">
-                                {selectedLogo === logoPath ? 'Selected' : 'Select'}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      
-                      <Button 
-                        type="button" 
-                        variant="secondary" 
-                        onClick={() => setShowLogoSelector(false)}
-                      >
-                        Done
-                      </Button>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-lg font-semibold">Products/Services</Label>
+              <Button type="button" onClick={addProduct} size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Item
+              </Button>
+            </div>
+
+            {products.map((product, index) => (
+              <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm">Product/Service Name</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={product.name}
+                        onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                        placeholder="Enter product name"
+                        required
+                        className="flex-1"
+                      />
+                      <Select onValueChange={(value) => {
+                        if (value === "custom") {
+                          // User wants to add custom product, do nothing special
+                          return;
+                        }
+                        const item = inventory?.find(inv => inv.id === value);
+                        if (item) selectInventoryItem(product.id, item);
+                      }}>
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Import from Inventory" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">Add Custom Product</SelectItem>
+                          {inventory?.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.product_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : (
-                    <div>
-                      {(selectedLogo || businessDetails?.business_logo_url) ? (
-                        <div className="flex flex-col space-y-2">
-                          <img 
-                            src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
-                            alt="Business logo" 
-                            className="h-20 border border-gray-200 bg-white p-2"
-                            loading="lazy"
-                          />
-                          <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
-                            Change Logo
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
-                          Select Logo
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  </div>
+                  <div>
+                    <Label className="text-sm">Description</Label>
+                    <Textarea
+                      value={product.description || ""}
+                      onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                      placeholder="Enter description (optional)"
+                      className="min-h-[60px]"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                  <div>
+                    <Label className="text-sm">Quantity</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={product.quantity}
+                      onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Price (Rs.)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={product.price}
+                      onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <span className="text-sm font-medium">
+                      Total: Rs.{(product.quantity * product.price).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeProduct(product.id)}
+                      className="w-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Signature section */}
-              {showSignatureCanvas ? (
-                <div className="space-y-4">
-                  <Label>Signature</Label>
-                  {profile?.id && (
-                    <SignatureManager
-                      userId={profile.id}
-                      onSignatureSelect={handleSignatureSelect}
-                      defaultSignature={selectedSignature || profile?.digital_signature_url}
-                    />
-                  )}
-                  <Button 
-                    type="button" 
-                    variant="secondary" 
-                    onClick={() => setShowSignatureCanvas(false)}
-                  >
-                    Done
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Signature</Label>
-                  <div>
-                    {(selectedSignature || profile?.digital_signature_url) ? (
-                      <div className="flex flex-col space-y-2">
-                        <img 
-                          src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
-                          alt="Your signature" 
-                          className="h-20 border border-gray-200 bg-white p-2"
-                          loading="lazy"
-                        />
-                        <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
-                          Change Signature
-                        </Button>
+          <div className="border-t pt-4">
+            <div className="space-y-2 text-right">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>Rs.{subtotal.toFixed(2)}</span>
+              </div>
+              {selectedTaxes.length > 0 && (
+                <div className="space-y-1">
+                  {selectedTaxes.map(taxId => {
+                    const tax = taxConfigurations.find(t => t.id === taxId);
+                    if (!tax) return null;
+                    const taxAmount = subtotal * (tax.rate / 100);
+                    return (
+                      <div key={taxId} className="flex justify-between text-sm">
+                        <span>{tax.name} ({tax.rate}%):</span>
+                        <span>Rs.{taxAmount.toFixed(2)}</span>
                       </div>
-                    ) : (
-                      <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
-                        Add Your Signature
-                      </Button>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
-
-              <div className="border-t pt-4">
-                <div className="space-y-2 text-right">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>Rs.{subtotal.toFixed(2)}</span>
-                  </div>
-                  {selectedTaxes.length > 0 && (
-                    <div className="space-y-1">
-                      {selectedTaxes.map(taxId => {
-                        const tax = taxConfigurations.find(t => t.id === taxId);
-                        if (!tax) return null;
-                        const taxAmount = subtotal * (tax.rate / 100);
-                        return (
-                          <div key={taxId} className="flex justify-between text-sm">
-                            <span>{tax.name} ({tax.rate}%):</span>
-                            <span>Rs.{taxAmount.toFixed(2)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="flex justify-between text-lg font-bold border-t pt-2">
-                    <span>Total:</span>
-                    <span>Rs.{total.toFixed(2)}</span>
-                  </div>
-                </div>
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
+                <span>Total:</span>
+                <span>Rs.{total.toFixed(2)}</span>
               </div>
+            </div>
+          </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating..." : "Create Invoice"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-        
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/invoices')}
-        >
-          View All
-        </Button>
-      </div>
-    </>
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Invoice"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

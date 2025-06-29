@@ -3,87 +3,67 @@ import jsPDF from 'jspdf';
 import { TemplateProps } from '../../../invoiceTemplates';
 
 export const renderProductsTable = (doc: jsPDF, props: TemplateProps, startY: number): number => {
-  const { products } = props;
-  const pageWidth = doc.internal.pageSize.width;
-  const pageHeight = doc.internal.pageSize.height;
-  let yPos = startY;
-  let currentPage = 1;
+  const { products, isEstimate } = props;
+  
+  let yPos = startY + 10;
   
   // Table header
-  doc.setFont('helvetica', 'bold');
-  doc.text('Item', 10, yPos);
-  doc.text('Description', 70, yPos);
-  doc.text('Qty', pageWidth - 80, yPos);
-  doc.text('Price', pageWidth - 50, yPos);
-  doc.text('Total', pageWidth - 25, yPos);
-  yPos += 5;
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Item", 20, yPos);
+  doc.text("Description", 70, yPos);
+  doc.text("Qty", 130, yPos);
+  doc.text("Price", 150, yPos);
+  doc.text("Total", 170, yPos);
   
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.2);
-  doc.line(10, yPos, pageWidth - 10, yPos);
+  // Header line
+  doc.line(20, yPos + 2, 190, yPos + 2);
+  
   yPos += 10;
+  doc.setFont("helvetica", "normal");
   
-  // Table items
-  doc.setFont('helvetica', 'normal');
-  
-  const startNewPage = () => {
-    doc.addPage();
-    currentPage++;
-    yPos = 20;
+  // Products
+  products.forEach((product) => {
+    // Check if we need a new page
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
     
-    // Add header for new page
-    doc.setFont('helvetica', 'bold');
-    doc.text('Item', 10, yPos);
-    doc.text('Description', 70, yPos);
-    doc.text('Qty', pageWidth - 80, yPos);
-    doc.text('Price', pageWidth - 50, yPos);
-    doc.text('Total', pageWidth - 25, yPos);
+    doc.text(product.name, 20, yPos);
+    
+    // Add description if available
+    if (product.description) {
+      doc.setFontSize(9);
+      doc.text(product.description, 70, yPos);
+      doc.setFontSize(12);
+    }
+    
+    doc.text(product.quantity.toString(), 130, yPos);
+    doc.text(`Rs.${product.price.toFixed(2)}`, 150, yPos);
+    doc.text(`Rs.${(product.quantity * product.price).toFixed(2)}`, 170, yPos);
+    
+    yPos += 10;
+  });
+  
+  // Add custom fields if they exist
+  if (props.customFields && Object.keys(props.customFields).length > 0) {
     yPos += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text("Additional Information:", 20, yPos);
+    yPos += 8;
+    doc.setFont("helvetica", "normal");
     
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.2);
-    doc.line(10, yPos, pageWidth - 10, yPos);
-    yPos += 10;
-    
-    doc.setFont('helvetica', 'normal');
-  };
-  
-  // Ensure products is an array
-  const safeProducts = Array.isArray(products) ? products : [];
-  
-  for (let i = 0; i < safeProducts.length; i++) {
-    const product = safeProducts[i];
-    
-    // Check if we need to start a new page
-    if (yPos > pageHeight - 60) {
-      startNewPage();
-    }
-    
-    // Ensure product data is valid
-    const productName = product?.name || 'Unknown Product';
-    const productDescription = product?.description || '';
-    const productQuantity = isNaN(product?.quantity) ? 0 : product.quantity;
-    const productPrice = isNaN(product?.price) ? 0 : product.price;
-    const productTotal = productQuantity * productPrice;
-    
-    doc.text(productName, 10, yPos);
-    
-    // Handle description - split into multiple lines if needed
-    if (productDescription) {
-      const descriptionLines = doc.splitTextToSize(productDescription, 60);
-      let descYPos = yPos;
-      for (let j = 0; j < Math.min(descriptionLines.length, 2); j++) {
-        doc.text(descriptionLines[j], 70, descYPos);
-        if (j < descriptionLines.length - 1) descYPos += 5;
+    Object.entries(props.customFields).forEach(([key, value]) => {
+      if (value) {
+        doc.text(`${key}: ${value}`, 20, yPos);
+        yPos += 6;
       }
-    }
-    
-    doc.text(productQuantity.toString(), pageWidth - 80, yPos);
-    doc.text(`${productPrice.toFixed(2)}`, pageWidth - 50, yPos);
-    doc.text(`${productTotal.toFixed(2)}`, pageWidth - 25, yPos);
-    
-    yPos += 10;
+    });
   }
   
-  return yPos;
+  // Bottom line
+  doc.line(20, yPos, 190, yPos);
+  
+  return yPos + 5;
 };
