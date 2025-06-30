@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,17 +25,21 @@ interface CustomFieldValues {
 }
 
 interface CreateEstimateDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialogProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialogProps = {}) {
+  const [isOpen, setIsOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([{ id: "1", name: "", quantity: 1, price: 0 }]);
   const [description, setDescription] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValues>({});
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const dialogOpen = open !== undefined ? open : isOpen;
+  const setDialogOpen = onOpenChange || setIsOpen;
 
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
@@ -147,7 +151,7 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
 
       if (error) throw error;
 
-      // Insert invoice items
+      // Insert estimate items
       await Promise.all(
         products.map(async (product) => {
           const { error: itemError } = await supabase
@@ -213,7 +217,7 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
 
         if (uploadError) throw uploadError;
 
-        // Update invoice with PDF URL
+        // Update estimate with PDF URL
         const { error: updateError } = await supabase
           .from('estimates')
           .update({ pdf_url: filePath })
@@ -233,7 +237,7 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
         });
       }
 
-      onOpenChange(false);
+      setDialogOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -249,8 +253,15 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
     await createEstimate.mutateAsync();
   };
 
+  const DialogComponent = open !== undefined ? Dialog : DialogTrigger;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {open === undefined && (
+        <DialogTrigger asChild>
+          <Button>Create New Estimate</Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Estimate</DialogTitle>
@@ -260,8 +271,7 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
           <div>
             <Label htmlFor="customer">Select Customer</Label>
             <CustomerSelector
-              id="customer"
-              value={selectedCustomer}
+              value={selectedCustomer || ""}
               onValueChange={setSelectedCustomer}
             />
           </div>
@@ -391,8 +401,8 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
             <p className="text-2xl font-bold">Total: Rs.{calculateTotal.toFixed(2)}</p>
           </div>
 
-          <Button type="submit" disabled={createEstimate.isLoading}>
-            {createEstimate.isLoading ? "Creating..." : "Create Estimate"}
+          <Button type="submit" disabled={createEstimate.isPending}>
+            {createEstimate.isPending ? "Creating..." : "Create Estimate"}
           </Button>
         </form>
       </DialogContent>

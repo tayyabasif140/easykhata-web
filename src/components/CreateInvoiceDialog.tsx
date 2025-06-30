@@ -29,11 +29,12 @@ interface Product {
 }
 
 interface CreateInvoiceDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogProps) {
+export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogProps = {}) {
+  const [isOpen, setIsOpen] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [dueDate, setDueDate] = useState<Date>();
   const [products, setProducts] = useState<Product[]>([]);
@@ -48,6 +49,9 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  const dialogOpen = open !== undefined ? open : isOpen;
+  const setDialogOpen = onOpenChange || setIsOpen;
 
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
@@ -324,7 +328,7 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
       });
 
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      setOpen(false);
+      setDialogOpen(false);
       
       // Reset form
       setCustomerId("");
@@ -349,7 +353,12 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {open === undefined && (
+        <DialogTrigger asChild>
+          <Button>Create Invoice</Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
@@ -424,7 +433,7 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Custom Fields</h3>
-              {customFields.map((field) => (
+              {customFields?.map((field) => (
                 <div key={field.id}>
                   <Label htmlFor={field.id}>{field.column_name}</Label>
                   <Input
@@ -596,7 +605,7 @@ export function CreateInvoiceDialog({ open, onOpenChange }: CreateInvoiceDialogP
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>

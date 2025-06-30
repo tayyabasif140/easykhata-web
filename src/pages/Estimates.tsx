@@ -15,6 +15,7 @@ import { BackButton } from "@/components/BackButton";
 
 const Estimates = () => {
   const [editEstimateId, setEditEstimateId] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -190,7 +191,10 @@ const Estimates = () => {
             <BackButton />
             <h1 className="text-3xl font-bold text-gray-900">Estimates</h1>
           </div>
-          <CreateEstimateDialog />
+          <CreateEstimateDialog 
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+          />
         </div>
 
         <div className="grid gap-6">
@@ -259,7 +263,10 @@ const Estimates = () => {
             <Card>
               <CardContent className="text-center py-12">
                 <p className="text-gray-500 mb-4">No estimates found</p>
-                <CreateEstimateDialog />
+                <CreateEstimateDialog 
+                  open={showCreateDialog}
+                  onOpenChange={setShowCreateDialog}
+                />
               </CardContent>
             </Card>
           )}

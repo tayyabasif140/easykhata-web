@@ -28,6 +28,7 @@ const AllInvoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -320,7 +321,10 @@ const AllInvoices = () => {
             <BackButton />
             <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
           </div>
-          <CreateInvoiceDialog />
+          <CreateInvoiceDialog 
+            open={showCreateDialog} 
+            onOpenChange={setShowCreateDialog} 
+          />
         </div>
 
         {/* Filters Section */}
@@ -557,7 +561,10 @@ const AllInvoices = () => {
             <Card>
               <CardContent className="text-center py-12">
                 <p className="text-gray-500 mb-4">No invoices found</p>
-                <CreateInvoiceDialog />
+                <CreateInvoiceDialog 
+                  open={showCreateDialog} 
+                  onOpenChange={setShowCreateDialog} 
+                />
               </CardContent>
             </Card>
           )}
