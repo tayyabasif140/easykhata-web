@@ -1,16 +1,23 @@
+
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { CustomerSelector } from "./CustomerSelector";
-import { Trash2, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Textarea } from "./ui/textarea";
 import { generateInvoicePDF } from "@/utils/invoiceTemplates";
+import { SignatureManager } from "./SignatureManager";
+import { useNavigate } from "react-router-dom";
 
 interface Product {
   id: string;
@@ -20,26 +27,66 @@ interface Product {
   description?: string;
 }
 
-interface CustomFieldValues {
-  [key: string]: string;
-}
-
-interface CreateEstimateDialogProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
-
-export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialogProps = {}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([{ id: "1", name: "", quantity: 1, price: 0 }]);
-  const [description, setDescription] = useState("");
-  const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValues>({});
+export function CreateEstimateDialog() {
+  const [open, setOpen] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [validUntil, setValidUntil] = useState<Date>();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedSignature, setSelectedSignature] = useState<string>('');
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string>('');
+  const [showLogoSelector, setShowLogoSelector] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  const dialogOpen = open !== undefined ? open : isOpen;
-  const setDialogOpen = onOpenChange || setIsOpen;
+  // Memoized calculations
+  const subtotal = useMemo(() => 
+    products.reduce((sum, product) => sum + (product.quantity * product.price), 0), 
+    [products]
+  );
+
+  const totalTax = useMemo(() => {
+    return products.reduce((sum, product) => {
+      const productTotal = product.quantity * product.price;
+      return sum + (productTotal * 0.17); // 17% tax
+    }, 0);
+  }, [products]);
+
+  const total = useMemo(() => subtotal + totalTax, [subtotal, totalTax]);
+
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: inventory } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+      
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('user_id', userData.user.id);
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const { data: businessDetails } = useQuery({
     queryKey: ['businessDetails'],
@@ -53,14 +100,14 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
         .single();
       if (error) throw error;
       return data;
-    },
+    }
   });
 
   const { data: profile } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return null;
+      if (!userData.user) throw new Error('Not authenticated');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -68,344 +115,514 @@ export function CreateEstimateDialog({ open, onOpenChange }: CreateEstimateDialo
         .single();
       if (error) throw error;
       return data;
-    },
+    }
   });
 
-  const { data: customFields } = useQuery({
-    queryKey: ['customFields'],
+  const { data: logos } = useQuery({
+    queryKey: ['logos', profile?.id],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return null;
-      const { data, error } = await supabase
-        .from('custom_columns')
-        .select('*')
-        .eq('user_id', userData.user.id)
-        .eq('is_active', true);
-      if (error) throw error;
-      return data;
+      if (!profile?.id) return [];
+      try {
+        const { data, error } = await supabase.storage
+          .from('business_files')
+          .list(`${profile.id}/logo`, {
+            sortBy: { column: 'name', order: 'desc' }
+          });
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching logos:", error);
+        return [];
+      }
     },
+    enabled: !!profile?.id
   });
 
   const addProduct = () => {
-    setProducts([...products, { id: Date.now().toString(), name: "", quantity: 1, price: 0 }]);
-  };
-
-  const updateProduct = (id: string, field: string, value: any) => {
-    setProducts(
-      products.map((product) =>
-        product.id === id ? { ...product, [field]: value } : product
-      )
-    );
+    setProducts([...products, { 
+      id: Date.now().toString(), 
+      name: "", 
+      quantity: 1, 
+      price: 0,
+      description: ""
+    }]);
   };
 
   const removeProduct = (id: string) => {
-    setProducts(products.filter((product) => product.id !== id));
+    setProducts(products.filter(p => p.id !== id));
   };
 
-  const calculateSubtotal = useMemo(() => {
-    return products.reduce((acc, product) => acc + product.quantity * product.price, 0);
-  }, [products]);
+  const updateProduct = (id: string, field: keyof Product, value: string | number) => {
+    setProducts(products.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ));
+  };
 
-  const calculateTax = useMemo(() => {
-    if (!businessDetails?.tax_configuration || businessDetails.tax_configuration.length === 0) return 0;
+  const selectInventoryItem = (id: string, inventoryItem: any) => {
+    setProducts(products.map(p => 
+      p.id === id ? { 
+        ...p, 
+        name: inventoryItem.product_name,
+        price: inventoryItem.price,
+        description: inventoryItem.description || ""
+      } : p
+    ));
+  };
 
-    let taxAmount = 0;
-    businessDetails.tax_configuration.forEach((tax) => {
-      if (tax.enabled) {
-        taxAmount += calculateSubtotal * (tax.rate / 100);
-      }
-    });
-    return taxAmount;
-  }, [calculateSubtotal, businessDetails]);
+  const handleSignatureSelect = (signatureUrl: string) => {
+    setSelectedSignature(signatureUrl);
+    setShowSignatureCanvas(false);
+  };
 
-  const calculateTotal = useMemo(() => {
-    return calculateSubtotal + calculateTax;
-  }, [calculateSubtotal, calculateTax]);
+  const handleLogoSelect = (logoUrl: string) => {
+    setSelectedLogo(logoUrl);
+    setShowLogoSelector(false);
+  };
 
-  const createEstimate = useMutation({
-    mutationFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', selectedCustomer)
-        .single();
-
-      if (customerError) throw customerError;
-
-      const { data, error } = await supabase
-        .from('estimates')
-        .insert([
-          {
-            user_id: userData.user.id,
-            customer_id: selectedCustomer,
-            total_amount: calculateTotal,
-            tax_amount: calculateTax,
-            status: 'draft',
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Insert estimate items
-      await Promise.all(
-        products.map(async (product) => {
-          const { error: itemError } = await supabase
-            .from('estimate_items')
-            .insert([
-              {
-                estimate_id: data.id,
-                product_name: product.name,
-                quantity: product.quantity,
-                price: product.price,
-                total: product.quantity * product.price,
-                description: product.description,
-              },
-            ]);
-          if (itemError) throw itemError;
-        })
-      );
-
-      return { ...data, customer: customerData };
-    },
-    onSuccess: async (newEstimate) => {
-      queryClient.invalidateQueries({ queryKey: ['estimates'] });
-
-      // Generate PDF
-      try {
-        const pdf = await generateInvoicePDF('classic', {
-          customerName: newEstimate.customer.name,
-          companyName: businessDetails?.business_name || '',
-          phone: newEstimate.customer.phone || '',
-          email: newEstimate.customer.email || '',
-          products: products.map((product) => ({
-            name: product.name,
-            quantity: product.quantity,
-            price: product.price,
-            description: product.description,
-          })),
-          subtotal: calculateSubtotal,
-          tax: calculateTax,
-          total: calculateTotal,
-          businessDetails: businessDetails,
-          profile: profile,
-          isEstimate: true,
-          customFields: customFields?.reduce((obj: any, field) => {
-            obj[field.column_name] = customFieldValues[field.id] || '';
-            return obj;
-          }, {}),
-        });
-
-        const pdfBlob = pdf.output('blob');
-        const pdfFile = new File([pdfBlob], `estimate-${newEstimate.id}.pdf`, { type: 'application/pdf' });
-
-        // Upload PDF to Supabase storage
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) throw new Error('Not authenticated');
-
-        const filePath = `${userData.user.id}/estimates/${pdfFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('business_files')
-          .upload(filePath, pdfFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Update estimate with PDF URL
-        const { error: updateError } = await supabase
-          .from('estimates')
-          .update({ pdf_url: filePath })
-          .eq('id', newEstimate.id);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: "Success",
-          description: "Estimate created and PDF generated successfully",
-        });
-      } catch (pdfError: any) {
-        toast({
-          title: "Error",
-          description: pdfError.message,
-          variant: "destructive",
-        });
-      }
-
-      setDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+  const generatePDF = async () => {
+    try {
+      const template = businessDetails?.invoice_template || 'classic';
+      
+      const estimateData = {
+        customerName: customers?.find(c => c.id === customerId)?.name || 'Customer',
+        companyName: customers?.find(c => c.id === customerId)?.company || '',
+        phone: customers?.find(c => c.id === customerId)?.phone || '',
+        email: customers?.find(c => c.id === customerId)?.email || '',
+        products,
+        subtotal,
+        tax: totalTax,
+        total,
+        dueDate: validUntil,
+        businessDetails: {
+          ...businessDetails,
+          business_logo_url: selectedLogo || businessDetails?.business_logo_url
+        },
+        profile: {
+          ...profile,
+          digital_signature_url: selectedSignature || profile?.digital_signature_url
+        },
+        logoBase64: null,
+        signatureBase64: null,
+        isEstimate: true
+      };
+      
+      return await generateInvoicePDF(template, estimateData);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createEstimate.mutateAsync();
+    
+    if (!customerId || products.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select a customer and add at least one product",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    // Show immediate notification
+    toast({
+      title: "Creating estimate...",
+      description: "Your estimate is being generated",
+    });
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      // Create estimate
+      const { data: estimate, error: estimateError } = await supabase
+        .from('estimates')
+        .insert([{
+          customer_id: customerId,
+          total_amount: subtotal,
+          tax_amount: totalTax,
+          valid_until: validUntil?.toISOString().split('T')[0],
+          user_id: userData.user.id,
+          status: 'draft'
+        }])
+        .select()
+        .single();
+
+      if (estimateError) throw estimateError;
+
+      // Create estimate items
+      const estimateItems = products.map(product => ({
+        estimate_id: estimate.id,
+        product_name: product.name,
+        description: product.description || null,
+        quantity: product.quantity,
+        price: product.price,
+        total: product.quantity * product.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('estimate_items')
+        .insert(estimateItems);
+
+      if (itemsError) throw itemsError;
+
+      // Generate and download PDF with template
+      const doc = await generatePDF();
+      if (doc) {
+        const fileName = `estimate_${estimate.id}.pdf`;
+        doc.save(fileName);
+      }
+
+      toast({
+        title: "Success",
+        description: "Estimate created successfully!",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['estimates'] });
+      setOpen(false);
+      
+      // Reset form
+      setCustomerId("");
+      setValidUntil(undefined);
+      setProducts([]);
+      setSelectedSignature("");
+      setSelectedLogo("");
+
+    } catch (error: any) {
+      console.error('Error creating estimate:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create estimate",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const DialogComponent = open !== undefined ? Dialog : DialogTrigger;
-
   return (
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      {open === undefined && (
-        <DialogTrigger asChild>
-          <Button>Create New Estimate</Button>
-        </DialogTrigger>
-      )}
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New Estimate</DialogTitle>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <Label htmlFor="customer">Select Customer</Label>
-            <CustomerSelector
-              value={selectedCustomer || ""}
-              onValueChange={setSelectedCustomer}
-            />
-          </div>
+    <>
+      <div className="flex gap-2">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 w-full sm:w-auto" data-create-estimate>
+              <Plus className="w-4 h-4" />
+              Create Estimate
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Estimate</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Customer</Label>
+                  <Select value={customerId} onValueChange={setCustomerId} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers?.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} {customer.company ? `(${customer.company})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Valid Until</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !validUntil && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {validUntil ? format(validUntil, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={validUntil}
+                        onSelect={setValidUntil}
+                        initialFocus
+                        className="p-3 pointer-events-auto rounded-xl border-2 border-primary/20 shadow-lg"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Products</h3>
-            {products.map((product) => (
-              <div key={product.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                <div>
-                  <Label htmlFor={`name-${product.id}`}>Name</Label>
-                  <Input
-                    type="text"
-                    id={`name-${product.id}`}
-                    value={product.name}
-                    onChange={(e) => updateProduct(product.id, "name", e.target.value)}
-                    placeholder="Product Name"
-                  />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-lg font-semibold">Products/Services</Label>
+                  <Button type="button" onClick={addProduct} size="sm" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Item
+                  </Button>
                 </div>
+
+                {products.map((product, index) => (
+                  <div key={product.id} className="grid grid-cols-1 gap-4 p-4 border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm">Product/Service Name</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={product.name}
+                            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                            placeholder="Enter product name"
+                            required
+                            className="flex-1"
+                          />
+                          <Select onValueChange={(value) => {
+                            if (value === "custom") {
+                              // User wants to add custom product, do nothing special
+                              return;
+                            }
+                            const item = inventory?.find(inv => inv.id === value);
+                            if (item) selectInventoryItem(product.id, item);
+                          }}>
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Import from Inventory" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="custom">Add Custom Product</SelectItem>
+                              {inventory?.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.product_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Description</Label>
+                        <Textarea
+                          value={product.description || ""}
+                          onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                          placeholder="Enter description (optional)"
+                          className="min-h-[60px]"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                      <div>
+                        <Label className="text-sm">Quantity</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={product.quantity}
+                          onChange={(e) => updateProduct(product.id, 'quantity', parseInt(e.target.value) || 1)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm">Price (Rs.)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={product.price}
+                          onChange={(e) => updateProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                          required
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <span className="text-sm font-medium">
+                          Total: Rs.{(product.quantity * product.price).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeProduct(product.id)}
+                          className="w-full"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Logo Selection */}
+              <div className="space-y-2">
+                <Label>Business Logo</Label>
                 <div>
-                  <Label htmlFor={`quantity-${product.id}`}>Quantity</Label>
-                  <Input
-                    type="number"
-                    id={`quantity-${product.id}`}
-                    value={product.quantity}
-                    onChange={(e) => updateProduct(product.id, "quantity", parseInt(e.target.value))}
-                    placeholder="Quantity"
-                  />
+                  {showLogoSelector ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                        {businessDetails?.business_logo_url && (
+                          <div className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                               onClick={() => handleLogoSelect(businessDetails.business_logo_url)}>
+                            <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                              <img
+                                src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
+                                alt="Default logo"
+                                className="h-20 w-auto object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                            <p className="text-center text-sm">
+                              {selectedLogo === businessDetails.business_logo_url || (!selectedLogo && businessDetails.business_logo_url) ? 'Selected' : 'Select'}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {logos?.filter(logo => logo.name.includes('logo')).map((logo) => {
+                          const logoPath = `${profile?.id}/logo/${logo.name}`;
+                          if (businessDetails?.business_logo_url === logoPath) return null;
+                          
+                          return (
+                            <div 
+                              key={logo.id} 
+                              className={`border rounded-lg p-4 cursor-pointer ${selectedLogo === logoPath ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'}`}
+                              onClick={() => handleLogoSelect(logoPath)}
+                            >
+                              <div className="relative mb-2 bg-white h-24 flex items-center justify-center">
+                                <img
+                                  src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${logoPath}`}
+                                  alt={`Logo ${logo.name}`}
+                                  className="h-20 w-auto object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <p className="text-center text-sm">
+                                {selectedLogo === logoPath ? 'Selected' : 'Select'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        onClick={() => setShowLogoSelector(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      {(selectedLogo || businessDetails?.business_logo_url) ? (
+                        <div className="flex flex-col space-y-2">
+                          <img 
+                            src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedLogo || businessDetails?.business_logo_url}`} 
+                            alt="Business logo" 
+                            className="h-20 border border-gray-200 bg-white p-2"
+                            loading="lazy"
+                          />
+                          <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                            Change Logo
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button type="button" variant="outline" onClick={() => setShowLogoSelector(true)}>
+                          Select Logo
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label htmlFor={`price-${product.id}`}>Price</Label>
-                  <Input
-                    type="number"
-                    id={`price-${product.id}`}
-                    value={product.price}
-                    onChange={(e) => updateProduct(product.id, "price", parseFloat(e.target.value))}
-                    placeholder="Price"
-                  />
+              </div>
+
+              {/* Signature section */}
+              {showSignatureCanvas ? (
+                <div className="space-y-4">
+                  <Label>Signature</Label>
+                  {profile?.id && (
+                    <SignatureManager
+                      userId={profile.id}
+                      onSignatureSelect={handleSignatureSelect}
+                      defaultSignature={selectedSignature || profile?.digital_signature_url}
+                    />
+                  )}
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={() => setShowSignatureCanvas(false)}
+                  >
+                    Done
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor={`description-${product.id}`}>Description</Label>
-                  <Textarea
-                    id={`description-${product.id}`}
-                    value={product.description}
-                    onChange={(e) => updateProduct(product.id, "description", e.target.value)}
-                    placeholder="Description"
-                  />
+              ) : (
+                <div className="space-y-2">
+                  <Label>Signature</Label>
+                  <div>
+                    {(selectedSignature || profile?.digital_signature_url) ? (
+                      <div className="flex flex-col space-y-2">
+                        <img 
+                          src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${selectedSignature || profile?.digital_signature_url}`} 
+                          alt="Your signature" 
+                          className="h-20 border border-gray-200 bg-white p-2"
+                          loading="lazy"
+                        />
+                        <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                          Change Signature
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" onClick={() => setShowSignatureCanvas(true)}>
+                        Add Your Signature
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => removeProduct(product.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
+              )}
+
+              <div className="border-t pt-4">
+                <div className="space-y-2 text-right">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>Rs.{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax (17%):</span>
+                    <span>Rs.{totalTax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                    <span>Total:</span>
+                    <span>Rs.{total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Estimate"}
                 </Button>
               </div>
-            ))}
-            <Button type="button" onClick={addProduct}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </Button>
-          </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Business Logo & Signature</h3>
-              <div className="flex gap-4 items-start">
-                <div className="flex-1">
-                  <Label htmlFor="businessLogo">Business Logo</Label>
-                  {businessDetails?.business_logo_url && (
-                    <div className="mt-2">
-                      <img
-                        src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${businessDetails.business_logo_url}`}
-                        alt="Business Logo"
-                        className="h-20 w-auto object-contain border rounded"
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <Label htmlFor="signature">Digital Signature</Label>
-                  {profile?.digital_signature_url && (
-                    <div className="mt-2">
-                      <img
-                        src={`https://ykjtvqztcatrkinzfpov.supabase.co/storage/v1/object/public/business_files/${profile.digital_signature_url}`}
-                        alt="Digital Signature"
-                        className="h-20 w-auto object-contain border rounded"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Custom Fields</h3>
-              {customFields?.map((field) => (
-                <div key={field.id}>
-                  <Label htmlFor={field.id}>{field.column_name}</Label>
-                  <Input
-                    id={field.id}
-                    type={field.column_type === 'number' ? 'number' : 'text'}
-                    value={customFieldValues[field.id] || ''}
-                    onChange={(e) => setCustomFieldValues(prev => ({
-                      ...prev,
-                      [field.id]: e.target.value
-                    }))}
-                    placeholder={`Enter ${field.column_name.toLowerCase()}`}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description"
-            />
-          </div>
-
-          <div className="text-right">
-            <p className="text-lg font-semibold">Subtotal: Rs.{calculateSubtotal.toFixed(2)}</p>
-            <p className="text-lg font-semibold">Tax: Rs.{calculateTax.toFixed(2)}</p>
-            <p className="text-2xl font-bold">Total: Rs.{calculateTotal.toFixed(2)}</p>
-          </div>
-
-          <Button type="submit" disabled={createEstimate.isPending}>
-            {createEstimate.isPending ? "Creating..." : "Create Estimate"}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/estimates')}
+        >
+          View All
+        </Button>
+      </div>
+    </>
   );
 }

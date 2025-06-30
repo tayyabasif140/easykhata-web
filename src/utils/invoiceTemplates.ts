@@ -24,7 +24,6 @@ export interface TemplateProps {
   signatureBase64?: string | null;
   logoBase64?: string | null;
   isEstimate?: boolean;
-  customFields?: { [key: string]: string };
 }
 
 export interface InvoiceData extends TemplateProps {}
